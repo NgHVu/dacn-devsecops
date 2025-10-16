@@ -1,25 +1,31 @@
 # Bắt đầu từ image Jenkins chính thức với JDK 17
 FROM jenkins/jenkins:lts-jdk17
 
-# Chuyển sang user root để có quyền cài đặt
+# Chuyển sang user root để cài đặt
 USER root
 
-# Cài đặt tất cả các công cụ cần thiết trong một layer duy nhất để tối ưu hóa
+# Cài đặt các công cụ cơ bản và các gói phụ thuộc cho Python
 RUN apt-get update && apt-get install -y \
-    # --- Công cụ cơ bản ---
     git \
     curl \
     unzip \
-    # --- Môi trường Python ---
-    python3 \
-    python3-venv \
-    python3-pip \
-    # --- Các gói phụ thuộc để cài Docker CLI ---
     ca-certificates \
     gnupg \
+    software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
-# Cài đặt Docker CLI (để Jenkins có thể gọi lệnh 'docker')
+# Thêm PPA deadsnakes để cài đặt các phiên bản Python cũ hơn
+RUN add-apt-repository ppa:deadsnakes/ppa -y
+
+# Cài đặt Python 3.11 và các công cụ cần thiết để build C extensions
+RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3.11-venv \
+    python3.11-dev \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Cài đặt Docker CLI
 RUN install -m 0755 -d /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
     chmod a+r /etc/apt/keyrings/docker.gpg && \
@@ -29,8 +35,8 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
       tee /etc/apt/sources.list.d/docker.list > /dev/null && \
     apt-get update && apt-get install -y docker-ce-cli
 
-# Cài đặt Trivy (công cụ quét bảo mật)
+# Cài đặt Trivy
 RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
-# Chuyển về lại user jenkins để đảm bảo an toàn khi vận hành
+# Chuyển về lại user jenkins
 USER jenkins

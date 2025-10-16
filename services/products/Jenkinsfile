@@ -65,11 +65,10 @@ pipeline {
 
         stage('2. Unit Test') {
             steps {
-                // Thêm dir() ở đây
                 dir('services/products') {
                     echo '--> Tạo virtualenv và chạy pytest...'
                     sh '''
-                        python3 -m venv ${VENV_DIR}
+                        python3.11 -m venv ${VENV_DIR}  // <-- THAY ĐỔI Ở ĐÂY
                         . ${VENV_DIR}/bin/activate
                         python -m pip install --upgrade pip
                         pip install -r requirements.txt
@@ -77,6 +76,7 @@ pipeline {
                     '''
                 }
             }
+        }
         }
 
         // ========================================================
