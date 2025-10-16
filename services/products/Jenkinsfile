@@ -1,39 +1,25 @@
 pipeline {
-    // ============================================================
-    // ⚙️ Agent & Options
-    // ============================================================
     agent any
+
+    // SỬA LỖI CÚ PHÁP: Chuyển timestamps() và ansiColor() vào đây
     options {
-        timestamps()                       // Thêm timestamp vào log
-        ansiColor('xterm')                 // Màu sắc log dễ đọc
-        timeout(time: 30, unit: 'MINUTES') // Chặn treo pipeline quá lâu
-        buildDiscarder(logRotator(numToKeepStr: '15')) // Giữ lại 15 bản build gần nhất
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        disableConcurrentBuilds()
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+        ansiColor('xterm')
     }
+    
+    // Khối wrappers không còn cần thiết nữa
+    // wrappers { ... }
 
-    // ============================================================
-    // 🧰 Tools (chỉ cần JDK17 cho SonarScanner nếu dùng sau này)
-    // ============================================================
-    tools {
-        jdk 'jdk17'
-    }
-
-    // ============================================================
-    // 🌍 Environment
-    // ============================================================
     environment {
-        // Trivy: fail khi có HIGH/CRITICAL (đúng tinh thần DevSecOps)
+        IMAGE_NAME      = 'products'
+        IMAGE_TAG       = '' // Sẽ được tính toán ở stage 1.1
+        VENV_DIR        = '.venv'
         TRIVY_EXIT_CODE = '1'
         TRIVY_SEVERITY  = 'HIGH,CRITICAL'
-
-        // Bật BuildKit để build Docker nhanh & tối ưu layer
         DOCKER_BUILDKIT = '1'
-
-        // Tên image cố định cho service
-        IMAGE_NAME = 'products'
-        // Tag sẽ được tính trong stage "Compute Image Tag"
-        IMAGE_TAG  = ''
-        // Đường dẫn virtualenv
-        VENV_DIR   = '.venv'
     }
 
     stages {
@@ -48,16 +34,15 @@ pipeline {
             steps {
                 echo '--> Lấy mã nguồn từ Git...'
                 checkout scm
-                sh 'git --no-pager log -1 --pretty=oneline || true'
+                sh 'git --no-pager log -1 --pretty=oneline'
             }
         }
 
         stage('1.1 Compute Image Tag') {
             steps {
                 script {
-                    // Lấy short SHA (7 ký tự). Fallback sang BUILD_NUMBER nếu repo không có git metadata.
-                    def shortSha = sh(returnStdout: true, script: "git rev-parse --short=7 HEAD || echo ${env.BUILD_NUMBER}").trim()
-                    env.IMAGE_TAG = shortSha
+                    def commitHash = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
+                    env.IMAGE_TAG = commitHash
                     echo "--> IMAGE_TAG = ${env.IMAGE_TAG}"
                 }
             }
@@ -67,8 +52,9 @@ pipeline {
             steps {
                 dir('services/products') {
                     echo '--> Tạo virtualenv và chạy pytest...'
+                    // HOÀN THIỆN LOGIC: Chạy lệnh pytest
                     sh '''
-                        python3 -m venv ${VENV_DIR}  // <-- SỬA LẠI Ở ĐÂY
+                        python3 -m venv ${VENV_DIR}
                         . ${VENV_DIR}/bin/activate
                         python -m pip install --upgrade pip
                         pip install -r requirements.txt
@@ -78,85 +64,57 @@ pipeline {
             }
         }
 
-        // ========================================================
-        // 🔐 Security Scans (local-first)
-        // ========================================================
+        // --- CÁC STAGE BẢO MẬT (đã thêm lại) ---
+
         stage('3. SonarQube Analysis') {
             steps {
-                echo '[CHỜ] Sẽ cấu hình sau khi SonarQube sẵn sàng (kết nối scanner + quality gate).'
-                // withSonarQubeEnv('SonarQube-Server') {
-                //     sh 'sonar-scanner -Dsonar.projectKey=products -Dsonar.sources=app -Dsonar.python.version=3.11'
-                // }
+                echo "[CHỜ] Giai đoạn này sẽ được cấu hình sau."
             }
         }
 
         stage('4. Trivy FS Scan (SCA)') {
             steps {
-                // Thêm dir() ở đây
                 dir('services/products') {
-                    echo '--> Quét thư viện trong workspace với Trivy (Filesystem)...'
+                    echo '--> Quét thư viện với Trivy (Filesystem)...'
                     sh "trivy fs --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ."
                 }
             }
         }
+        
+        // --- GIAI ĐOẠN BUILD & QUÉT IMAGE ---
 
-        // ========================================================
-        // 🐳 Build & Scan Container Image
-        // ========================================================
         stage('5. Build Docker Image') {
             steps {
-                // Thêm dir() ở đây
                 dir('services/products') {
                     script {
-                        def full = "${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                        echo "--> Build image: ${full}"
-                        sh """
-                            docker build \
-                              --pull \
-                              -t ${full} \
-                              .
-                        """
+                        def fullImageName = "${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                        echo "--> Building Docker image: ${fullImageName}"
+                        sh "docker build -t ${fullImageName} ."
                     }
                 }
             }
         }
 
         stage('6. Trivy Image Scan') {
-            steps {
+             steps {
                 script {
-                    def full = "${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                    echo "--> Trivy image scan: ${full}"
-                    sh "trivy image --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${full}"
+                    def fullImageName = "${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                    echo "--> Scanning Docker image: ${fullImageName}"
+                    sh "trivy image --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${fullImageName}"
                 }
             }
         }
-
-        // ========================================================
-        // ☁️ Các bước chờ kích hoạt khi có AWS
-        // ========================================================
-        stage('[CHỜ] Push to ECR') {
-            when { expression { return false } } // bật khi sẵn sàng
-            steps { echo 'Sẽ đẩy image lên AWS ECR (login ECR, tag, push)...' }
-        }
-
-        stage('[CHỜ] Update GitOps Repo') {
-            when { expression { return false } } // bật khi sẵn sàng
-            steps { echo 'Sẽ cập nhật repo cấu hình để trigger ArgoCD...' }
-        }
     }
 
-    // ============================================================
-    // 🧹 Cleanup
-    // ============================================================
     post {
         always {
             echo '--> Dọn dẹp workspace & docker images...'
             script {
-                def full = "${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                sh """
-                    docker rmi ${full} || true
-                    docker image prune -f || true
-                """
+                if (env.IMAGE_TAG) { // Chỉ xóa nếu IMAGE_TAG có giá trị
+                    def fullImageName = "${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                    sh "docker rmi ${fullImageName} || true"
+                }
+                sh "docker image prune -f || true"
             }
             cleanWs()
         }
