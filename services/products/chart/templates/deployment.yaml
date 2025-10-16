@@ -1,0 +1,139 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # 📛 Tên tài nguyên: sinh theo quy tắc fullname (release + chart), tối đa 63 ký tự
+  name: {{ include "products.fullname" . }}
+  labels:
+    # 🏷️ Bộ nhãn chuẩn K8s/Helm (chart, version, instance, component…)
+    {{- include "products.labels" . | nindent 4 }}
+  {{- with .Values.annotations }}
+  annotations:
+    # 📝 Annotation chung (nếu có) từ values.yaml
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  # 🧩 Số bản sao (pod) mong muốn
+  replicas: {{ .Values.replicaCount }}
+
+  # 🎯 Selector để Deployment quản lý đúng nhóm Pod của mình
+  selector:
+    matchLabels:
+      {{- include "products.selectorLabels" . | nindent 6 }}
+
+  template:
+    metadata:
+      labels:
+        # 🏷️ Nhãn selector cho Pod phải khớp với phần selector ở trên
+        {{- include "products.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        # 📝 Annotation riêng cho Pod (nếu cần)
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      # 🔑 ServiceAccount tuỳ theo cấu hình (tạo mới hoặc dùng default)
+      serviceAccountName: {{ include "products.serviceAccount.name" . }}
+
+      # 🛡️ Bảo mật cấp Pod (khớp với non-root 10001 trong Dockerfile)
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # 🔐 Kéo image từ private registry (nếu cấu hình)
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      containers:
+        - name: {{ .Chart.Name }}
+          # 🛡️ Bảo mật cấp Container (non-root, không cho leo thang đặc quyền…)
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          # 🖼️ Image & tag (CI/CD sẽ ghi đè .Values.image.tag)
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          # 🌐 Port container (đặt tên 'http' để Service có thể target theo tên)
+          ports:
+            - name: http
+              containerPort: {{ .Values.container.port }}
+              protocol: TCP
+
+          # 🧪 Liveness Probe: kiểm tra "còn sống"
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.container.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.container.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.container.probes.liveness.periodSeconds }}
+            {{- with .Values.container.probes.liveness.timeoutSeconds }}
+            timeoutSeconds: {{ . }}
+            {{- end }}
+            {{- with .Values.container.probes.liveness.failureThreshold }}
+            failureThreshold: {{ . }}
+            {{- end }}
+
+          # 🧪 Readiness Probe: kiểm tra "sẵn sàng nhận traffic"
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.container.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.container.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.container.probes.readiness.periodSeconds }}
+            {{- with .Values.container.probes.readiness.timeoutSeconds }}
+            timeoutSeconds: {{ . }}
+            {{- end }}
+            {{- with .Values.container.probes.readiness.failureThreshold }}
+            failureThreshold: {{ . }}
+            {{- end }}
+
+          # ⏳ (Tuỳ chọn) Startup Probe: bật nếu app khởi động chậm
+          {{- with .Values.container.probes.startup }}
+          {{- if .enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .path }}
+              port: http
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+            failureThreshold: {{ .failureThreshold }}
+            {{- with .timeoutSeconds }}timeoutSeconds: {{ . }}{{- end }}
+          {{- end }}
+          {{- end }}
+
+          # ⚙️ Tài nguyên (requests/limits) để scheduler hoạt động tối ưu
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+          # 🌱 Biến môi trường trực tiếp
+          {{- with .Values.container.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          # 🌱 Bơm biến môi trường từ ConfigMap/Secret
+          {{- with .Values.container.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+      # 🗺️ Scheduling options (tuỳ chọn)
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

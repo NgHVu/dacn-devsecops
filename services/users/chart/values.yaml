@@ -1,0 +1,4 @@
+image:
+  repository: example/users
+  tag: latest
+replicaCount: 1

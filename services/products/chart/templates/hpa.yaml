@@ -1,0 +1,45 @@
+{{- if .Values.autoscaling.enabled -}}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  # 📛 Tên tài nguyên dùng fullname (release + chart), đồng bộ với Deployment/Service
+  name: {{ include "products.fullname" . }}
+  labels:
+    # 🏷️ Bộ nhãn chuẩn K8s/Helm
+    {{- include "products.labels" . | nindent 4 }}
+spec:
+  # 🎯 Mục tiêu co giãn: trỏ đúng tới Deployment của service này
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "products.fullname" . }}
+
+  # 🔢 Số Pod tối thiểu/tối đa
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+
+  # 📊 Tiêu chí co giãn (có thể theo CPU và/hoặc Memory)
+  metrics:
+    {{- if .Values.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+
+  # (Tuỳ chọn nâng cao) Behavior giúp làm mượt quá trình scale (anti-thrashing)
+  {{- if .Values.autoscaling.behavior }}
+  behavior:
+    {{- toYaml .Values.autoscaling.behavior | nindent 4 }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,82 @@
+# ================================================================= #
+# Git, Docker, & Project Files
+# ================================================================= #
+.git/
+.gitignore
+.gitattributes
+Dockerfile
+.dockerignore
+README.md
+
+# ================================================================= #
+# Python Specific
+# ================================================================= #
+# Bytecode, virtual envs, và packaging
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+wheels/
+pip-wheel-metadata/
+
+# Testing artifacts (không cần trong image)
+tests/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Linter & type-checker caches
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+
+# ================================================================= #
+# General, Secrets, & Tooling
+# ================================================================= #
+# Logs & runtime
+*.log
+*.pid
+*.sock
+
+# Env & secrets (giữ lại file mẫu)
+.env
+.env.*
+!.env.example
+
+# Local overrides
+docker-compose.override.yml
+*.local.yaml
+*.local.yml
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# CI / Infra artifacts (không bao giờ cần trong image)
+.jenkins/
+jenkins_home/
+terraform/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Helm packaged charts (nếu có build chart trong service)
+charts/**/*.tgz
+
+# Docker runtime dir
+.docker/
