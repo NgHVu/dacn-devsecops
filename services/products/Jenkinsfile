@@ -65,14 +65,17 @@ pipeline {
 
         stage('2. Unit Test') {
             steps {
-                echo '--> Tạo virtualenv và chạy pytest...'
-                sh '''
-                    python3 -m venv ${VENV_DIR}
-                    . ${VENV_DIR}/bin/activate
-                    python -m pip install --upgrade pip
-                    pip install -r requirements.txt
-                    pytest -q
-                '''
+                // Thêm dir() ở đây
+                dir('services/products') {
+                    echo '--> Tạo virtualenv và chạy pytest...'
+                    sh '''
+                        python3 -m venv ${VENV_DIR}
+                        . ${VENV_DIR}/bin/activate
+                        python -m pip install --upgrade pip
+                        pip install -r requirements.txt
+                        pytest -q
+                    '''
+                }
             }
         }
 
@@ -90,8 +93,11 @@ pipeline {
 
         stage('4. Trivy FS Scan (SCA)') {
             steps {
-                echo '--> Quét thư viện trong workspace với Trivy (Filesystem)...'
-                sh "trivy fs --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ."
+                // Thêm dir() ở đây
+                dir('services/products') {
+                    echo '--> Quét thư viện trong workspace với Trivy (Filesystem)...'
+                    sh "trivy fs --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ."
+                }
             }
         }
 
@@ -100,15 +106,18 @@ pipeline {
         // ========================================================
         stage('5. Build Docker Image') {
             steps {
-                script {
-                    def full = "${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                    echo "--> Build image: ${full}"
-                    sh """
-                        docker build \
-                          --pull \
-                          -t ${full} \
-                          .
-                    """
+                // Thêm dir() ở đây
+                dir('services/products') {
+                    script {
+                        def full = "${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                        echo "--> Build image: ${full}"
+                        sh """
+                            docker build \
+                              --pull \
+                              -t ${full} \
+                              .
+                        """
+                    }
                 }
             }
         }
