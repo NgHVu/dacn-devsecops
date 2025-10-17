@@ -38,6 +38,7 @@ pipeline {
         stage('1.1 Compute Image Tag') {
             steps {
                 script {
+                    // Cú pháp đúng để lấy output từ shell và gán vào biến
                     env.IMAGE_TAG = sh(
                         script: 'git rev-parse --short=7 HEAD',
                         returnStdout: true
