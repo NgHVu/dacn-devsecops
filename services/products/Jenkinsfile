@@ -1,5 +1,10 @@
 pipeline {
     agent any
+    tools {
+        // Tên 'sonar-scanner-latest' phải khớp chính xác với tên bạn đã đặt trong Manage Jenkins > Tools
+        sonar 'sonar-scanner-latest'
+    }
+
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         disableConcurrentBuilds()
