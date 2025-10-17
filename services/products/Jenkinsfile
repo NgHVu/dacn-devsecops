@@ -1,5 +1,3 @@
-// services/products/Jenkinsfile
-
 pipeline {
     agent any
     options {
@@ -26,17 +24,10 @@ pipeline {
             }
         }
 
-        stage('1. Checkout SCM') {
+        stage('1. Checkout SCM & Compute Tag') {
             steps {
-                echo '--> Lấy mã nguồn từ Git...'
+                echo '--> Lấy mã nguồn từ Git và tính toán Image Tag...'
                 checkout scm
-                sh 'git --no-pager log -1 --pretty=oneline'
-            }
-        }
-
-        // === SỬA LỖI QUAN TRỌNG Ở ĐÂY ===
-        stage('1.1 Compute Image Tag') {
-            steps {
                 script {
                     env.IMAGE_TAG = sh(
                         script: 'git rev-parse --short=7 HEAD',
@@ -49,7 +40,6 @@ pipeline {
                 }
             }
         }
-        // ===================================
 
         stage('2. Unit Test') {
             agent {
@@ -73,9 +63,33 @@ pipeline {
             }
         }
 
+        // --- STAGE SONARQUBE ĐÃ ĐƯỢC KÍCH HOẠT ---
         stage('3. SonarQube Analysis') {
             steps {
-                echo "[CHỜ] Giai đoạn này sẽ được cấu hình sau."
+                dir('services/products') {
+                    // Sử dụng kết nối 'sonarqube-local' đã cấu hình ở Bước 3
+                    withSonarQubeEnv('sonarqube-local') {
+                        // Chạy SonarScanner
+                        sh '''
+                            sonar-scanner \
+                            -Dsonar.projectKey=products-service \
+                            -Dsonar.sources=./app \
+                            -Dsonar.host.url=http://sonarqube:9000 \
+                            -Dsonar.login=$SONAR_AUTH_TOKEN
+                        '''
+                    }
+                }
+            }
+        }
+
+        // --- THÊM STAGE KIỂM TRA QUALITY GATE ---
+        stage('3.1 Quality Gate') {
+            steps {
+                // Đợi kết quả phân tích từ SonarQube
+                timeout(time: 2, unit: 'MINUTES') {
+                    // Kiểm tra trạng thái của Quality Gate
+                    waitForQualityGate abortPipeline: true
+                }
             }
         }
 
@@ -92,7 +106,6 @@ pipeline {
             steps {
                 dir('services/products') {
                     script {
-                        // === SỬA LỖI: Dùng tag đã được gán đúng ===
                         sh "docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} ."
                     }
                 }
@@ -102,7 +115,6 @@ pipeline {
         stage('6. Trivy Image Scan') {
             steps {
                 script {
-                    // === SỬA LỖI: Dùng tag đã được gán đúng ===
                     sh "trivy image --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
                 }
             }
