@@ -89,7 +89,7 @@ pipeline {
         stage('3.1 Quality Gate') {
             steps {
                 // Đợi kết quả phân tích từ SonarQube
-                timeout(time: 2, unit: 'MINUTES') {
+                timeout(time: 5, unit: 'MINUTES') {
                     // Kiểm tra trạng thái của Quality Gate
                     waitForQualityGate abortPipeline: true
                 }
