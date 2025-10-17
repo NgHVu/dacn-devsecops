@@ -1,10 +1,5 @@
 pipeline {
     agent any
-    tools {
-        // Tên 'sonar-scanner-latest' phải khớp chính xác với tên bạn đã đặt trong Manage Jenkins > Tools
-        sonar 'sonar-scanner-latest'
-    }
-
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         disableConcurrentBuilds()
@@ -71,17 +66,20 @@ pipeline {
         // --- STAGE SONARQUBE ĐÃ ĐƯỢC KÍCH HOẠT ---
         stage('3. SonarQube Analysis') {
             steps {
-                dir('services/products') {
-                    // Sử dụng kết nối 'sonarqube-local' đã cấu hình ở Bước 3
-                    withSonarQubeEnv('sonarqube-local') {
-                        // Chạy SonarScanner
-                        sh '''
-                            sonar-scanner \
-                            -Dsonar.projectKey=products-service \
-                            -Dsonar.sources=./app \
-                            -Dsonar.host.url=http://sonarqube:9000 \
-                            -Dsonar.login=$SONAR_AUTH_TOKEN
-                        '''
+                script {
+                    // Bước 1: Lấy đường dẫn của SonarScanner đã cài đặt
+                    def scannerHome = tool 'sonar-scanner-latest'
+
+                    // Bước 2: Chạy các lệnh trong đúng thư mục
+                    dir('services/products') {
+                        withSonarQubeEnv('sonarqube-local') {
+                            // Bước 3: Gọi scanner bằng đường dẫn tuyệt đối của nó
+                            sh "${scannerHome}/bin/sonar-scanner \
+                               -Dsonar.projectKey=products-service \
+                               -Dsonar.sources=./app \
+                               -Dsonar.host.url=http://sonarqube:9000 \
+                               -Dsonar.login=$SONAR_AUTH_TOKEN"
+                        }
                     }
                 }
             }
