@@ -1,3 +1,5 @@
+// services/products/Jenkinsfile
+
 pipeline {
     agent any
     options {
@@ -10,7 +12,6 @@ pipeline {
 
     environment {
         IMAGE_NAME      = 'products'
-        IMAGE_TAG       = ''
         VENV_DIR        = '.venv'
         TRIVY_EXIT_CODE = '1'
         TRIVY_SEVERITY  = 'HIGH,CRITICAL'
@@ -18,7 +19,6 @@ pipeline {
     }
 
     stages {
-        // SỬA LỖI: Điền đầy đủ nội dung cho stage
         stage('0. Pre-Clean') {
             steps {
                 echo '--> Dọn dẹp thư mục làm việc trước khi chạy'
@@ -26,7 +26,6 @@ pipeline {
             }
         }
 
-        // SỬA LỖI: Điền đầy đủ nội dung cho stage
         stage('1. Checkout SCM') {
             steps {
                 echo '--> Lấy mã nguồn từ Git...'
@@ -35,25 +34,29 @@ pipeline {
             }
         }
 
+        // === SỬA LỖI QUAN TRỌNG Ở ĐÂY ===
         stage('1.1 Compute Image Tag') {
             steps {
                 script {
-                    // SỬA LỖI Ở ĐÂY: Dùng cú pháp đúng để lấy output
                     env.IMAGE_TAG = sh(
-                        script: 'git rev-parse --short=7 HEAD', 
+                        script: 'git rev-parse --short=7 HEAD',
                         returnStdout: true
                     ).trim()
+                    if (!env.IMAGE_TAG) {
+                        env.IMAGE_TAG = "dev-${env.BUILD_NUMBER}"
+                    }
                     echo "--> IMAGE_TAG = ${env.IMAGE_TAG}"
                 }
             }
         }
+        // ===================================
 
         stage('2. Unit Test') {
             agent {
                 docker {
                     image 'python:3.12-bookworm'
-                    args '-u 0:0' // Chạy với quyền root để tránh lỗi permission
-                    reuseNode true // Tái sử dụng workspace từ agent chính
+                    args '-u 0:0'
+                    reuseNode true
                 }
             }
             steps {
@@ -64,13 +67,12 @@ pipeline {
                         . ${VENV_DIR}/bin/activate
                         python -m pip install --upgrade pip
                         pip install -r requirements.txt
-                        # pytest -q  // Comment lại nếu bạn chưa có file test
+                        # pytest -q
                     '''
                 }
             }
         }
 
-        // SỬA LỖI: Điền đầy đủ nội dung cho stage
         stage('3. SonarQube Analysis') {
             steps {
                 echo "[CHỜ] Giai đoạn này sẽ được cấu hình sau."
@@ -90,9 +92,8 @@ pipeline {
             steps {
                 dir('services/products') {
                     script {
-                        def fullImageName = "${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                        echo "--> Building Docker image: ${fullImageName}"
-                        sh "docker build -t ${fullImageName} ."
+                        // === SỬA LỖI: Dùng tag đã được gán đúng ===
+                        sh "docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} ."
                     }
                 }
             }
@@ -101,9 +102,8 @@ pipeline {
         stage('6. Trivy Image Scan') {
             steps {
                 script {
-                    def fullImageName = "${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                    echo "--> Scanning Docker image: ${fullImageName}"
-                    sh "trivy image --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${fullImageName}"
+                    // === SỬA LỖI: Dùng tag đã được gán đúng ===
+                    sh "trivy image --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
                 }
             }
         }
@@ -114,8 +114,7 @@ pipeline {
             echo '--> Dọn dẹp workspace & docker images...'
             script {
                 if (env.IMAGE_TAG) {
-                    def fullImageName = "${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                    sh "docker rmi ${fullImageName} || true"
+                    sh "docker rmi ${env.IMAGE_NAME}:${env.IMAGE_TAG} || true"
                 }
                 sh "docker image prune -f || true"
             }
