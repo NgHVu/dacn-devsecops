@@ -2,25 +2,17 @@
 # Core Framework (FastAPI + ASGI server)
 # ================================================================= #
 fastapi==0.111.1
-uvicorn[standard]==0.24.0.post1
+uvicorn[standard]==0.29.0
 
 # ================================================================= #
 # Database (PostgreSQL - Full Async Stack)
 # ================================================================= #
-# ORM with modern async support
-sqlalchemy==2.0.22
-
-# High-performance asynchronous driver for PostgreSQL
-asyncpg==0.28.0
-
-# (Optional but Recommended) For database schema migrations
-alembic==1.12.1
+sqlalchemy==2.0.31
+asyncpg==0.29.0
+alembic==1.13.2
 
 # ================================================================= #
 # Testing (Async-first)
 # ================================================================= #
-# Standard testing framework
-pytest==7.4.3
-
-# Modern async HTTP client, ideal for testing FastAPI
+pytest==8.2.2
 httpx==0.27.0
