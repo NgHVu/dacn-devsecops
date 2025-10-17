@@ -18,7 +18,6 @@ pipeline {
     }
 
     stages {
-        // SỬA LỖI: Điền đầy đủ nội dung cho stage
         stage('0. Pre-Clean') {
             steps {
                 echo '--> Dọn dẹp thư mục làm việc trước khi chạy'
@@ -26,7 +25,6 @@ pipeline {
             }
         }
 
-        // SỬA LỖI: Điền đầy đủ nội dung cho stage
         stage('1. Checkout SCM') {
             steps {
                 echo '--> Lấy mã nguồn từ Git...'
@@ -47,14 +45,8 @@ pipeline {
             }
         }
 
+        // --- ĐÃ LOẠI BỎ AGENT DOCKER ---
         stage('2. Unit Test') {
-            agent {
-                docker {
-                    image 'python:3.12-bookworm'
-                    args '-u 0:0' // Chạy với quyền root để tránh lỗi permission
-                    reuseNode true // Tái sử dụng workspace từ agent chính
-                }
-            }
             steps {
                 dir('services/products') {
                     echo '--> Tạo virtualenv và chạy pytest...'
@@ -68,8 +60,8 @@ pipeline {
                 }
             }
         }
+        // ------------------------------------
 
-        // SỬA LỖI: Điền đầy đủ nội dung cho stage
         stage('3. SonarQube Analysis') {
             steps {
                 echo "[CHỜ] Giai đoạn này sẽ được cấu hình sau."
