@@ -38,15 +38,20 @@ pipeline {
         stage('1.1 Compute Image Tag') {
             steps {
                 script {
-                    // Cú pháp đúng để lấy output từ shell và gán vào biến
+                    // Lấy 7 ký tự đầu của commit hiện tại
                     env.IMAGE_TAG = sh(
-                        script: 'git rev-parse --short=7 HEAD',
-                        returnStdout: true
+                    script: "git rev-parse --short=7 HEAD",
+                    returnStdout: true
                     ).trim()
+                    if (!env.IMAGE_TAG) {
+                        // Fallback nếu chạy không có git metadata
+                        env.IMAGE_TAG = env.BUILD_NUMBER ?: "latest"
+                    }
                     echo "--> IMAGE_TAG = ${env.IMAGE_TAG}"
                 }
             }
         }
+
 
         stage('2. Unit Test') {
             agent {
