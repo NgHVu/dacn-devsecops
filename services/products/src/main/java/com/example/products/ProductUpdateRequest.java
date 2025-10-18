@@ -1,16 +1,11 @@
 package com.example.products;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.Size;
-
+import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 
-@JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "Payload cập nhật (trường nào gửi thì trường đó được cập nhật)")
-public record ProductsUpdateRequest(
+public record ProductUpdateRequest(
 
         @Size(min = 1, max = 120, message = "Tên phải từ 1 đến 120 ký tự")
         @Schema(description = "Tên sản phẩm", example = "Cơm Tấm Sườn Bì Chả")

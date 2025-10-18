@@ -1,66 +1,46 @@
 # ================================================================= #
-# Giai đoạn 1: Builder - Build các "bánh xe" phụ thuộc
+# Giai đoạn 1: Builder - Build ứng dụng bằng Maven
 # ================================================================= #
-# Nâng cấp lên Python 3.11 để đồng bộ với các stack hiện đại
-FROM python:3.11-slim AS builder
+# Sử dụng base image Maven với Java 21 (Temurin là bản build OpenJDK)
+FROM maven:3.9-eclipse-temurin-21 AS builder
 
-# Thiết lập các biến môi trường tốt nhất cho Python
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+WORKDIR /app
 
-WORKDIR /opt/wheels
+# 1. Copy file pom.xml và tải thư viện trước để tận dụng cache
+COPY pom.xml .
+RUN mvn dependency:go-offline
 
-# Sao chép requirements.txt vào trước để tận dụng layer cache
-COPY requirements.txt .
+# 2. Copy toàn bộ mã nguồn và build file .jar
+COPY src ./src
+# -DskipTests để bỏ qua unit test (vì Jenkinsfile sẽ chạy test ở stage riêng)
+RUN mvn package -DskipTests
 
-# Đảm bảo pip/setuptools/wheel là phiên bản mới, sau đó build wheelhouse
-RUN python -m pip install --upgrade pip setuptools wheel && \
-    pip wheel --no-cache-dir --wheel-dir . -r requirements.txt
+# 3. Trích xuất các "lớp" (layers) từ file .jar để Docker tối ưu hóa
+RUN java -Djarmode=layertools -jar target/*.jar extract
 
 
 # ================================================================= #
-# Giai đoạn 2: Final - Image cuối cùng để chạy ứng dụng
+# Giai đoạn 2: Final - Image cuối cùng để chạy
 # ================================================================= #
-FROM python:3.11-slim
+# Sử dụng image JRE (Runtime) 21 tối giản của Alpine
+FROM eclipse-temurin:21-jre-alpine
 
-# Thiết lập các biến môi trường
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    APP_HOME=/app \
-    APP_USER=app \
-    APP_UID=10001 \
-    APP_GID=10001
+# Tạo user không có quyền root
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Tạo group và user không có quyền root bằng ID số (ổn định hơn)
-RUN groupadd -g ${APP_GID} -r ${APP_USER} && \
-    useradd  -u ${APP_UID} -r -g ${APP_GID} -d ${APP_HOME} -s /sbin/nologin ${APP_USER}
-
-WORKDIR ${APP_HOME}
-
-# Cài đặt các thư viện từ wheelhouse một cách an toàn
-COPY --from=builder /opt/wheels /opt/wheels
-COPY requirements.txt .
-RUN python -m pip install --upgrade pip && \
-    pip install --no-cache-dir --find-links=/opt/wheels -r requirements.txt
-
-# Sao chép mã nguồn ứng dụng và gán quyền sở hữu ngay lập tức
-# Kết quả: /app/app/main.py -> module path là app.main:app
-COPY --chown=${APP_UID}:${APP_GID} ./app ${APP_HOME}/app
+WORKDIR /app
 
 # Chuyển sang người dùng không có quyền root
-USER ${APP_UID}:${APP_GID}
+USER appuser
 
-# Mở cổng 8080
-EXPOSE 8080
+# Sao chép các "lớp" đã được trích xuất (thứ tự này rất quan trọng)
+COPY --from=builder /app/dependencies/ ./
+COPY --from=builder /app/spring-boot-loader/ ./
+COPY --from=builder /app/snapshot-dependencies/ ./
+COPY --from=builder /app/application/ ./
 
-# Thêm metadata theo tiêu chuẩn OCI (Open Container Initiative)
-LABEL org.opencontainers.image.source="https://github.com/NgHVu/dacn-devsecops" \
-      org.opencontainers.image.description="Products Service for the Food Ordering App" \
-      org.opencontainers.image.licenses="MIT"
+# Mở cổng 8081 (theo file application.properties)
+EXPOSE 8081
 
-# Healthcheck: chỉ trả về 0 (thành công) khi endpoint /healthz trả về HTTP 200
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD python -c "import http.client,sys; c=http.client.HTTPConnection('127.0.0.1',8080,timeout=2); c.request('GET','/healthz'); r=c.getresponse(); sys.exit(0 if r.status==200 else 1)"
-
-# Lệnh khởi chạy server
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Lệnh để khởi chạy ứng dụng (sử dụng trình khởi chạy của Spring)
+ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]

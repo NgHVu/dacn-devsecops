@@ -21,7 +21,7 @@ import java.util.List;
 @ConditionalOnProperty(prefix = "app.seed", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class DataSeeder implements CommandLineRunner {
 
-    private final ProductsRepository repo;
+    private final ProductRepository repo;
 
     @Override
     @Transactional
@@ -32,7 +32,7 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
 
-        List<Products> toInsert = new ArrayList<>();
+        List<Product> toInsert = new ArrayList<>();
 
         seedIfAbsent(toInsert, "Cơm Tấm Sườn Bì Chả", new BigDecimal("55000.00"), "com-tam.jpg");
         seedIfAbsent(toInsert, "Phở Bò Tái Nạm",     new BigDecimal("50000.00"), "pho-bo.jpg");
@@ -46,12 +46,12 @@ public class DataSeeder implements CommandLineRunner {
         }
     }
 
-    private void seedIfAbsent(List<Products> buffer, String name, BigDecimal price, String image) {
+    private void seedIfAbsent(List<Product> buffer, String name, BigDecimal price, String image) {
         if (repo.existsByNameIgnoreCase(name)) {
             log.debug("Bỏ qua (đã tồn tại): {}", name);
             return;
         }
-        buffer.add(Products.builder()
+        buffer.add(Product.builder()
                 .name(name)
                 .price(price)
                 .image(image)

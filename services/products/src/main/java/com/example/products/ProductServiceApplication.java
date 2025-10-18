@@ -27,10 +27,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
         )
     )
 )
-public class ProductsServiceApplication {
+public class ProductServiceApplication {
 
     public static void main(String[] args) {
         // Giữ SpringApplication.run đơn giản để startup nhanh, log sạch
-        SpringApplication.run(ProductsServiceApplication.class, args);
+        SpringApplication.run(ProductServiceApplication.class, args);
     }
 }
