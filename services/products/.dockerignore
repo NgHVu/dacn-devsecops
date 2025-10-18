@@ -1,114 +1,87 @@
-# =================================================================
-# Java / Maven build
-# =================================================================
+# ================================================================= #
+# General & Secrets
+# ================================================================= #
+# Log files
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Environment variables - ignore all .env files except the example
+.env
+.env.*
+!.env.example
+
+# Local override configurations
+*.local.yaml
+*.local.yml
+docker-compose.override.yml
+
+# Secret keys and certificates
+*.pem
+*.key
+*.crt
+*.p12
+
+# ================================================================= #
+# Language Specific & Caches
+# ================================================================= #
+# Node.js (for Frontend service)
+node_modules/
+.npm/
+.next/
+build/
+dist/
+coverage/
+.eslintcache
+
+# Java & Maven (for Backend services)
 target/
+pom.xml.tag
+pom.xml.next
+pom.xml.releaseBackup
 *.class
 *.jar
 *.war
 *.ear
 
-# Maven wrapper cache (giữ file wrapper trong repo, chỉ ignore cache)
-.mvn/wrapper/maven-wrapper.jar
-# Nếu không dùng wrapper, có thể ignore luôn cả thư mục:
-# .mvn/
-
-# =================================================================
-# Spring Boot / Runtime / Logs
-# =================================================================
-*.log
-*.pid
-*.seed
+# Java runtime files
 hs_err_pid*
 replay_pid*
-# PID/heap dump tạm
-*.hprof
 
-# =================================================================
-# Test reports & Coverage
-# =================================================================
-# Maven Surefire/Failsafe reports (thường nằm trong target/, thêm để chắc)
-**/surefire-reports/
-**/failsafe-reports/
-# JaCoCo
-**/jacoco.exec
-**/jacoco/
-**/coverage/
-**/site/
+# Maven wrapper cache
+.mvn/wrapper/maven-wrapper.jar
 
-# =================================================================
-# SonarQube / Lint tooling
-# =================================================================
-.scannerwork/
-.sonarlint/
-# Nếu dùng IntelliJ SonarLint
-.idea/sonarlint/
-
-# =================================================================
-# Env & Secrets (KHÔNG commit thông tin nhạy cảm)
-# =================================================================
-.env
-.env.*
-!.env.example
-*.local.yml
-*.local.yaml
-
-# =================================================================
-# Docker / Compose (KHÔNG ignore Dockerfile!)
-# =================================================================
-# Thư mục runtime tùy chọn khi dev
-.docker/
-# Compose override local
-docker-compose.override.yml
-
-# =================================================================
-# IDE / Editor
-# =================================================================
-# IntelliJ
-.idea/
-*.iml
-# VS Code
-.vscode/
-# Eclipse / STS
-.project
-.classpath
-.settings/
-# Vim / etc.
-*.swp
-*.swo
-*~
-
-# =================================================================
-# OS junk
-# =================================================================
-.DS_Store
-Thumbs.db
-
-# =================================================================
-# CI / Infra artifacts
-# =================================================================
-.jenkins/
-jenkins_home/
-
+# ================================================================= #
+# Tools & Frameworks
+# ================================================================= #
 # Terraform
-terraform/
 .terraform/
 *.tfstate
 *.tfstate.*
-*.tfplan
 crash.log
+*.tfvars
+*.tfplan
+!terraform.tfvars.example
 
-# =================================================================
-# Helm
-# =================================================================
-# Chart đã package
-charts/**/*.tgz
-# Values riêng môi trường (nếu có)
-values.local.yaml
+# Jenkins & Docker
+jenkins_home/
+.docker/
+*.pid
+*.sock
 
-# =================================================================
-# (Tuỳ chọn) Monorepo có frontend Node/JS
-# Bật khi repo có phần frontend để tránh nặng repo
-# =================================================================
-# node_modules/
-# dist/
-# build/
+# Helm packaged charts
+**/charts/**/*.tgz
+
+# ================================================================= #
+# IDEs & OS
+# ================================================================= #
+# IDEs - ignore all, but keep extensions file for team consistency
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db

@@ -27,7 +27,7 @@ import java.time.OffsetDateTime;
            @Index(name = "idx_products_name", columnList = "name")
        })
 @Schema(description = "Thông tin chi tiết của một sản phẩm")
-public class Product {
+public class Products {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) // Tự động tăng ID
