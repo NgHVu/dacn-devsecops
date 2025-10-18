@@ -1,73 +1,95 @@
-# ================================================================= #
-# Git, Docker, & Project Files
-# ================================================================= #
-.git/
-.gitignore
-.gitattributes
-Dockerfile
-.dockerignore
-README.md
+# =================================================================
+# Java / Maven build
+# =================================================================
+target/
+*.class
+*.jar
+*.war
+*.ear
 
-# ================================================================= #
-# Python Specific
-# ================================================================= #
-# Bytecode, virtual envs, và packaging
-__pycache__/
-*.py[cod]
-*$py.class
-.venv/
-venv/
-env/
-ENV/
-*.egg-info/
-wheels/
-pip-wheel-metadata/
+# Maven wrapper cache (giữ file wrapper trong repo, chỉ ignore cache)
+.mvn/wrapper/maven-wrapper.jar
+# Nếu không dùng wrapper, có thể ignore luôn cả thư mục:
+# .mvn/
 
-# Testing artifacts (không cần trong image)
-tests/
-.pytest_cache/
-.coverage
-.coverage.*
-htmlcov/
-coverage.xml
-
-# Linter & type-checker caches
-.mypy_cache/
-.ruff_cache/
-.pyre/
-.pytype/
-
-# ================================================================= #
-# General, Secrets, & Tooling
-# ================================================================= #
-# Logs & runtime
+# =================================================================
+# Spring Boot / Runtime / Logs
+# =================================================================
 *.log
 *.pid
-*.sock
+*.seed
+hs_err_pid*
+replay_pid*
+# PID/heap dump tạm
+*.hprof
 
-# Env & secrets (giữ lại file mẫu)
+# =================================================================
+# Test reports & Coverage
+# =================================================================
+# Maven Surefire/Failsafe reports (thường nằm trong target/, thêm để chắc)
+**/surefire-reports/
+**/failsafe-reports/
+# JaCoCo
+**/jacoco.exec
+**/jacoco/
+**/coverage/
+**/site/
+
+# =================================================================
+# SonarQube / Lint tooling
+# =================================================================
+.scannerwork/
+.sonarlint/
+# Nếu dùng IntelliJ SonarLint
+.idea/sonarlint/
+
+# =================================================================
+# Env & Secrets (KHÔNG commit thông tin nhạy cảm)
+# =================================================================
 .env
 .env.*
 !.env.example
-
-# Local overrides
-docker-compose.override.yml
-*.local.yaml
 *.local.yml
+*.local.yaml
 
+# =================================================================
+# Docker / Compose (KHÔNG ignore Dockerfile!)
+# =================================================================
+# Thư mục runtime tùy chọn khi dev
+.docker/
+# Compose override local
+docker-compose.override.yml
+
+# =================================================================
 # IDE / Editor
-.vscode/
+# =================================================================
+# IntelliJ
 .idea/
+*.iml
+# VS Code
+.vscode/
+# Eclipse / STS
+.project
+.classpath
+.settings/
+# Vim / etc.
 *.swp
 *.swo
+*~
 
-# OS files
+# =================================================================
+# OS junk
+# =================================================================
 .DS_Store
 Thumbs.db
 
-# CI / Infra artifacts (không bao giờ cần trong image)
+# =================================================================
+# CI / Infra artifacts
+# =================================================================
 .jenkins/
 jenkins_home/
+
+# Terraform
 terraform/
 .terraform/
 *.tfstate
@@ -75,8 +97,18 @@ terraform/
 *.tfplan
 crash.log
 
-# Helm packaged charts (nếu có build chart trong service)
+# =================================================================
+# Helm
+# =================================================================
+# Chart đã package
 charts/**/*.tgz
+# Values riêng môi trường (nếu có)
+values.local.yaml
 
-# Docker runtime dir
-.docker/
+# =================================================================
+# (Tuỳ chọn) Monorepo có frontend Node/JS
+# Bật khi repo có phần frontend để tránh nặng repo
+# =================================================================
+# node_modules/
+# dist/
+# build/
