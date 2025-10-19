@@ -40,9 +40,7 @@ pipeline {
             }
         }
 
-        // ================================================================= #
-        // SỬA LỖI: Gộp Test và Sonar Analysis vào MỘT stage duy nhất
-        // ================================================================= #
+        //Gộp Test và Sonar Analysis vào MỘT stage duy nhất
         stage('2. Test & Analyze') {
             agent {
                 docker {
@@ -54,13 +52,11 @@ pipeline {
             steps {
                 dir('services/products') {
                     withSonarQubeEnv('sonarqube-local') {
-                        // Chạy cả hai lệnh trong cùng một shell, trên cùng một container
                         sh '''
                            mvn clean verify sonar:sonar \
                                -Dsonar.projectKey=products-service \
                                -Dsonar.host.url=http://sonarqube:9000 \
-                               -Dsonar.login=$SONAR_AUTH_TOKEN \
-                               -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+                               -Dsonar.login=$SONAR_AUTH_TOKEN
                         '''
                     }
                 }
