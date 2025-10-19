@@ -32,8 +32,8 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
       $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
       tee /etc/apt/sources.list.d/docker.list > /dev/null && \
     apt-get update && \
-    apt-get install -y --no-install-recommends docker-ce-cli
-
+    apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin
+     
 # Cài đặt Trivy với phiên bản đã chỉ định
 RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v${TRIVY_VERSION}
 
