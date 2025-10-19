@@ -10,7 +10,8 @@ appVersion: "1.0.0"
 # --- Compatibility & Metadata ---
 kubeVersion: ">=1.24.0-0"
 keywords:
-  - fastapi
+  - spring-boot
+  - java
   - products
   - food-ordering
   - devsecops

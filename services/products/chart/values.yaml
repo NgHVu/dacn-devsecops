@@ -38,8 +38,8 @@ imagePullSecrets: []
 # Container Settings
 #=================================================================#
 container:
-  # Cổng ứng dụng FastAPI lắng nghe bên trong container
-  port: 8080
+  # Cổng ứng dụng String Boot lắng nghe bên trong container
+  port: 8081
 
   # (Tuỳ chọn) Biến môi trường & nguồn env (ConfigMap/Secret)
   env: []
@@ -62,13 +62,11 @@ container:
   # Cấu hình probes chi tiết hơn (có thể tinh chỉnh mà không sửa template)
   probes:
     liveness:
-      path: /healthz
+      path: /actuator/health/liveness  # <-- SỬA DÒNG NÀY
       initialDelaySeconds: 15
       periodSeconds: 20
-      # timeoutSeconds: 2
-      # failureThreshold: 3
     readiness:
-      path: /readyz
+      path: /actuator/health/readiness # <-- SỬA DÒNG NÀY
       initialDelaySeconds: 5
       periodSeconds: 10
       # timeoutSeconds: 2
