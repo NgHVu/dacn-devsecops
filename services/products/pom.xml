@@ -80,7 +80,6 @@
 
     <build>
         <plugins>
-            <!-- Bắt buộc JDK >= 21 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
@@ -124,9 +123,6 @@
                 <version>${maven.failsafe.version}</version>
             </plugin>
             
-            <!-- ========================================================= -->
-            <!-- == SỬA LỖI: Khối JaCoCo duy nhất và hoàn chỉnh           == -->
-            <!-- ========================================================= -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
@@ -156,7 +152,6 @@
                 </executions>
             </plugin>
 
-            <!-- Boot -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -173,7 +168,6 @@
     <profiles>
         <profile>
             <id>ci</id>
-            <!-- chỗ trống cho cấu hình CI nếu cần -->
-        </profile>
+            </profile>
     </profiles>
 </project>
