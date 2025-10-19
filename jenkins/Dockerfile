@@ -6,7 +6,6 @@ FROM jenkins/jenkins:lts-jdk21
 
 # TỐI ƯU 2: Sử dụng ARG để linh hoạt hóa phiên bản
 ARG TRIVY_VERSION="0.49.1" # Kiểm tra phiên bản mới nhất tại GitHub của Trivy
-ARG DOCKER_VERSION="5:24.0.7-1~debian.12~bookworm" # Kiểm tra phiên bản Docker CE cho Debian
 
 # ================================================================= #
 # Giai đoạn 2: Cài đặt với quyền Root
@@ -33,7 +32,7 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
       $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
       tee /etc/apt/sources.list.d/docker.list > /dev/null && \
     apt-get update && \
-    apt-get install -y --no-install-recommends docker-ce-cli=${DOCKER_VERSION}
+    apt-get install -y --no-install-recommends docker-ce-cli
 
 # Cài đặt Trivy với phiên bản đã chỉ định
 RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v${TRIVY_VERSION}
