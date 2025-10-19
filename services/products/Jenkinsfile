@@ -75,7 +75,7 @@ pipeline {
                            mvn sonar:sonar \
                                -Dsonar.projectKey=products-service \
                                -Dsonar.host.url=http://sonarqube:9000 \
-                               -Dsonar.login=$SONAR_AUTH_TOKEN
+                               -Dsonar.login=$SONAR_AUTH_TOKEN \
                                -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
                         '''
                     }
