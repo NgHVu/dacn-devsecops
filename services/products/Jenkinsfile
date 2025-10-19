@@ -10,7 +10,6 @@ pipeline {
 
     environment {
         IMAGE_NAME      = 'products'
-        VENV_DIR        = '.venv'
         TRIVY_EXIT_CODE = '1'
         TRIVY_SEVERITY  = 'HIGH,CRITICAL'
         DOCKER_BUILDKIT = '1'
@@ -44,42 +43,40 @@ pipeline {
         stage('2. Unit Test') {
             agent {
                 docker {
-                    image 'python:3.12-bookworm'
+                    // Sử dụng image Maven với Java 21 để đồng bộ với dự án
+                    image 'maven:3.9-eclipse-temurin-21'
                     args '-u 0:0'
                     reuseNode true
                 }
             }
             steps {
                 dir('services/products') {
-                    echo '--> Tạo virtualenv và chạy pytest...'
-                    sh '''
-                        python3 -m venv ${VENV_DIR}
-                        . ${VENV_DIR}/bin/activate
-                        python -m pip install --upgrade pip
-                        pip install -r requirements.txt
-                        # pytest -q
-                    '''
+                    echo '--> Chạy Maven test và build...'
+                    // Lệnh `verify` sẽ tự động: compile -> test -> package
+                    sh 'mvn clean verify'
                 }
             }
         }
 
         // --- STAGE SONARQUBE ĐÃ ĐƯỢC KÍCH HOẠT ---
         stage('3. SonarQube Analysis') {
+             agent {
+                docker {
+                    image 'maven:3.9-eclipse-temurin-21'
+                    args '-u 0:0'
+                    reuseNode true
+                }
+            }
             steps {
-                script {
-                    // Bước 1: Lấy đường dẫn của SonarScanner đã cài đặt
-                    def scannerHome = tool 'sonar-scanner-latest'
-
-                    // Bước 2: Chạy các lệnh trong đúng thư mục
-                    dir('services/products') {
-                        withSonarQubeEnv('sonarqube-local') {
-                            // Bước 3: Gọi scanner bằng đường dẫn tuyệt đối của nó
-                            sh "${scannerHome}/bin/sonar-scanner \
+                dir('services/products') {
+                    withSonarQubeEnv('sonarqube-local') {
+                        // Dùng `mvn sonar:sonar` là cách làm chuẩn cho dự án Maven
+                        sh '''
+                           mvn sonar:sonar \
                                -Dsonar.projectKey=products-service \
-                               -Dsonar.sources=./app \
                                -Dsonar.host.url=http://sonarqube:9000 \
-                               -Dsonar.login=$SONAR_AUTH_TOKEN"
-                        }
+                               -Dsonar.login=$SONAR_AUTH_TOKEN
+                        '''
                     }
                 }
             }
@@ -99,7 +96,8 @@ pipeline {
         stage('4. Trivy FS Scan (SCA)') {
             steps {
                 dir('services/products') {
-                    echo '--> Quét thư viện với Trivy (Filesystem)...'
+                    echo '--> Quét file pom.xml với Trivy (Filesystem)...'
+                    // Trivy sẽ tự động tìm và quét file pom.xml trong thư mục này
                     sh "trivy fs --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ."
                 }
             }
