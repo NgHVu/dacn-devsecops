@@ -168,7 +168,17 @@
         <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.12</version> <executions>
+                <version>0.8.12</version>
+
+                <configuration>
+                    <excludes>
+                        <exclude>**/DataSeeder.java</exclude>
+                        <exclude>**/ProductServiceApplication.java</exclude>
+                        <exclude>**/config/*</exclude>
+                        <exclude>**/*Request.java</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
                     <execution>
                         <goals>
                             <goal>prepare-agent</goal>
@@ -176,7 +186,8 @@
                     </execution>
                     <execution>
                         <id>report</id>
-                        <phase>verify</phase> <goals>
+                        <phase>verify</phase>
+                        <goals>
                             <goal>report</goal>
                         </goals>
                     </execution>
