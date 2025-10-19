@@ -45,7 +45,7 @@ pipeline {
                 docker {
                     // Sử dụng image Maven với Java 21 để đồng bộ với dự án
                     image 'maven:3.9-eclipse-temurin-21'
-                    args '-u 0:0'
+                    args '-u 0:0 --network dacn-ci_ci'
                     reuseNode true
                 }
             }
@@ -63,7 +63,7 @@ pipeline {
              agent {
                 docker {
                     image 'maven:3.9-eclipse-temurin-21'
-                    args '-u 0:0'
+                    args '-u 0:0 --network dacn-ci_ci'
                     reuseNode true
                 }
             }
