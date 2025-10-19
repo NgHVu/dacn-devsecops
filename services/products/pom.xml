@@ -176,8 +176,8 @@
                 <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
                 
                 <!-- (Tùy chọn) Chỉ định rõ các thư mục mã nguồn và test -->
-                <sonar.sources>src/main/java</sonar.sources>
-                <sonar.tests>src/test/java</sonar.tests>
+                <sonar.sources>src/main/java/com/example/products</sonar.sources>
+                <sonar.tests>src/test/java/com/example/products</sonar.tests>
             </properties>
         </profile>
     </profiles>
