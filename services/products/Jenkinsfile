@@ -40,27 +40,11 @@ pipeline {
             }
         }
 
-        stage('2. Unit Test') {
+        // ================================================================= #
+        // SỬA LỖI: Gộp Test và Sonar Analysis vào MỘT stage duy nhất
+        // ================================================================= #
+        stage('2. Test & Analyze') {
             agent {
-                docker {
-                    // Sử dụng image Maven với Java 21 để đồng bộ với dự án
-                    image 'maven:3.9-eclipse-temurin-21'
-                    args '-u 0:0 --network dacn-ci_ci'
-                    reuseNode true
-                }
-            }
-            steps {
-                dir('services/products') {
-                    echo '--> Chạy Maven test và build...'
-                    // Lệnh `verify` sẽ tự động: compile -> test -> package
-                    sh 'mvn clean verify'
-                }
-            }
-        }
-
-        // --- STAGE SONARQUBE ĐÃ ĐƯỢC KÍCH HOẠT ---
-        stage('3. SonarQube Analysis') {
-             agent {
                 docker {
                     image 'maven:3.9-eclipse-temurin-21'
                     args '-u 0:0 --network dacn-ci_ci'
@@ -70,9 +54,9 @@ pipeline {
             steps {
                 dir('services/products') {
                     withSonarQubeEnv('sonarqube-local') {
-                        // Dùng `mvn sonar:sonar` là cách làm chuẩn cho dự án Maven
+                        // Chạy cả hai lệnh trong cùng một shell, trên cùng một container
                         sh '''
-                           mvn sonar:sonar \
+                           mvn clean verify sonar:sonar \
                                -Dsonar.projectKey=products-service \
                                -Dsonar.host.url=http://sonarqube:9000 \
                                -Dsonar.login=$SONAR_AUTH_TOKEN \
@@ -83,12 +67,9 @@ pipeline {
             }
         }
 
-        // --- THÊM STAGE KIỂM TRA QUALITY GATE ---
-        stage('3.1 Quality Gate') {
+        stage('3. Quality Gate') {
             steps {
-                // Đợi kết quả phân tích từ SonarQube
                 timeout(time: 5, unit: 'MINUTES') {
-                    // Kiểm tra trạng thái của Quality Gate
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -97,8 +78,7 @@ pipeline {
         stage('4. Trivy FS Scan (SCA)') {
             steps {
                 dir('services/products') {
-                    echo '--> Quét file pom.xml với Trivy (Filesystem)...'
-                    // Trivy sẽ tự động tìm và quét file pom.xml trong thư mục này
+                    echo '--> Quét thư viện với Trivy (Filesystem)...'
                     sh "trivy fs --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ."
                 }
             }
