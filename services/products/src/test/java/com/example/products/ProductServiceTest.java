@@ -136,6 +136,7 @@ class ProductServiceTest {
     // =========================================================
     // Test cho phương thức list (trường hợp cơ bản)
     // =========================================================
+    @SuppressWarnings("unchecked")
     @Test
     void testList_Success() {
         // Arrange

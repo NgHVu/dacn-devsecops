@@ -40,9 +40,6 @@ pipeline {
             }
         }
 
-        // ================================================================= #
-        // SỬA LỖI: Tách biệt Test và Sonar, thêm bước kiểm tra
-        // ================================================================= #
         stage('2. Test & Analyze') {
             agent {
                 docker {
@@ -53,19 +50,10 @@ pipeline {
             }
             steps {
                 dir('services/products') {
-                    // Bước 1: Chạy test và tạo báo cáo JaCoCo
-                    echo '--> [1/3] Running tests and generating coverage report...'
-                    sh 'mvn clean verify'
-
-                    // Bước 2: KIỂM TRA xem báo cáo có được tạo ra không
-                    echo '--> [2/3] Verifying coverage report existence...'
-                    sh 'ls -l target/site/jacoco/jacoco.xml'
-
-                    // Bước 3: Gửi báo cáo đã được xác minh đến SonarQube
-                    echo '--> [3/3] Sending report to SonarQube...'
                     withSonarQubeEnv('sonarqube-local') {
+                        // Chạy cả hai lệnh trong cùng một shell
                         sh '''
-                           mvn sonar:sonar \
+                           mvn clean verify sonar:sonar \
                                -Dsonar.projectKey=products-service \
                                -Dsonar.host.url=http://sonarqube:9000 \
                                -Dsonar.login=$SONAR_AUTH_TOKEN
