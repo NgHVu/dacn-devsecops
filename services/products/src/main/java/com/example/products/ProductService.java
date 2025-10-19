@@ -3,6 +3,7 @@ package com.example.products;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification; 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,17 +25,30 @@ public class ProductService {
     // --- LOGIC CHO READ ---
     @Transactional(readOnly = true)
     public Page<Product> list(String q, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
+        
+        // 1. Tạo một Specification rỗng (luôn đúng) để bắt đầu
+        Specification<Product> spec = Specification.allOf();
+
+        // 2. Nếu có từ khóa tên, thêm điều kiện "AND name LIKE ..."
+        if (StringUtils.hasText(q)) {
+            spec = spec.and((root, query, cb) -> 
+                cb.like(cb.lower(root.get("name")), "%" + q.trim().toLowerCase() + "%")
+            );
+        }
+
+        // 3. Nếu có khoảng giá, thêm điều kiện "AND price BETWEEN ..."
         if (minPrice != null && maxPrice != null) {
             if (minPrice.compareTo(maxPrice) > 0) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "minPrice không được lớn hơn maxPrice");
             }
-            return repo.searchByPriceRange(minPrice, maxPrice, pageable);
+            spec = spec.and((root, query, cb) -> 
+                cb.between(root.get("price"), minPrice, maxPrice)
+            );
         }
-        if (StringUtils.hasText(q)) {
-            return repo.findByNameContainingIgnoreCase(q.trim(), pageable);
-        }
-        return repo.findAll(pageable);
-    }
+
+        // 4. Thực thi truy vấn với tất cả các điều kiện đã được xây dựng
+        return repo.findAll(spec, pageable);
+    }   
 
     @Transactional(readOnly = true)
     public Product getById(Long id) {

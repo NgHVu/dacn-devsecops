@@ -41,7 +41,8 @@ public class ProductController {
 
             @Parameter(description = "Giá tối đa")
             @RequestParam(required = false) @DecimalMin("0.00") BigDecimal maxPrice,
-
+            
+            @Parameter(hidden = true)
             @PageableDefault(size = 10, sort = "updatedAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         return ResponseEntity.ok(service.list(q, minPrice, maxPrice, pageable));
