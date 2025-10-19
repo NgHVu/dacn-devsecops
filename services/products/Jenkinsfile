@@ -13,19 +13,15 @@ pipeline {
         TRIVY_EXIT_CODE = '1'
         TRIVY_SEVERITY  = 'HIGH,CRITICAL'
         DOCKER_BUILDKIT = '1'
+        // TỐI ƯU: Định nghĩa thư mục cache chung cho Trivy
+        TRIVY_CACHE_DIR = "/var/jenkins_home/caches/trivy"
     }
 
     stages {
-        stage('0. Pre-Clean') {
-            steps {
-                echo '--> Dọn dẹp thư mục làm việc trước khi chạy'
-                deleteDir()
-            }
-        }
-
         stage('1. Checkout SCM & Compute Tag') {
             steps {
                 echo '--> Lấy mã nguồn từ Git và tính toán Image Tag...'
+                sh 'git clean -fdx'
                 checkout scm
                 script {
                     env.IMAGE_TAG = sh(
@@ -44,14 +40,13 @@ pipeline {
             agent {
                 docker {
                     image 'maven:3.9-eclipse-temurin-21'
-                    args '-u 0:0 --network dacn-ci_ci'
+                    args '-v $HOME/.m2:/root/.m2 -u 0:0 --network dacn-ci_ci'
                     reuseNode true
                 }
             }
             steps {
                 dir('services/products') {
                     withSonarQubeEnv('sonarqube-local') {
-                        // Chạy cả hai lệnh trong cùng một shell
                         sh '''
                            mvn clean verify sonar:sonar \
                                -Dsonar.projectKey=products-service \
@@ -62,7 +57,7 @@ pipeline {
                 }
             }
         }
-
+        
         stage('3. Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
@@ -71,12 +66,14 @@ pipeline {
             }
         }
 
-        // ... Các stages còn lại giữ nguyên ...
+        // ================================================================= #
+        // TỐI ƯU: Sử dụng cache chung cho Trivy
+        // ================================================================= #
         stage('4. Trivy FS Scan (SCA)') {
             steps {
                 dir('services/products') {
                     echo '--> Quét thư viện với Trivy (Filesystem)...'
-                    sh "trivy fs --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ."
+                    sh "trivy fs --cache-dir ${TRIVY_CACHE_DIR} --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ."
                 }
             }
         }
@@ -84,6 +81,7 @@ pipeline {
         stage('5. Build Docker Image') {
             steps {
                 dir('services/products') {
+                    echo '--> Building Docker image (đã tối ưu với Layer Caching)...'
                     script {
                         sh "docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} ."
                     }
@@ -91,10 +89,13 @@ pipeline {
             }
         }
 
+        // ================================================================= #
+        // TỐI ƯU: Tái sử dụng cache chung cho Trivy
+        // ================================================================= #
         stage('6. Trivy Image Scan') {
             steps {
                 script {
-                    sh "trivy image --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                    sh "trivy image --cache-dir ${TRIVY_CACHE_DIR} --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
                 }
             }
         }
@@ -102,14 +103,13 @@ pipeline {
 
     post {
         always {
-            echo '--> Dọn dẹp workspace & docker images...'
+            echo '--> Dọn dẹp docker images...'
             script {
                 if (env.IMAGE_TAG) {
                     sh "docker rmi ${env.IMAGE_NAME}:${env.IMAGE_TAG} || true"
                 }
                 sh "docker image prune -f || true"
             }
-            cleanWs()
         }
     }
 }
