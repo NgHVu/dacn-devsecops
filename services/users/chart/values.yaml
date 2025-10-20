@@ -1,4 +1,122 @@
-image:
-  repository: example/users
-  tag: latest
+#=================================================================#
+# Global Settings
+#=================================================================#
 replicaCount: 1
+
+# (Tuỳ chọn) Nhãn/annotation chung áp dụng cho mọi tài nguyên
+labels: {}
+annotations: {}
+# labels:
+#   app.kubernetes.io/part-of: food-ordering
+#   app.kubernetes.io/component: users # <-- Sửa
+# annotations:
+#   argocd.argoproj.io/sync-wave: "0"
+
+# (Tuỳ chọn) Annotation riêng cho Pod
+podAnnotations: {}
+# podAnnotations:
+#   prometheus.io/scrape: "true"
+#   prometheus.io/port: "8082" # <-- Sửa
+#   prometheus.io/path: "/actuator/prometheus"
+
+#=================================================================#
+# Image Settings
+#=================================================================#
+image:
+  # Ví dụ khi lên AWS ECR:
+  # 123456789012.dkr.ecr.ap-southeast-1.amazonaws.com/users
+  repository: users # <-- SỬA ĐỔI 1
+  pullPolicy: IfNotPresent
+  # CI/CD sẽ cập nhật tag này (sha7/semver). Local giữ "local".
+  tag: "local"
+
+# Cần thiết khi dùng private registry (ví dụ: ECR)
+imagePullSecrets: []
+# - name: my-ecr-secret
+
+#=================================================================#
+# Container Settings
+#=================================================================#
+container:
+  # Cổng ứng dụng Spring Boot lắng nghe bên trong container
+  port: 8082 # <-- SỬA ĐỔI 2
+
+  # (Tuỳ chọn) Biến môi trường & nguồn env (ConfigMap/Secret)
+  env: []
+  # env:
+  #   - name: APP_ENV
+  #     value: "dev"
+  #   - name: DATABASE_URL
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: users-secret
+  #         key: database_url
+
+  envFrom: []
+  # envFrom:
+  #   - configMapRef:
+  #       name: users-config
+  #   - secretRef:
+  #       name: users-secret
+
+  # Cấu hình probes đã được cập nhật cho Spring Boot Actuator
+  probes:
+    liveness:
+      path: /actuator/health/liveness
+      initialDelaySeconds: 15
+      periodSeconds: 20
+    readiness:
+      path: /actuator/health/readiness
+      initialDelaySeconds: 5
+      periodSeconds: 10
+
+#=================================================================#
+# Service & Networking
+#=================================================================#
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+ingress:
+  enabled: false
+  # ... các phần còn lại giữ nguyên
+
+#=================================================================#
+# Resource & Autoscaling
+#=================================================================#
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  # ... các phần còn lại giữ nguyên
+
+autoscaling:
+  enabled: false
+  # ... các phần còn lại giữ nguyên
+
+#=================================================================#
+# Security & RBAC
+#=================================================================#
+serviceAccount:
+  create: true
+  name: ""
+
+podSecurityContext:
+  fsGroup: 10001
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+#=================================================================#
+# Scheduling
+#=================================================================#
+nodeSelector: {}
+tolerations: []
+affinity: {}
