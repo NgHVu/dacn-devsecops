@@ -1,1 +1,118 @@
-pipeline { agent any; stages { stage('Build'){steps{echo 'build'}} } }
+pipeline {
+    agent any
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        disableConcurrentBuilds()
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+        ansiColor('xterm')
+    }
+
+    environment {
+        // SỬA ĐỔI 1: Đổi tên Image
+        IMAGE_NAME      = 'orders'
+        TRIVY_EXIT_CODE = '1'
+        TRIVY_SEVERITY  = 'HIGH,CRITICAL'
+        DOCKER_BUILDKIT = '1'
+        TRIVY_CACHE_DIR = "/var/jenkins_home/caches/trivy"
+    }
+
+    stages {
+        stage('1. Checkout SCM & Compute Tag') {
+            steps {
+                echo '--> Lấy mã nguồn từ Git và tính toán Image Tag...'
+                sh 'git clean -fdx'
+                checkout scm
+                script {
+                    env.IMAGE_TAG = sh(
+                        script: 'git rev-parse --short=7 HEAD',
+                        returnStdout: true
+                    ).trim()
+                    if (!env.IMAGE_TAG) {
+                        env.IMAGE_TAG = "dev-${env.BUILD_NUMBER}"
+                    }
+                    echo "--> IMAGE_TAG = ${env.IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('2. Test & Analyze') {
+            agent {
+                docker {
+                    image 'maven:3.9-eclipse-temurin-21'
+                    args '-v $HOME/.m2:/root/.m2 -u 0:0 --network dacn-ci_ci'
+                    reuseNode true
+                }
+            }
+            steps {
+                // SỬA ĐỔI 2: Thay đổi thư mục làm việc
+                dir('services/orders') {
+                    withSonarQubeEnv('sonarqube-local') {
+                        sh '''
+                           mvn clean verify sonar:sonar \
+                               -Dsonar.projectKey=orders-service \
+                               -Dsonar.host.url=http://sonarqube:9000 \
+                               -Dsonar.login=$SONAR_AUTH_TOKEN
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('3. Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('4. Trivy FS Scan (SCA)') {
+            steps {
+                // SỬA ĐỔI 2: Thay đổi thư mục làm việc
+                dir('services/users') {
+                    echo '--> Quét thư viện với Trivy (Filesystem)...'
+                    sh "trivy fs --cache-dir ${TRIVY_CACHE_DIR} --timeout 30m --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ."
+                }
+            }
+        }
+
+        stage('5. Build Docker Image') {
+            steps {
+                // SỬA ĐỔI 2: Thay đổi thư mục làm việc
+                dir('services/users') {
+                    echo '--> Building Docker image...'
+                    script {
+                        sh "docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} ."
+                    }
+                }
+            }
+        }
+
+        stage('6. Trivy Image Scan') {
+            agent {
+                docker {
+                    image 'aquasecurity/trivy:0.49.1' 
+                    args '-v /var/run/docker.sock:/var/run/docker.sock -v ${TRIVY_CACHE_DIR}:/root/.cache/trivy -u 0:0'
+                    reuseNode true
+                }
+            }
+            steps {
+                echo '--> Quét Docker image với Trivy...'
+                sh "trivy image --timeout 30m --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+            }
+        }
+    }
+
+    post {
+        always {
+            echo '--> Dọn dẹp docker images...'
+            script {
+                if (env.IMAGE_TAG) {
+                    sh "docker rmi ${env.IMAGE_NAME}:${env.IMAGE_TAG} || true"
+                }
+                sh "docker image prune -f || true"
+            }
+        }
+    }
+}
