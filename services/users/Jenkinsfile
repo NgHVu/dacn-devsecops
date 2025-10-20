@@ -9,7 +9,6 @@ pipeline {
     }
 
     environment {
-        // SỬA ĐỔI 1: Đổi tên Image
         IMAGE_NAME      = 'users'
         TRIVY_EXIT_CODE = '1'
         TRIVY_SEVERITY  = 'HIGH,CRITICAL'
@@ -45,7 +44,6 @@ pipeline {
                 }
             }
             steps {
-                // SỬA ĐỔI 2: Thay đổi thư mục làm việc
                 dir('services/users') {
                     withSonarQubeEnv('sonarqube-local') {
                         sh '''
@@ -69,7 +67,6 @@ pipeline {
 
         stage('4. Trivy FS Scan (SCA)') {
             steps {
-                // SỬA ĐỔI 2: Thay đổi thư mục làm việc
                 dir('services/users') {
                     echo '--> Quét thư viện với Trivy (Filesystem)...'
                     sh "trivy fs --cache-dir ${TRIVY_CACHE_DIR} --timeout 30m --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ."
@@ -79,7 +76,6 @@ pipeline {
 
         stage('5. Build Docker Image') {
             steps {
-                // SỬA ĐỔI 2: Thay đổi thư mục làm việc
                 dir('services/users') {
                     echo '--> Building Docker image...'
                     script {

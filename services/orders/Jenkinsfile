@@ -69,8 +69,7 @@ pipeline {
 
         stage('4. Trivy FS Scan (SCA)') {
             steps {
-                // SỬA ĐỔI 2: Thay đổi thư mục làm việc
-                dir('services/users') {
+                dir('services/orders') {
                     echo '--> Quét thư viện với Trivy (Filesystem)...'
                     sh "trivy fs --cache-dir ${TRIVY_CACHE_DIR} --timeout 30m --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ."
                 }
@@ -79,8 +78,7 @@ pipeline {
 
         stage('5. Build Docker Image') {
             steps {
-                // SỬA ĐỔI 2: Thay đổi thư mục làm việc
-                dir('services/users') {
+                dir('services/orders') {
                     echo '--> Building Docker image...'
                     script {
                         sh "docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} ."
