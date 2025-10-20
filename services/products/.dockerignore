@@ -1,87 +1,78 @@
-# ================================================================= #
-# General & Secrets
-# ================================================================= #
-# Log files
-*.log
-npm-debug.log*
-yarn-debug.log*
+=================================================================
 
-# Environment variables - ignore all .env files except the example
-.env
-.env.*
-!.env.example
+Git & Docker
 
-# Local override configurations
-*.local.yaml
-*.local.yml
+=================================================================
+
+Bỏ qua thư mục Git và các file .ignore
+
+.git
+.gitignore
+.dockerignore
+
+Bỏ qua các file docker-compose dùng cho local dev
+
+docker-compose.dev.yml
 docker-compose.override.yml
 
-# Secret keys and certificates
-*.pem
-*.key
-*.crt
-*.p12
+=================================================================
 
-# ================================================================= #
-# Language Specific & Caches
-# ================================================================= #
-# Node.js (for Frontend service)
-node_modules/
-.npm/
-.next/
-build/
-dist/
-coverage/
-.eslintcache
+Java & Maven Build Artifacts
 
-# Java & Maven (for Backend services)
+=================================================================
+
+Bỏ qua toàn bộ thư mục build của Maven
+
 target/
+
+Bỏ qua các file backup của Maven release plugin
+
 pom.xml.tag
 pom.xml.next
 pom.xml.releaseBackup
+
+Bỏ qua các file đã được biên dịch và đóng gói
+
 *.class
 *.jar
 *.war
 *.ear
 
-# Java runtime files
+Bỏ qua cache của Maven wrapper
+
+.mvn/wrapper/maven-wrapper.jar
+
+=================================================================
+
+Logs & Runtime files
+
+=================================================================
+
+.log
+npm-debug.log
+yarn-debug.log*
 hs_err_pid*
 replay_pid*
 
-# Maven wrapper cache
-.mvn/wrapper/maven-wrapper.jar
+=================================================================
 
-# ================================================================= #
-# Tools & Frameworks
-# ================================================================= #
-# Terraform
-.terraform/
-*.tfstate
-*.tfstate.*
-crash.log
-*.tfvars
-*.tfplan
-!terraform.tfvars.example
+IDEs & OS generated files
 
-# Jenkins & Docker
-jenkins_home/
-.docker/
-*.pid
-*.sock
+=================================================================
 
-# Helm packaged charts
-**/charts/**/*.tgz
-
-# ================================================================= #
-# IDEs & OS
-# ================================================================= #
-# IDEs - ignore all, but keep extensions file for team consistency
 .idea/
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 *.swp
 *.swo
-
-# OS generated files
 .DS_Store
 Thumbs.db
+
+=================================================================
+
+Secrets & Environment variables
+
+=================================================================
+
+.env
+.env.*
+!.env.example

@@ -1,2 +1,78 @@
-__pycache__/
-node_modules/
+=================================================================
+
+Git & Docker
+
+=================================================================
+
+Bỏ qua thư mục Git và các file .ignore
+
+.git
+.gitignore
+.dockerignore
+
+Bỏ qua các file docker-compose dùng cho local dev
+
+docker-compose.dev.yml
+docker-compose.override.yml
+
+=================================================================
+
+Java & Maven Build Artifacts
+
+=================================================================
+
+Bỏ qua toàn bộ thư mục build của Maven
+
+target/
+
+Bỏ qua các file backup của Maven release plugin
+
+pom.xml.tag
+pom.xml.next
+pom.xml.releaseBackup
+
+Bỏ qua các file đã được biên dịch và đóng gói
+
+*.class
+*.jar
+*.war
+*.ear
+
+Bỏ qua cache của Maven wrapper
+
+.mvn/wrapper/maven-wrapper.jar
+
+=================================================================
+
+Logs & Runtime files
+
+=================================================================
+
+.log
+npm-debug.log
+yarn-debug.log*
+hs_err_pid*
+replay_pid*
+
+=================================================================
+
+IDEs & OS generated files
+
+=================================================================
+
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+=================================================================
+
+Secrets & Environment variables
+
+=================================================================
+
+.env
+.env.*
+!.env.example
