@@ -14,6 +14,7 @@ pipeline {
         TRIVY_SEVERITY  = 'HIGH,CRITICAL'
         DOCKER_BUILDKIT = '1'
         TRIVY_CACHE_DIR = "/var/jenkins_home/caches/trivy"
+        GITHUB_PAT      = credentials('github-pat') 
     }
 
     stages {
@@ -23,14 +24,20 @@ pipeline {
                 sh 'git clean -fdx'
                 checkout scm
                 script {
-                    env.IMAGE_TAG = sh(
-                        script: 'git rev-parse --short=7 HEAD',
-                        returnStdout: true
-                    ).trim()
+                    env.IMAGE_TAG = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
                     if (!env.IMAGE_TAG) {
                         env.IMAGE_TAG = "dev-${env.BUILD_NUMBER}"
                     }
                     echo "--> IMAGE_TAG = ${env.IMAGE_TAG}"
+                }
+            }
+        }
+        
+        stage('1.5. Login to Registries') {
+            steps {
+                script {
+                    echo '--> Đăng nhập vào GitHub Container Registry...'
+                    sh 'echo $GITHUB_PAT_PSW | docker login ghcr.io -u NgHVu --password-stdin'
                 }
             }
         }
@@ -88,7 +95,7 @@ pipeline {
         stage('6. Trivy Image Scan') {
             agent {
                 docker {
-                    image 'aquasecurity/trivy:0.49.1' 
+                    image 'ghcr.io/aquasecurity/trivy:0.49.1' 
                     args '-v /var/run/docker.sock:/var/run/docker.sock -v ${TRIVY_CACHE_DIR}:/root/.cache/trivy -u 0:0'
                     reuseNode true
                 }
