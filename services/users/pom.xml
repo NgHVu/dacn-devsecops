@@ -87,7 +87,6 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- === THÊM VÀO: Thư viện để test các endpoint bảo mật === -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
@@ -111,13 +110,12 @@
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>${jacoco.version}</version>
                 <configuration>
-                    <!-- SỬA ĐỔI: Chỉ loại bỏ các file cấu hình, không loại bỏ cả package -->
                     <excludes>
                         <exclude>**/UserServiceApplication.java</exclude>
                         <exclude>**/config/**</exclude>
-                        <exclude>**/security/SecurityConfig.java</exclude> <!-- Chỉ exclude file config -->
+                        <exclude>**/security/SecurityConfig.java</exclude> 
                         <exclude>**/dto/**</exclude>
-                        <exclude>**/entity/**</exclude> <!-- Thêm entity -->
+                        <exclude>**/entity/**</exclude> 
                     </excludes>
                 </configuration>
                 <executions>
