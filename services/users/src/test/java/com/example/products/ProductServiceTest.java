@@ -11,12 +11,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.example.products.dto.ProductCreateRequest;
-import com.example.products.dto.ProductUpdateRequest;
-import com.example.products.entity.Product;
-import com.example.products.repository.ProductRepository;
-import com.example.products.service.ProductService;
-
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -31,10 +25,10 @@ import static org.mockito.Mockito.*;
 class ProductServiceTest {
 
     @Mock
-    private ProductRepository productRepository;
+    private UserRepository productRepository;
 
     @InjectMocks
-    private ProductService productService;
+    private UserService productService;
 
     @Test
     void testGetById_Success() {

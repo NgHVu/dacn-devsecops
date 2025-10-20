@@ -1,10 +1,5 @@
 package com.example.products;
 
-import com.example.products.controller.ProductController;
-import com.example.products.dto.ProductCreateRequest;
-import com.example.products.dto.ProductUpdateRequest;
-import com.example.products.entity.Product;
-import com.example.products.service.ProductService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +17,7 @@ import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(ProductController.class)
+@WebMvcTest(UserController.class)
 class ProductControllerTest {
 
     @Autowired
@@ -33,7 +28,7 @@ class ProductControllerTest {
 
     @SuppressWarnings("removal")
     @MockBean
-    private ProductService productService;
+    private UserService productService;
 
     @Test
     void testList_ShouldReturn200OK() throws Exception {

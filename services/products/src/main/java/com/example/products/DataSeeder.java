@@ -9,6 +9,9 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import com.example.products.entity.Product;
+import com.example.products.repository.ProductRepository;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;

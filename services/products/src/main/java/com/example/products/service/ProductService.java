@@ -1,4 +1,4 @@
-package com.example.products;
+package com.example.products.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -9,6 +9,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
+
+import com.example.products.dto.ProductCreateRequest;
+import com.example.products.dto.ProductUpdateRequest;
+import com.example.products.entity.Product;
+import com.example.products.repository.ProductRepository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

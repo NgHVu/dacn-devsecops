@@ -1,4 +1,4 @@
-package com.example.products;
+package com.example.products.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -13,6 +13,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+
+import com.example.products.dto.ProductCreateRequest;
+import com.example.products.dto.ProductUpdateRequest;
+import com.example.products.entity.Product;
+import com.example.products.service.ProductService;
 
 import java.math.BigDecimal;
 import java.net.URI;
