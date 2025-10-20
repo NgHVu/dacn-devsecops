@@ -1,3 +1,39 @@
 apiVersion: v2
+# SỬA ĐỔI 1: Đổi tên chart
 name: orders
+description: A Helm chart for the Orders microservice of the Food Ordering application.
+type: application
+
+# --- Versioning ---
+# Giữ nguyên, vì đây là phiên bản đầu tiên của chart và ứng dụng này
 version: 0.1.0
+appVersion: "1.0.0"
+
+# --- Compatibility & Metadata ---
+kubeVersion: ">=1.24.0-0"
+keywords:
+  - spring-boot
+  - java
+  # SỬA ĐỔI 2: Cập nhật keyword
+  - orders
+  - food-ordering
+  - devsecops
+
+# --- Links ---
+home: https://github.com/NgHVu/dacn-devsecops
+sources:
+  # SỬA ĐỔI 3: Cập nhật đường dẫn mã nguồn
+  - https://github.com/NgHVu/dacn-devsecops/tree/main/services/orders
+
+# --- Maintainers ---
+# ⚠️ NHẮC NHỞ: Mục này chứa thông tin cá nhân (tên, email) của bạn.
+maintainers:
+  - name: "Vu"
+    email: "nhoangvu2306@gmail.com"
+
+# --- (Optional) Annotations for publishing ---
+annotations:
+  category: WebApplication
+
+# SỬA ĐỔI 4: Cập nhật icon
+icon: https://raw.githubusercontent.com/NgHVu/dacn-devsecops/main/assets/orders-icon.png # ⚠️ Đảm bảo file này tồn tại
