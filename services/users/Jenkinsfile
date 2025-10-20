@@ -37,7 +37,7 @@ pipeline {
             steps {
                 script {
                     echo '--> Đăng nhập vào GitHub Container Registry...'
-                    sh 'echo $GITHUB_PAT_PSW | docker login ghcr.io -u NgHVu --password-stdin'
+                    sh "echo \$GITHUB_PAT_PSW | docker login ghcr.io -u NgHVu --password-stdin"
                 }
             }
         }
@@ -119,3 +119,4 @@ pipeline {
         }
     }
 }
+
