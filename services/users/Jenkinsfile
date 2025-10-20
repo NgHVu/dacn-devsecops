@@ -35,9 +35,10 @@ pipeline {
         
         stage('1.5. Login to Registries') {
             steps {
-                script {
+                // withCredentials sẽ tự động tạo biến GITHUB_TOKEN chứa password
+                withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_TOKEN')]) {
                     echo '--> Đăng nhập vào GitHub Container Registry...'
-                    sh "echo \$GITHUB_PAT_PSW | docker login ghcr.io -u NgHVu --password-stdin"
+                    sh "echo ${GITHUB_TOKEN} | docker login ghcr.io -u NgHVu --password-stdin"
                 }
             }
         }
