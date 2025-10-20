@@ -39,7 +39,7 @@ COPY --from=builder /app/spring-boot-loader/ ./
 COPY --from=builder /app/snapshot-dependencies/ ./
 COPY --from=builder /app/application/ ./
 
-# Mở cổng 8081 (theo file application.properties)
+# Mở cổng 8081 (theo file application.properties của products-service)
 EXPOSE 8081
 
 # Lệnh để khởi chạy ứng dụng (sử dụng trình khởi chạy của Spring)
