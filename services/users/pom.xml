@@ -80,8 +80,6 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>${springdoc.version}</version>
         </dependency>
-
-        <!-- === DEPENDENCIES CHO TEST === -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -113,9 +111,9 @@
                     <excludes>
                         <exclude>**/UserServiceApplication.java</exclude>
                         <exclude>**/config/**</exclude>
-                        <exclude>**/security/SecurityConfig.java</exclude> 
+                        <exclude>**/security/SecurityConfig.java</exclude>
                         <exclude>**/dto/**</exclude>
-                        <exclude>**/entity/**</exclude> 
+                        <exclude>**/entity/**</exclude>
                     </excludes>
                 </configuration>
                 <executions>
@@ -136,4 +134,22 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>sonar</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <!-- Chỉ định đường dẫn tới báo cáo JaCoCo -->
+                <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+                
+                <!-- (Tùy chọn) Chỉ định rõ các thư mục mã nguồn và test -->
+                <sonar.sources>src/main/java</sonar.sources>
+                <sonar.tests>src/test/java</sonar.tests>
+            </properties>
+        </profile>
+    </profiles>
 </project>
+
