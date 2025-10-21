@@ -56,17 +56,33 @@ pipeline {
             }
             steps {
                 echo '--> Đang cập nhật cơ sở dữ liệu Trivy (có thể mất nhiều thời gian ở lần đầu)...'
-                // Script này chạy Trivy ở chế độ nền và in ra log mỗi 60 giây
-                // để Jenkins không bị timeout.
+                // Script này chạy Trivy ở chế độ nền và in ra log mỗi 30 giây
+                // để Jenkins không bị timeout, đồng thời kiểm tra lỗi của Trivy.
                 sh '''
+                    #!/bin/sh
+                    set -e
+
+                    echo "Bắt đầu tải CSDL của Trivy trong nền..."
                     trivy image --download-db-only --cache-dir /root/.cache/trivy --timeout 30m &
-                    pid=$!
-                    echo "Trivy DB download process started with PID: $pid"
-                    while kill -0 $pid 2>/dev/null; do
-                        echo "Still downloading Trivy DB... (waiting for process $pid to finish)"
-                        sleep 60
+                    
+                    TRIVY_PID=$!
+                    
+                    # Vòng lặp "giữ kết nối"
+                    while kill -0 $TRIVY_PID >/dev/null 2>&1; do
+                        echo "[Keep-alive] Quá trình tải CSDL vẫn đang chạy (PID: ${TRIVY_PID})..."
+                        sleep 30
                     done
-                    wait $pid
+                    
+                    # Đợi tiến trình nền kết thúc và kiểm tra mã thoát
+                    wait $TRIVY_PID
+                    EXIT_CODE=$?
+                    
+                    if [ $EXIT_CODE -ne 0 ]; then
+                        echo "Lỗi: Quá trình tải CSDL của Trivy đã thất bại với mã thoát $EXIT_CODE"
+                        exit $EXIT_CODE
+                    fi
+                    
+                    echo "Tải CSDL của Trivy thành công."
                 '''
             }
         }
