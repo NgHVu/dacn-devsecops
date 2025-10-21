@@ -25,6 +25,8 @@
         <springdoc.version>2.6.0</springdoc.version>
         <jjwt.version>0.12.6</jjwt.version>
         <jacoco.version>0.8.12</jacoco.version>
+        <maven.surefire.version>3.2.5</maven.surefire.version>
+        <enforcer.version>3.5.0</enforcer.version>
     </properties>
 
     <dependencies>
@@ -94,15 +96,45 @@
 
     <build>
         <plugins>
+            <!-- Bắt buộc JDK >= 21 -->
             <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${enforcer.version}</version>
+                <executions>
+                    <execution>
+                        <id>enforce-java</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[21,)</version>
+                                </requireJavaVersion>
+                            </rules>
+                            <fail>true</fail>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- BỔ SUNG: Khai báo tường minh cho Compiler -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.14.0</version>
                 <configuration>
-                    <layers>
-                        <enabled>true</enabled>
-                    </layers>
+                    <release>${maven.compiler.release}</release>
                 </configuration>
             </plugin>
+
+            <!-- BỔ SUNG: Khai báo tường minh cho Surefire (chạy unit test) -->
+             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven.surefire.version}</version>
+            </plugin>
+            
+            <!-- JaCoCo Plugin -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
@@ -119,18 +151,25 @@
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
-                        <goals>
-                            <goal>prepare-agent</goal>
-                        </goals>
+                        <goals><goal>prepare-agent</goal></goals>
                     </execution>
                     <execution>
                         <id>report</id>
                         <phase>verify</phase>
-                        <goals>
-                            <goal>report</goal>
-                        </goals>
+                        <goals><goal>report</goal></goals>
                     </execution>
                 </executions>
+            </plugin>
+
+            <!-- Spring Boot Plugin -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <layers>
+                        <enabled>true</enabled>
+                    </layers>
+                </configuration>
             </plugin>
         </plugins>
     </build>
@@ -142,10 +181,7 @@
                 <activeByDefault>true</activeByDefault>
             </activation>
             <properties>
-                <!-- Chỉ định đường dẫn tới báo cáo JaCoCo -->
                 <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
-                
-                <!-- (Tùy chọn) Chỉ định rõ các thư mục mã nguồn và test -->
                 <sonar.sources>src/main/java</sonar.sources>
                 <sonar.tests>src/test/java</sonar.tests>
             </properties>
