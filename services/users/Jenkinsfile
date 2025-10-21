@@ -14,7 +14,6 @@ pipeline {
         TRIVY_SEVERITY  = 'HIGH,CRITICAL'
         DOCKER_BUILDKIT = '1'
         TRIVY_CACHE_DIR = "/var/jenkins_home/caches/trivy"
-        GITHUB_PAT      = credentials('github-pat') 
     }
 
     stages {
@@ -36,6 +35,7 @@ pipeline {
         stage('1.5. Login to Registries') {
             steps {
                 // withCredentials sẽ tự động tạo biến GITHUB_TOKEN chứa password
+                // và che giấu giá trị của nó trong log
                 withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_TOKEN')]) {
                     echo '--> Đăng nhập vào GitHub Container Registry...'
                     sh "echo ${GITHUB_TOKEN} | docker login ghcr.io -u NgHVu --password-stdin"
@@ -102,12 +102,17 @@ pipeline {
                 }
             }
             steps {
+                echo '--> Cập nhật cơ sở dữ liệu Trivy...'
+                // Chỉ tải DB và sử dụng cache đã mount
+                sh "trivy image --download-db-only --cache-dir /root/.cache/trivy --timeout 15m"
+
                 echo '--> Quét Docker image với Trivy...'
+                // Chạy nhanh hơn vì DB đã có sẵn
                 sh "trivy image --timeout 30m --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
             }
         }
     }
-
+    
     post {
         always {
             echo '--> Dọn dẹp docker images...'
