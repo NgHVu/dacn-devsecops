@@ -6,8 +6,8 @@ import com.example.users.dto.LoginRequest;
 import com.example.users.dto.RegisterRequest;
 import com.example.users.dto.UserResponse;
 import com.example.users.exception.EmailAlreadyExistsException;
-import com.example.users.security.JwtAuthenticationFilter; // THÊM IMPORT
-import com.example.users.security.JwtTokenProvider; // THÊM IMPORT
+import com.example.users.security.JwtAuthenticationFilter;
+import com.example.users.security.JwtTokenProvider;
 import com.example.users.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf; // <-- THÊM IMPORT NÀY
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,19 +39,15 @@ class AuthControllerTest {
     private ObjectMapper objectMapper;
 
     @SuppressWarnings("removal")
-        @MockBean
+    @MockBean
     private UserService userService;
 
-    // =========================================================
-    // SỬA LỖI: Thêm các MockBean cho các thành phần bảo mật
-    // mà @WebMvcTest không tự động tải
-    // =========================================================
     @SuppressWarnings("removal")
-        @MockBean
+    @MockBean
     private JwtTokenProvider jwtTokenProvider;
 
     @SuppressWarnings("removal")
-        @MockBean
+    @MockBean
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
 
@@ -59,16 +56,15 @@ class AuthControllerTest {
     @Test
     @DisplayName("POST /register: Thành công khi dữ liệu hợp lệ")
     void testRegisterUser_Success() throws Exception {
-        // Arrange
         RegisterRequest request = new RegisterRequest("Test User", "test@example.com", "password123");
         UserResponse response = new UserResponse(1L, "Test User", "test@example.com");
 
         when(userService.registerUser(any(RegisterRequest.class))).thenReturn(response);
 
-        // Act & Assert
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf())) // <-- SỬA LỖI: Thêm token CSRF hợp lệ vào request
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.name").value("Test User"))
@@ -84,7 +80,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(badRequest)))
+                .content(objectMapper.writeValueAsString(badRequest))
+                .with(csrf())) // <-- SỬA LỖI: Thêm token CSRF hợp lệ vào request
                 .andExpect(status().isBadRequest());
 
         verify(userService, never()).registerUser(any());
@@ -100,7 +97,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf())) // <-- SỬA LỖI: Thêm token CSRF hợp lệ vào request
                 .andExpect(status().isConflict());
     }
 
@@ -116,7 +114,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf())) // <-- SỬA LỖI: Thêm token CSRF hợp lệ vào request
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("dummy.jwt.token"));
     }
@@ -131,7 +130,9 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf())) // <-- SỬA LỖI: Thêm token CSRF hợp lệ vào request
                 .andExpect(status().isUnauthorized());
     }
 }
+
