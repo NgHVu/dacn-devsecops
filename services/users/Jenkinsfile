@@ -56,7 +56,18 @@ pipeline {
             }
             steps {
                 echo '--> Đang cập nhật cơ sở dữ liệu Trivy (có thể mất nhiều thời gian ở lần đầu)...'
-                sh "trivy image --download-db-only --cache-dir /root/.cache/trivy --timeout 30m"
+                // Script này chạy Trivy ở chế độ nền và in ra log mỗi 60 giây
+                // để Jenkins không bị timeout.
+                sh '''
+                    trivy image --download-db-only --cache-dir /root/.cache/trivy --timeout 30m &
+                    pid=$!
+                    echo "Trivy DB download process started with PID: $pid"
+                    while kill -0 $pid 2>/dev/null; do
+                        echo "Still downloading Trivy DB... (waiting for process $pid to finish)"
+                        sleep 60
+                    done
+                    wait $pid
+                '''
             }
         }
 
