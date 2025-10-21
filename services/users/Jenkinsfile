@@ -38,10 +38,9 @@ pipeline {
                     echo '--> Đăng nhập vào GitHub Container Registry...'
                     
                     // Dùng tham số 'stdin' của bước 'sh' để truyền token an toàn
-                    sh(
-                        script: "docker login ghcr.io -u NgHVu --password-stdin",
-                        stdin: GITHUB_TOKEN
-                    )
+                    sh '''
+                        echo $GITHUB_TOKEN | docker login ghcr.io -u NgHVu --password-stdin
+                    '''
                 }
             }
         }
