@@ -45,6 +45,21 @@ pipeline {
             }
         }
 
+        // Thêm --network dacn-ci_ci vào tất cả các agent
+        stage('1.6. Warm-up Caches') {
+            agent {
+                docker {
+                    image 'ghcr.io/aquasecurity/trivy:0.49.1'
+                    args '-v ${TRIVY_CACHE_DIR}:/root/.cache/trivy -u 0:0 --network dacn-ci_ci'
+                    reuseNode true
+                }
+            }
+            steps {
+                echo '--> Đang cập nhật cơ sở dữ liệu Trivy (có thể mất nhiều thời gian ở lần đầu)...'
+                sh "trivy image --download-db-only --cache-dir /root/.cache/trivy --timeout 30m"
+            }
+        }
+
         stage('2. Test & Analyze') {
             agent {
                 docker {
@@ -99,22 +114,17 @@ pipeline {
             agent {
                 docker {
                     image 'ghcr.io/aquasecurity/trivy:0.49.1' 
-                    args '-v /var/run/docker.sock:/var/run/docker.sock -v ${TRIVY_CACHE_DIR}:/root/.cache/trivy -u 0:0'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock -v ${TRIVY_CACHE_DIR}:/root/.cache/trivy -u 0:0 --network dacn-ci_ci'
                     reuseNode true
                 }
             }
             steps {
-                echo '--> Cập nhật cơ sở dữ liệu Trivy...'
-                // Chỉ tải DB và sử dụng cache đã mount
-                sh "trivy image --download-db-only --cache-dir /root/.cache/trivy --timeout 15m"
-
-                echo '--> Quét Docker image với Trivy...'
-                // Chạy nhanh hơn vì DB đã có sẵn
-                sh "trivy image --timeout 30m --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                echo '--> Quét Docker image với Trivy (sử dụng cache đã có)...'
+                sh "trivy image --timeout 5m --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
             }
         }
     }
-    
+
     post {
         always {
             echo '--> Dọn dẹp docker images...'
@@ -127,4 +137,5 @@ pipeline {
         }
     }
 }
+
 
