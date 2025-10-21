@@ -6,6 +6,8 @@ import com.example.users.dto.LoginRequest;
 import com.example.users.dto.RegisterRequest;
 import com.example.users.dto.UserResponse;
 import com.example.users.exception.EmailAlreadyExistsException;
+import com.example.users.security.JwtAuthenticationFilter; // THÊM IMPORT
+import com.example.users.security.JwtTokenProvider; // THÊM IMPORT
 import com.example.users.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -36,8 +38,21 @@ class AuthControllerTest {
     private ObjectMapper objectMapper;
 
     @SuppressWarnings("removal")
-    @MockBean
+        @MockBean
     private UserService userService;
+
+    // =========================================================
+    // SỬA LỖI: Thêm các MockBean cho các thành phần bảo mật
+    // mà @WebMvcTest không tự động tải
+    // =========================================================
+    @SuppressWarnings("removal")
+        @MockBean
+    private JwtTokenProvider jwtTokenProvider;
+
+    @SuppressWarnings("removal")
+        @MockBean
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
 
     // === Test cho /api/auth/register ===
 
@@ -54,7 +69,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated()) // 201 Created
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.name").value("Test User"))
                 .andExpect(jsonPath("$.email").value("test@example.com"));
@@ -70,7 +85,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(badRequest)))
-                .andExpect(status().isBadRequest()); // 400 Bad Request
+                .andExpect(status().isBadRequest());
 
         verify(userService, never()).registerUser(any());
     }
@@ -86,7 +101,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isConflict()); // 409 Conflict
+                .andExpect(status().isConflict());
     }
 
     // === Test cho /api/auth/login ===
@@ -102,7 +117,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk()) // 200 OK
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("dummy.jwt.token"));
     }
 
@@ -117,7 +132,6 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized()); // 401 Unauthorized
+                .andExpect(status().isUnauthorized());
     }
 }
-
