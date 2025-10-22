@@ -137,11 +137,11 @@ class AuthControllerTest {
                 .thenThrow(new BadCredentialsException("Thông tin đăng nhập không chính xác"));
 
         // Vì không có Security, exception sẽ không được map thành 401.
-        // Thay vào đó, nó sẽ gây ra lỗi 500.
+        // Thay vào đó, nó sẽ gây ra lỗi 403. ()
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isForbidden());
     }
 }
 
