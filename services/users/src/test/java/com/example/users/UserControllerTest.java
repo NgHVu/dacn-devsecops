@@ -68,4 +68,12 @@ class UserControllerTest {
 
         verify(userService, never()).getCurrentUser();
     }
+
+    @Test
+    @DisplayName("GET /me: Thất bại (401) khi không có @WithMockUser")
+    void testGetCurrentUser_WithoutMockUser_ShouldReturnUnauthorized() throws Exception {
+        // Test này không có @WithMockUser
+        mockMvc.perform(get("/api/users/me"))
+                .andExpect(status().isUnauthorized()); // Mong đợi 401
+    }
 }
