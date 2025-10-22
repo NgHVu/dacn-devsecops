@@ -92,6 +92,13 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Dành cho Test: Cung cấp một database H2 in-memory -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -117,7 +124,7 @@
                 </executions>
             </plugin>
 
-            <!-- BỔ SUNG: Khai báo tường minh cho Compiler -->
+            <!-- Khai báo tường minh cho Compiler -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -127,7 +134,7 @@
                 </configuration>
             </plugin>
 
-            <!-- BỔ SUNG: Khai báo tường minh cho Surefire (chạy unit test) -->
+            <!-- Khai báo tường minh cho Surefire (chạy unit test) -->
              <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -188,4 +195,3 @@
         </profile>
     </profiles>
 </project>
-
