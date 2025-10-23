@@ -8,7 +8,6 @@ import com.example.users.entity.User;
 import com.example.users.exception.EmailAlreadyExistsException;
 import com.example.users.repository.UserRepository;
 import com.example.users.security.JwtTokenProvider;
-// BỔ SUNG: Import @Lazy
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -19,11 +18,11 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.util.Collections;
 import java.util.Optional;
 
+
 @Service
-// BỎ @RequiredArgsConstructor 
 @Transactional
 public class UserServiceImpl implements UserService {
 
@@ -32,10 +31,9 @@ public class UserServiceImpl implements UserService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
 
-    // TỰ VIẾT CONSTRUCTOR và thêm @Lazy vào các dependency gây vòng lặp
     public UserServiceImpl(UserRepository userRepository,
-                           @Lazy PasswordEncoder passwordEncoder, // THÊM @Lazy
-                           @Lazy AuthenticationManager authenticationManager, // THÊM @Lazy
+                           @Lazy PasswordEncoder passwordEncoder,
+                           @Lazy AuthenticationManager authenticationManager,
                            JwtTokenProvider jwtTokenProvider) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -43,44 +41,36 @@ public class UserServiceImpl implements UserService {
         this.jwtTokenProvider = jwtTokenProvider;
     }
 
-
-    
-    // Spring Security sử dụng để tải thông tin User từ DB.
-     
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        return userRepository.findByEmail(email)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng với email: " + email));
+
+        // Trả về UserDetails của Spring Security
+        return new org.springframework.security.core.userdetails.User(
+                user.getEmail(),
+                user.getPassword(),
+                Collections.emptyList()
+        );
     }
 
-    
-    //  Xử lý logic đăng ký người dùng mới.
-     
     @Override
     @Transactional
     public UserResponse registerUser(RegisterRequest registerRequest) {
         if (userRepository.existsByEmail(registerRequest.email())) {
-            // Giúp GlobalExceptionHandler có thể bắt và trả về lỗi 409 CONFLICT.
             throw new EmailAlreadyExistsException("Email '" + registerRequest.email() + "' đã được sử dụng");
         }
-
         String encodedPassword = passwordEncoder.encode(registerRequest.password());
-
         User user = User.builder()
                 .name(registerRequest.name())
                 .email(registerRequest.email())
                 .password(encodedPassword)
                 .build();
-
         User savedUser = userRepository.save(user);
-
         return UserResponse.fromEntity(savedUser);
     }
 
-    
-    // Xử lý logic đăng nhập.
-    
     @Override
     @Transactional(readOnly = true)
     public AuthResponse loginUser(LoginRequest loginRequest) {
@@ -90,49 +80,42 @@ public class UserServiceImpl implements UserService {
                         loginRequest.password()
                 )
         );
-
         SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        // Đảm bảo principal là User entity
         User user = userRepository.findByEmail(authentication.getName())
                         .orElseThrow(() -> new UsernameNotFoundException("User not found after authentication"));
-
-
         String accessToken = jwtTokenProvider.generateToken(user);
-
         return new AuthResponse(accessToken);
     }
 
-    
-    // Lấy thông tin người dùng đang đăng nhập.
-     
     @Override
     @Transactional(readOnly = true)
     public UserResponse getCurrentUser() {
-        // Lấy User từ một phương thức helper
-        return UserResponse.fromEntity(getAuthenticatedUser());
+        User authenticatedUser = getAuthenticatedUser();
+        return UserResponse.fromEntity(authenticatedUser);
     }
 
-
-    // Tìm kiếm User theo email (dùng nội bộ).
     @Override
     @Transactional(readOnly = true)
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
     }
 
-    /**
-     * Một phương thức helper private để lấy thông tin User đã được xác thực.
-     * Giúp tái sử dụng và làm cho code của getCurrentUser() gọn hơn.
-     */
-     private User getAuthenticatedUser() {
+    private User getAuthenticatedUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
              throw new IllegalStateException("Không có người dùng nào được xác thực");
         }
 
+        // SỬA: Ưu tiên dùng getName() vì nó đáng tin cậy hơn principal
         String currentUserName = authentication.getName();
+        if (currentUserName == null) {
+            // Trường hợp hy hữu principal không trả về tên hợp lệ
+             throw new IllegalStateException("Không thể xác định tên người dùng từ Security Context");
+        }
+
+
         return userRepository.findByEmail(currentUserName)
                  .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng đã xác thực: " + currentUserName));
      }
 }
+

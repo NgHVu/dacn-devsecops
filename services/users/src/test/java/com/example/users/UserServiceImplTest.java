@@ -8,7 +8,7 @@ import com.example.users.entity.User;
 import com.example.users.exception.EmailAlreadyExistsException;
 import com.example.users.repository.UserRepository;
 import com.example.users.security.JwtTokenProvider;
-import com.example.users.service.UserServiceImpl; // Sửa: Import implementation
+import com.example.users.service.UserServiceImpl; // Import implementation
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,7 +25,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.Collections;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,7 +35,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class) // Sử dụng MockitoExtension để quản lý mocks
 @DisplayName("UserServiceImpl Tests")
-// SỬA: Bỏ "implements UserService"
+// Bỏ "implements UserService" vì đây là class test
 class UserServiceImplTest {
 
     // Đối tượng cần test, Mockito sẽ tự inject các @Mock vào đây
@@ -70,9 +69,8 @@ class UserServiceImplTest {
     @BeforeEach
     void setUp() {
         // Thiết lập SecurityContextHolder để sử dụng mock context
-        // Phải clear context trước mỗi test để tránh ảnh hưởng lẫn nhau
+        // Quan trọng: Phải clear context trước mỗi test để tránh ảnh hưởng lẫn nhau
         SecurityContextHolder.clearContext();
-        // Không set context ở đây nữa, sẽ set trong từng test case cần thiết
 
         testUser = User.builder()
                 .id(1L)
@@ -171,7 +169,7 @@ class UserServiceImplTest {
         when(authenticationManager.authenticate(authToken)).thenReturn(authentication); // Sử dụng mock authentication
         when(authentication.getName()).thenReturn(loginRequest.email()); // Giả lập getName() trả về email
 
-        // SỬA: Giả lập userRepository trả về User entity khi được gọi sau khi xác thực
+        // Giả lập userRepository trả về User entity khi được gọi sau khi xác thực
         when(userRepository.findByEmail(loginRequest.email())).thenReturn(Optional.of(testUser));
 
         // Giả lập JwtTokenProvider tạo token
@@ -187,7 +185,7 @@ class UserServiceImplTest {
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isEqualTo(authentication);
 
         verify(authenticationManager).authenticate(authToken);
-        verify(userRepository).findByEmail(loginRequest.email()); // SỬA: Xác minh gọi repo
+        verify(userRepository).findByEmail(loginRequest.email());
         verify(jwtTokenProvider).generateToken(testUser);
     }
 
@@ -218,19 +216,15 @@ class UserServiceImplTest {
     @DisplayName("getCurrentUser: Thành công khi người dùng đã xác thực")
     void testGetCurrentUser_Success() {
         // Arrange
-        // SỬA: Giả lập SecurityContextHolder có chứa Authentication
+        // Giả lập SecurityContextHolder có chứa Authentication
         SecurityContextHolder.setContext(securityContext);
         when(securityContext.getAuthentication()).thenReturn(authentication);
         when(authentication.isAuthenticated()).thenReturn(true);
-        // Giả lập Principal là UserDetails hoặc String (username)
-        // Ví dụ: Giả lập trả về UserDetails
-        UserDetails springUserDetails = new org.springframework.security.core.userdetails.User(
-            testUser.getEmail(), testUser.getPassword(), Collections.emptyList()
-        );
-        when(authentication.getPrincipal()).thenReturn(springUserDetails);
-        //when(authentication.getName()).thenReturn(testUser.getEmail()); // Hoặc dùng getName()
 
-        // SỬA: Giả lập userRepository trả về User entity khi được gọi bởi getAuthenticatedUser
+        // Mock authentication.getName() để trả về username mong muốn
+        when(authentication.getName()).thenReturn(testUser.getEmail());
+
+        // Giả lập userRepository trả về User entity khi được gọi bởi getAuthenticatedUser
         when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
 
 
@@ -245,7 +239,8 @@ class UserServiceImplTest {
 
         verify(securityContext).getAuthentication();
         verify(authentication).isAuthenticated();
-        verify(authentication).getPrincipal();
+        // Xác minh gọi getName()
+        verify(authentication).getName();
         verify(userRepository).findByEmail(testUser.getEmail());
     }
 
@@ -253,9 +248,9 @@ class UserServiceImplTest {
     @DisplayName("getCurrentUser: Ném IllegalStateException khi người dùng chưa xác thực")
     void testGetCurrentUser_UserNotAuthenticated_ShouldThrowException() {
         // Arrange
-        // SỬA: Giả lập SecurityContextHolder trả về null authentication hoặc unauthenticated
+        // Giả lập SecurityContextHolder trả về null authentication hoặc unauthenticated
         SecurityContextHolder.setContext(securityContext);
-        when(securityContext.getAuthentication()).thenReturn(null); // Hoặc trả về authentication với isAuthenticated() = false
+        when(securityContext.getAuthentication()).thenReturn(null);
 
         // Act & Assert
         assertThrows(IllegalStateException.class, () -> {
@@ -263,8 +258,6 @@ class UserServiceImplTest {
         }, "Không có người dùng nào được xác thực"); // Kiểm tra message lỗi nếu cần
 
         verify(securityContext).getAuthentication();
-        // SỬA: Xóa mock không cần thiết
-        // verify(userRepository, never()).findByEmail(anyString()); // Không cần thiết vì exception ném ra trước đó
     }
 
 
@@ -297,3 +290,4 @@ class UserServiceImplTest {
          verify(userRepository).findByEmail("notfound@example.com");
      }
 }
+
