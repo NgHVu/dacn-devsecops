@@ -8,132 +8,292 @@ import com.example.users.entity.User;
 import com.example.users.exception.EmailAlreadyExistsException;
 import com.example.users.repository.UserRepository;
 import com.example.users.security.JwtTokenProvider;
-import com.example.users.service.UserService;
-
-import org.springframework.context.annotation.Lazy;
+import com.example.users.service.UserServiceImpl; // Sửa: Import implementation
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Collections;
 import java.util.Optional;
 
-@Service
-@Transactional
-public class UserServiceImplTest implements UserService {
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final AuthenticationManager authenticationManager;
-    private final JwtTokenProvider jwtTokenProvider;
+@ExtendWith(MockitoExtension.class) // Sử dụng MockitoExtension để quản lý mocks
+@DisplayName("UserServiceImpl Tests")
+// SỬA: Bỏ "implements UserService"
+class UserServiceImplTest {
 
-    public UserServiceImplTest(UserRepository userRepository,
-                           @Lazy PasswordEncoder passwordEncoder, // THÊM @Lazy
-                           @Lazy AuthenticationManager authenticationManager, // THÊM @Lazy
-                           JwtTokenProvider jwtTokenProvider) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.authenticationManager = authenticationManager;
-        this.jwtTokenProvider = jwtTokenProvider;
-    }
+    // Đối tượng cần test, Mockito sẽ tự inject các @Mock vào đây
+    @InjectMocks
+    private UserServiceImpl userService;
 
-    @Override
-    @Transactional(readOnly = true)
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        // Tìm User entity của bạn
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng với email: " + email));
+    // Các dependency cần mock
+    @Mock
+    private UserRepository userRepository;
 
-        return new org.springframework.security.core.userdetails.User(
-                user.getEmail(),
-                user.getPassword(),
-                Collections.emptyList() 
-        );
-    }
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
-    @Override
-    @Transactional
-    public UserResponse registerUser(RegisterRequest registerRequest) {
-        if (userRepository.existsByEmail(registerRequest.email())) {
-            throw new EmailAlreadyExistsException("Email '" + registerRequest.email() + "' đã được sử dụng");
-        }
+    @Mock
+    private AuthenticationManager authenticationManager;
 
-        String encodedPassword = passwordEncoder.encode(registerRequest.password());
+    @Mock
+    private JwtTokenProvider jwtTokenProvider;
 
-        User user = User.builder()
-                .name(registerRequest.name())
-                .email(registerRequest.email())
-                .password(encodedPassword)
+    // Mock cho SecurityContext để giả lập người dùng đăng nhập
+    @Mock
+    private SecurityContext securityContext;
+    @Mock
+    private Authentication authentication;
+
+
+    private User testUser;
+    private RegisterRequest registerRequest;
+    private LoginRequest loginRequest;
+
+    @BeforeEach
+    void setUp() {
+        // Thiết lập SecurityContextHolder để sử dụng mock context
+        // Phải clear context trước mỗi test để tránh ảnh hưởng lẫn nhau
+        SecurityContextHolder.clearContext();
+        // Không set context ở đây nữa, sẽ set trong từng test case cần thiết
+
+        testUser = User.builder()
+                .id(1L)
+                .name("Test User")
+                .email("test@example.com")
+                .password("encodedPassword")
                 .build();
 
-        User savedUser = userRepository.save(user);
-
-        return UserResponse.fromEntity(savedUser);
+        registerRequest = new RegisterRequest("Test User", "test@example.com", "password123");
+        loginRequest = new LoginRequest("test@example.com", "password123");
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public AuthResponse loginUser(LoginRequest loginRequest) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginRequest.email(),
-                        loginRequest.password()
-                )
+    // --- Test cho loadUserByUsername ---
+    @Test
+    @DisplayName("loadUserByUsername: Thành công khi tìm thấy user")
+    void testLoadUserByUsername_UserFound() {
+        // Arrange
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+
+        // Act
+        UserDetails userDetails = userService.loadUserByUsername("test@example.com");
+
+        // Assert
+        assertThat(userDetails).isNotNull();
+        assertThat(userDetails.getUsername()).isEqualTo("test@example.com");
+        assertThat(userDetails.getPassword()).isEqualTo("encodedPassword");
+        verify(userRepository).findByEmail("test@example.com");
+    }
+
+    @Test
+    @DisplayName("loadUserByUsername: Ném UsernameNotFoundException khi không tìm thấy user")
+    void testLoadUserByUsername_UserNotFound() {
+        // Arrange
+        when(userRepository.findByEmail("notfound@example.com")).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(UsernameNotFoundException.class, () -> {
+            userService.loadUserByUsername("notfound@example.com");
+        });
+        verify(userRepository).findByEmail("notfound@example.com");
+    }
+
+
+    // --- Test cho registerUser ---
+    @Test
+    @DisplayName("registerUser: Thành công khi email chưa tồn tại")
+    void testRegisterUser_Success() {
+        // Arrange
+        when(userRepository.existsByEmail(registerRequest.email())).thenReturn(false);
+        when(passwordEncoder.encode(registerRequest.password())).thenReturn("encodedPassword");
+        // Giả lập việc save trả về User có ID
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User userToSave = invocation.getArgument(0);
+            userToSave.setId(1L); // Gán ID giả lập
+            return userToSave;
+        });
+
+
+        // Act
+        UserResponse userResponse = userService.registerUser(registerRequest);
+
+        // Assert
+        assertThat(userResponse).isNotNull();
+        assertThat(userResponse.id()).isEqualTo(1L);
+        assertThat(userResponse.email()).isEqualTo(registerRequest.email());
+        assertThat(userResponse.name()).isEqualTo(registerRequest.name());
+        verify(userRepository).existsByEmail(registerRequest.email());
+        verify(passwordEncoder).encode(registerRequest.password());
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    @DisplayName("registerUser: Ném EmailAlreadyExistsException khi email đã tồn tại")
+    void testRegisterUser_EmailAlreadyExists() {
+        // Arrange
+        when(userRepository.existsByEmail(registerRequest.email())).thenReturn(true);
+
+        // Act & Assert
+        assertThrows(EmailAlreadyExistsException.class, () -> {
+            userService.registerUser(registerRequest);
+        });
+        verify(userRepository).existsByEmail(registerRequest.email());
+        // Đảm bảo không gọi encode hay save
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+
+    // --- Test cho loginUser ---
+    @Test
+    @DisplayName("loginUser: Thành công khi thông tin đăng nhập đúng")
+    void testLoginUser_Success() {
+        // Arrange
+        // Giả lập AuthenticationManager trả về đối tượng Authentication đã xác thực
+        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password());
+        when(authenticationManager.authenticate(authToken)).thenReturn(authentication); // Sử dụng mock authentication
+        when(authentication.getName()).thenReturn(loginRequest.email()); // Giả lập getName() trả về email
+
+        // SỬA: Giả lập userRepository trả về User entity khi được gọi sau khi xác thực
+        when(userRepository.findByEmail(loginRequest.email())).thenReturn(Optional.of(testUser));
+
+        // Giả lập JwtTokenProvider tạo token
+        when(jwtTokenProvider.generateToken(testUser)).thenReturn("dummy.jwt.token");
+
+        // Act
+        AuthResponse authResponse = userService.loginUser(loginRequest);
+
+        // Assert
+        assertThat(authResponse).isNotNull();
+        assertThat(authResponse.accessToken()).isEqualTo("dummy.jwt.token");
+        // Kiểm tra xem SecurityContextHolder có được set không (không bắt buộc nhưng nên có)
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isEqualTo(authentication);
+
+        verify(authenticationManager).authenticate(authToken);
+        verify(userRepository).findByEmail(loginRequest.email()); // SỬA: Xác minh gọi repo
+        verify(jwtTokenProvider).generateToken(testUser);
+    }
+
+     @Test
+     @DisplayName("loginUser: Ném Exception khi AuthenticationManager thất bại")
+     void testLoginUser_AuthenticationFailure() {
+         // Arrange
+         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(loginRequest.email(), "wrongpassword");
+         // Giả lập AuthenticationManager ném exception (ví dụ: BadCredentialsException)
+         when(authenticationManager.authenticate(authToken))
+                 .thenThrow(new org.springframework.security.authentication.BadCredentialsException("Bad credentials"));
+
+         // Act & Assert
+         assertThrows(org.springframework.security.authentication.BadCredentialsException.class, () -> {
+             userService.loginUser(new LoginRequest(loginRequest.email(), "wrongpassword"));
+         });
+
+         // Đảm bảo các bước sau không được gọi
+         verify(userRepository, never()).findByEmail(anyString());
+         verify(jwtTokenProvider, never()).generateToken(any(User.class));
+         // Kiểm tra SecurityContextHolder không bị thay đổi
+         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+     }
+
+
+    // --- Test cho getCurrentUser ---
+    @Test
+    @DisplayName("getCurrentUser: Thành công khi người dùng đã xác thực")
+    void testGetCurrentUser_Success() {
+        // Arrange
+        // SỬA: Giả lập SecurityContextHolder có chứa Authentication
+        SecurityContextHolder.setContext(securityContext);
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        when(authentication.isAuthenticated()).thenReturn(true);
+        // Giả lập Principal là UserDetails hoặc String (username)
+        // Ví dụ: Giả lập trả về UserDetails
+        UserDetails springUserDetails = new org.springframework.security.core.userdetails.User(
+            testUser.getEmail(), testUser.getPassword(), Collections.emptyList()
         );
+        when(authentication.getPrincipal()).thenReturn(springUserDetails);
+        //when(authentication.getName()).thenReturn(testUser.getEmail()); // Hoặc dùng getName()
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        User user = userRepository.findByEmail(authentication.getName())
-                        .orElseThrow(() -> {
-                            return new UsernameNotFoundException("User not found after authentication");
-                        });
+        // SỬA: Giả lập userRepository trả về User entity khi được gọi bởi getAuthenticatedUser
+        when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
 
 
-        String accessToken = jwtTokenProvider.generateToken(user);
+        // Act
+        UserResponse userResponse = userService.getCurrentUser();
 
-        return new AuthResponse(accessToken);
+        // Assert
+        assertThat(userResponse).isNotNull();
+        assertThat(userResponse.id()).isEqualTo(testUser.getId());
+        assertThat(userResponse.email()).isEqualTo(testUser.getEmail());
+        assertThat(userResponse.name()).isEqualTo(testUser.getName());
+
+        verify(securityContext).getAuthentication();
+        verify(authentication).isAuthenticated();
+        verify(authentication).getPrincipal();
+        verify(userRepository).findByEmail(testUser.getEmail());
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public UserResponse getCurrentUser() {
-        User authenticatedUser = getAuthenticatedUser();
-        return UserResponse.fromEntity(authenticatedUser);
+    @Test
+    @DisplayName("getCurrentUser: Ném IllegalStateException khi người dùng chưa xác thực")
+    void testGetCurrentUser_UserNotAuthenticated_ShouldThrowException() {
+        // Arrange
+        // SỬA: Giả lập SecurityContextHolder trả về null authentication hoặc unauthenticated
+        SecurityContextHolder.setContext(securityContext);
+        when(securityContext.getAuthentication()).thenReturn(null); // Hoặc trả về authentication với isAuthenticated() = false
+
+        // Act & Assert
+        assertThrows(IllegalStateException.class, () -> {
+            userService.getCurrentUser();
+        }, "Không có người dùng nào được xác thực"); // Kiểm tra message lỗi nếu cần
+
+        verify(securityContext).getAuthentication();
+        // SỬA: Xóa mock không cần thiết
+        // verify(userRepository, never()).findByEmail(anyString()); // Không cần thiết vì exception ném ra trước đó
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<User> findByEmail(String email) {
-        return userRepository.findByEmail(email);
-    }
 
-     private User getAuthenticatedUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    // --- Test cho findByEmail ---
+     @Test
+     @DisplayName("findByEmail: Trả về Optional chứa User khi tìm thấy")
+     void testFindByEmail_UserFound() {
+         // Arrange
+         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
 
-        if (authentication == null || !authentication.isAuthenticated() || authentication.getPrincipal() == null || "anonymousUser".equals(authentication.getPrincipal().toString())) {
-             throw new IllegalStateException("Không có người dùng nào được xác thực");
-        }
+         // Act
+         Optional<User> foundUser = userService.findByEmail("test@example.com");
 
-        String currentUserName;
-        Object principal = authentication.getPrincipal();
+         // Assert
+         assertThat(foundUser).isPresent().contains(testUser);
+         verify(userRepository).findByEmail("test@example.com");
+     }
 
-        if (principal instanceof UserDetails) {
-            currentUserName = ((UserDetails) principal).getUsername();
-        } else if (principal instanceof String) {
-            currentUserName = (String) principal;
-        } else {
-             throw new IllegalStateException("Không thể xác định tên người dùng từ Security Context");
-        }
+     @Test
+     @DisplayName("findByEmail: Trả về Optional rỗng khi không tìm thấy")
+     void testFindByEmail_UserNotFound() {
+         // Arrange
+         when(userRepository.findByEmail("notfound@example.com")).thenReturn(Optional.empty());
 
-        return userRepository.findByEmail(currentUserName)
-                 .orElseThrow(() -> {
-                    return new UsernameNotFoundException("Không tìm thấy người dùng đã xác thực: " + currentUserName);
-                 });
+         // Act
+         Optional<User> foundUser = userService.findByEmail("notfound@example.com");
+
+         // Assert
+         assertThat(foundUser).isNotPresent();
+         verify(userRepository).findByEmail("notfound@example.com");
      }
 }
-
