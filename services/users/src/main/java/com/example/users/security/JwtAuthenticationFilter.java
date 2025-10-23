@@ -13,7 +13,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component; 
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -24,7 +23,7 @@ import java.io.IOException;
  * Nhiệm vụ của nó là đọc, xác thực token JWT và thiết lập
  * thông tin xác thực cho Spring Security.
  */
-@Component // Đánh dấu đây là một Spring Component
+//@Component // Đánh dấu đây là một Spring Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
