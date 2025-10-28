@@ -1,7 +1,7 @@
 package com.example.orders.service;
 
-import com.example.orders.dto.request.OrderCreateRequest;
-import com.example.orders.dto.response.OrderResponse;
+import com.example.orders.dto.OrderCreateRequest;
+import com.example.orders.dto.OrderResponse;
 import com.example.orders.exception.OrderNotFoundException; 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

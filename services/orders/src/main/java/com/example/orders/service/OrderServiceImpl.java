@@ -1,11 +1,11 @@
 package com.example.orders.service;
 
-import com.example.orders.dto.external.ProductDto; 
-import com.example.orders.dto.external.UserDto;   
-import com.example.orders.dto.request.OrderCreateRequest;
-import com.example.orders.dto.request.OrderItemRequest;
-import com.example.orders.dto.response.OrderItemResponse;
-import com.example.orders.dto.response.OrderResponse;
+import com.example.orders.dto.ProductDto; 
+import com.example.orders.dto.UserDto;   
+import com.example.orders.dto.OrderCreateRequest;
+import com.example.orders.dto.OrderItemRequest;
+import com.example.orders.dto.OrderItemResponse;
+import com.example.orders.dto.OrderResponse;
 import com.example.orders.entity.Order;
 import com.example.orders.entity.OrderItem;
 import com.example.orders.entity.OrderStatus;
