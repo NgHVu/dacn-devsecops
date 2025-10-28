@@ -8,7 +8,7 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.5.6</version>
-        <relativePath/>
+        <relativePath/> 
     </parent>
 
     <groupId>com.dacn</groupId>
@@ -33,6 +33,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- THÊM: WebClient -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -128,7 +133,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.14.0</version>
+                <version>3.14.0</version> 
                 <configuration>
                     <release>${maven.compiler.release}</release>
                 </configuration>
@@ -139,8 +144,8 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven.surefire.version}</version>
-            </plugin>
-            
+             </plugin>
+
             <!-- JaCoCo Plugin -->
             <plugin>
                 <groupId>org.jacoco</groupId>
@@ -162,7 +167,7 @@
                     </execution>
                     <execution>
                         <id>report</id>
-                        <phase>verify</phase>
+                        <phase>verify</phase> <!-- Chạy report sau khi test -->
                         <goals><goal>report</goal></goals>
                     </execution>
                 </executions>
@@ -188,6 +193,7 @@
                 <activeByDefault>true</activeByDefault>
             </activation>
             <properties>
+                <!-- Đảm bảo đường dẫn này khớp với output của JaCoCo -->
                 <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
                 <sonar.sources>src/main/java</sonar.sources>
                 <sonar.tests>src/test/java</sonar.tests>
