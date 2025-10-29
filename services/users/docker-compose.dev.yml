@@ -14,7 +14,7 @@ services:
     image: postgres:15-alpine
     container_name: users-db
     networks:
-      - users-net
+      - dacn-net
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
@@ -38,7 +38,7 @@ services:
       dockerfile: Dockerfile
     container_name: users-app
     networks:
-      - users-net
+      - dacn-net
     ports:
       - "8082:8082" 
     environment:
