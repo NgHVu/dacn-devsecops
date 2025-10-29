@@ -2,8 +2,8 @@ version: "3.9"
 
 # Định nghĩa một mạng riêng cho service này
 networks:
-  products-net:
-    driver: bridge
+  dacn-net:
+    external: true
 
 volumes:
   products-pg-data: # Đặt tên volume rõ ràng hơn
@@ -51,3 +51,4 @@ services:
       products-db: # <-- THAY ĐỔI QUAN TRỌNG
         condition: service_healthy # Chỉ khởi động app khi CSDL "khỏe mạnh"
     restart: on-failure
+
