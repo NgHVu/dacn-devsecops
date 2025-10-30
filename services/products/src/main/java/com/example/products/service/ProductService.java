@@ -111,6 +111,13 @@ public class ProductService {
             existing.setPrice(normalized);
         }
 
+        if (req.stockQuantity() != null) {
+            if (req.stockQuantity() < 0) {
+                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số lượng tồn kho không thể âm");
+            }
+            existing.setStockQuantity(req.stockQuantity());
+        }
+
         // Cập nhật ảnh
         if (req.image() != null) {
             existing.setImage(req.image());
