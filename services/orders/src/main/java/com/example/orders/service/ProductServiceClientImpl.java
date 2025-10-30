@@ -42,7 +42,7 @@ public class ProductServiceClientImpl implements ProductServiceClient {
 
         // Tạo URI đầy đủ, ví dụ: http://products-app:8081/api/v1/products/by-ids?ids=1,2,3
         // Giả định Product Service dùng API versioning v1
-        String uri = productsServiceUrl + "/api/v1/products/by-ids?ids=" + idsParam;
+        String uri = productsServiceUrl + "/api/products/by-ids?ids=" + idsParam;
         log.debug("Gọi Product Service URI: {}", uri); // Dùng debug level cho URI chi tiết
 
         List<ProductDto> productDtos = webClient.get()
