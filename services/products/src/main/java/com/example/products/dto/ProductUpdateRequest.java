@@ -16,6 +16,10 @@ public record ProductUpdateRequest(
         @Schema(description = "Giá bán (VND)", example = "55000.00")
         BigDecimal price, // nullable
 
+        @Min(value = 0, message = "Số lượng tồn kho không thể âm")
+        @Schema(description = "Số lượng tồn kho mới", example = "150")
+        Integer stockQuantity, // nullable
+
         @Size(max = 255, message = "Độ dài ảnh tối đa 255 ký tự")
         @Schema(description = "Tên file ảnh hoặc URL", example = "com-tam.jpg")
         String image // nullable

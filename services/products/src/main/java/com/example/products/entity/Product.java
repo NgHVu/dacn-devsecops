@@ -29,7 +29,6 @@ public class Product {
 
     @NotBlank(message = "Tên sản phẩm không được để trống")
     @Size(min = 1, max = 120)
-    // SỬA ĐỔI: Thêm unique = true để đảm bảo CSDL không trùng tên
     @Column(nullable = false, length = 120, unique = true) 
     @Schema(description = "Tên món ăn", example = "Cơm Tấm Sườn Bì Chả")
     private String name;
@@ -40,6 +39,10 @@ public class Product {
     @Column(nullable = false, precision = 12, scale = 2)
     @Schema(description = "Giá bán (VND)", example = "55000.00")
     private BigDecimal price;
+
+    @Column(name = "stock_quantity", nullable = false)
+    @Builder.Default // Đặt giá trị mặc định là 0
+    private Integer stockQuantity = 0;
 
     @Size(max = 255)
     @Schema(description = "Tên file ảnh hoặc URL", example = "com-tam.jpg")

@@ -11,17 +11,13 @@ import com.example.orders.entity.OrderItem;
 import com.example.orders.entity.OrderStatus;
 import com.example.orders.exception.OrderNotFoundException;
 import com.example.orders.repository.OrderRepository;
-import com.example.orders.service.ProductServiceClient;
-import com.example.orders.service.UserServiceClient;
-import com.example.orders.service.OrderService;
+
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;

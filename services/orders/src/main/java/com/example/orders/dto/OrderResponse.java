@@ -1,6 +1,5 @@
 package com.example.orders.dto;
 
-import com.example.orders.dto.OrderItemResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

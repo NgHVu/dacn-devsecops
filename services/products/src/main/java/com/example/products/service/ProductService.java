@@ -82,6 +82,7 @@ public class ProductService {
         Product entity = Product.builder()
                 .name(req.name().trim())
                 .price(normalizedPrice)
+                .stockQuantity(req.stockQuantity())
                 .image(req.image())
                 .build();
         

@@ -1,6 +1,5 @@
 package com.example.orders.dto;
 
-import com.example.orders.dto.OrderItemRequest; 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid; 
 import jakarta.validation.constraints.NotEmpty; 

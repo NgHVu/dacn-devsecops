@@ -53,7 +53,7 @@ class ProductServiceTest {
 
     @Test
     void testCreate_Success() {
-        ProductCreateRequest request = new ProductCreateRequest("Bún Bò Huế", new BigDecimal("45000"), "bun-bo.jpg");
+        ProductCreateRequest request = new ProductCreateRequest("Bún Bò Huế", new BigDecimal("45000"), 50, "bun-bo.jpg");        
         Product savedProduct = Product.builder().id(1L).name("Bún Bò Huế").build();
         when(productRepository.existsByNameIgnoreCase("Bún Bò Huế")).thenReturn(false);
         when(productRepository.save(any(Product.class))).thenReturn(savedProduct);
@@ -64,7 +64,7 @@ class ProductServiceTest {
 
     @Test
     void testCreate_Conflict_ShouldThrowException() {
-        ProductCreateRequest request = new ProductCreateRequest("Phở Bò", new BigDecimal("50000"), "pho-bo.jpg");
+        ProductCreateRequest request = new ProductCreateRequest("Phở Bò", new BigDecimal("50000"), 100, "pho-bo.jpg");        
         when(productRepository.existsByNameIgnoreCase("Phở Bò")).thenReturn(true);
         assertThrows(ResponseStatusException.class, () -> productService.create(request));
     }
@@ -72,7 +72,7 @@ class ProductServiceTest {
     @Test
     void testUpdatePartial_AllFields_Success() {
         Product existing = Product.builder().id(1L).name("Cũ").price(new BigDecimal("10000")).image("cu.jpg").build();
-        ProductUpdateRequest request = new ProductUpdateRequest("Mới", new BigDecimal("20000"), "moi.jpg");
+        ProductUpdateRequest request = new ProductUpdateRequest("Mới", new BigDecimal("20000"), 20, "moi.jpg");        
         when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(productRepository.save(any(Product.class))).thenAnswer(i -> i.getArgument(0));
         Product updated = productService.updatePartial(1L, request);
@@ -84,7 +84,7 @@ class ProductServiceTest {
     @Test
     void testUpdatePartial_NameConflict_ShouldThrowException() {
         Product existing = Product.builder().id(1L).name("Cơm").build();
-        ProductUpdateRequest request = new ProductUpdateRequest("Phở", null, null);
+        ProductUpdateRequest request = new ProductUpdateRequest("Phở", null, null, null);
         when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(productRepository.existsByNameIgnoreCase("Phở")).thenReturn(true);
         assertThrows(ResponseStatusException.class, () -> productService.updatePartial(1L, request));
@@ -93,7 +93,7 @@ class ProductServiceTest {
     @Test
     void testUpdatePartial_InvalidPrice_ShouldThrowException() {
         Product existing = Product.builder().id(1L).name("Cơm").build();
-        ProductUpdateRequest request = new ProductUpdateRequest(null, new BigDecimal("0.00"), null);
+    ProductUpdateRequest request = new ProductUpdateRequest(null, new BigDecimal("0.00"), null, null);
         when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
         assertThrows(ResponseStatusException.class, () -> productService.updatePartial(1L, request));
     }

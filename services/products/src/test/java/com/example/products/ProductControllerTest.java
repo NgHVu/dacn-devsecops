@@ -56,7 +56,8 @@ class ProductControllerTest {
     
     @Test
     void testCreate_ShouldReturn201Created() throws Exception {
-        ProductCreateRequest request = new ProductCreateRequest("Phở Bò", new BigDecimal("50000"), "pho.jpg");
+        ProductCreateRequest request = new ProductCreateRequest("Phở Bò", new BigDecimal("50000"), 100, "pho.jpg");
+        
         Product savedProduct = Product.builder().id(1L).name("Phở Bò").build();
         given(productService.create(any(ProductCreateRequest.class))).willReturn(savedProduct);
 
@@ -67,17 +68,13 @@ class ProductControllerTest {
                 .andExpect(header().exists("Location"));
     }
     
-    // =========================================================
-    // == BỔ SUNG: Test cho endpoint PATCH /api/products/{id} ==
-    // =========================================================
     @Test
     void testUpdatePartial_ShouldReturn200OK() throws Exception {
-        // Arrange
-        ProductUpdateRequest request = new ProductUpdateRequest("Tên Mới", null, null);
+        ProductUpdateRequest request = new ProductUpdateRequest("Tên Mới", null, null, null);
+        
         Product updatedProduct = Product.builder().id(1L).name("Tên Mới").build();
         given(productService.updatePartial(eq(1L), any(ProductUpdateRequest.class))).willReturn(updatedProduct);
         
-        // Act & Assert
         mockMvc.perform(patch("/api/products/{id}", 1L)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))

@@ -1,12 +1,10 @@
 package com.example.orders.controller;
 
 import com.example.orders.dto.OrderCreateRequest;
-import com.example.orders.dto.OrderItemRequest; 
 import com.example.orders.dto.OrderResponse;
 import com.example.orders.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter; 
-import io.swagger.v3.oas.annotations.enums.ParameterIn; 
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema; 
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -21,7 +19,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.BadCredentialsException; 
 import org.springframework.security.core.Authentication; 
 import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.Sort;

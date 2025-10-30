@@ -19,9 +19,16 @@ public record ProductCreateRequest(
         @Schema(description = "Giá bán (VND)", example = "55000.00")
         BigDecimal price,
 
+        @NotNull(message = "Số lượng tồn kho không được để trống")
+        @Min(value = 0, message = "Số lượng tồn kho không thể âm")
+        @Schema(description = "Số lượng tồn kho ban đầu", example = "100")
+        Integer stockQuantity,
+
         // Nếu ảnh là bắt buộc, thêm @NotBlank
         @NotBlank(message = "Ảnh không được để trống") 
         @Size(max = 255, message = "Độ dài URL ảnh tối đa 255 ký tự")
         @Schema(description = "Tên file ảnh hoặc URL", example = "com-tam.jpg")
         String image
+
+
 ) {}
