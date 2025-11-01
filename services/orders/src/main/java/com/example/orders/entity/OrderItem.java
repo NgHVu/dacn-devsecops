@@ -42,6 +42,9 @@ public class OrderItem {
     @Column(name = "product_id", nullable = false) 
     private Long productId;
 
+    @Column(name = "product_name", nullable = false) 
+    private String productName;
+    
     // Số lượng sản phẩm được đặt cho mục hàng này.
     @Column(nullable = false) 
     private Integer quantity;
