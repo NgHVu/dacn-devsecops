@@ -71,6 +71,7 @@ public class OrderController {
     })
     @GetMapping("/my") 
     public ResponseEntity<Page<OrderResponse>> getMyOrders(
+            @Parameter(hidden = true)
             // Cấu hình phân trang mặc định: 10 mục/trang, sắp xếp theo createdAt giảm dần
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
             // Lấy thông tin user đã đăng nhập do Spring Security cung cấp
