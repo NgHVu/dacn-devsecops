@@ -55,8 +55,8 @@ public class OrderServiceImpl implements OrderService {
         log.info("Đã xác thực người dùng với email: {}", userEmail);
 
         // Gọi UserServiceClient
-        UserDto userDto = userServiceClient.getUserByEmail(userEmail, bearerToken);
-        Long userId = userDto.id(); // Lấy userId 
+        UserDto userDto = userServiceClient.getCurrentUser(bearerToken);
+        Long userId = userDto.id(); // Lấy userId thật
         log.info("Lấy được userId thật: {}", userId);
 
         // 2. Lấy thông tin sản phẩm từ Products Service 
@@ -137,7 +137,7 @@ public class OrderServiceImpl implements OrderService {
         log.info("Lấy danh sách đơn hàng cho email: {} với pageable: {}", userEmail, pageable);
 
         // 1. Lấy userId từ UserServiceClient
-        UserDto userDto = userServiceClient.getUserByEmail(userEmail, bearerToken);
+        UserDto userDto = userServiceClient.getCurrentUser(bearerToken);
         Long userId = userDto.id();
         log.info("Lấy được userId: {} cho email: {}", userId, userEmail);
 
@@ -156,7 +156,7 @@ public class OrderServiceImpl implements OrderService {
         log.info("Lấy chi tiết đơn hàng ID: {} cho email: {}", orderId, userEmail);
 
         // 1. Lấy userId từ UserServiceClient
-        UserDto userDto = userServiceClient.getUserByEmail(userEmail, bearerToken);
+        UserDto userDto = userServiceClient.getCurrentUser(bearerToken);
         Long userId = userDto.id();
         log.info("Lấy được userId: {} cho email: {}", userId, userEmail);
 

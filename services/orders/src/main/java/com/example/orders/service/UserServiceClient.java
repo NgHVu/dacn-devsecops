@@ -18,6 +18,5 @@ public interface UserServiceClient {
      * @throws BadCredentialsException Nếu không tìm thấy người dùng (lỗi 4xx).
      * @throws RuntimeException Nếu có lỗi kết nối/server từ Users Service (lỗi 5xx).
      */
-    UserDto getUserByEmail(String email, String bearerToken);
-
+    UserDto getCurrentUser(String bearerToken); 
 }
