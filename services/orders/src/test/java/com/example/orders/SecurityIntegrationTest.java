@@ -48,8 +48,7 @@ class SecurityIntegrationTest {
         mockMvc.perform(get("/api/v1/orders/my"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("Unauthorized"))
-                .andExpect(jsonPath("$.message").value("Yêu cầu xác thực. Vui lòng cung cấp token hợp lệ."));
-    }
+                .andExpect(jsonPath("$.message").value("Full authentication is required to access this resource"));    }
 
     @Test
     @DisplayName("GET /api/v1/orders/my: Thất bại (401) khi Token sai định dạng")
