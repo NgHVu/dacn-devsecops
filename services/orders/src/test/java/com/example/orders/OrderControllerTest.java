@@ -19,7 +19,6 @@ import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfigurat
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -39,6 +38,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 
 @WebMvcTest(
     controllers = OrderController.class,
@@ -67,6 +67,8 @@ class OrderControllerTest {
     @MockBean
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
+    @MockBean
+    private JpaMetamodelMappingContext jpaMetamodelMappingContext;
     // --- Dữ liệu mẫu ---
     private final String MOCK_EMAIL = "test.user@example.com";
     private final String MOCK_TOKEN = "Bearer dummy.token.123";
