@@ -176,8 +176,8 @@ class OrderServiceImplTest {
             orderService.createOrder(badRequest, MOCK_TOKEN);
         });
         
-        assertThat(exception.getMessage()).contains("Số lượng sản phẩm phải lớn hơn 0");
-
+        assertThat(exception.getMessage()).isEqualTo("Số lượng sản phẩm 101 phải lớn hơn 0.");
+        
         verify(orderRepository, never()).save(any());
     }
 
