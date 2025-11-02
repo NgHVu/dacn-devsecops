@@ -21,6 +21,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -60,6 +61,8 @@ class OrderControllerTest {
     // --- Giả lập các Bean phụ thuộc ---
     @MockBean
     private OrderService orderService; // Mock "bộ não" service
+    @MockBean
+    private UserDetailsService userDetailsService;
 
     // Cần mock các bean này để SecurityConfig của @WebMvcTest có thể khởi động
     @MockBean
