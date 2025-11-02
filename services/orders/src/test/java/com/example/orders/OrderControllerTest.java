@@ -39,6 +39,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 
 @WebMvcTest(
@@ -98,6 +99,7 @@ class OrderControllerTest {
 
         // Act & Assert
         mockMvc.perform(post("/api/v1/orders")
+                .with(csrf())
                 .header("Authorization", MOCK_TOKEN) // Manually add header (vì controller cần)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createRequest)))
@@ -119,6 +121,7 @@ class OrderControllerTest {
 
         // Act & Assert
         mockMvc.perform(post("/api/v1/orders")
+                .with(csrf())
                 .header("Authorization", MOCK_TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(badRequest)))
