@@ -118,9 +118,9 @@ class ProductServiceTest {
 
     @Test
     void testList_InvalidPriceRange_ShouldThrowException() {
-        assertThrows(ResponseStatusException.class, () -> {
-            productService.list(null, new BigDecimal("50000"), new BigDecimal("10000"), Pageable.unpaged());
-        });
+        assertThrows(ResponseStatusException.class, 
+        () ->  productService.list(null, new BigDecimal("50000"), new BigDecimal("10000"), Pageable.unpaged())
+        );
     }
 
     @Test
