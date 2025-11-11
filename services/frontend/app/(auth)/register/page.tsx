@@ -18,7 +18,8 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { AlertCircle, Loader2 } from "lucide-react"; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
 import { authService } from "@/services/authService"; 
-import { useAuth } from "@/context/AuthContext"; // <-- 1. IMPORT USEAUTH
+import { useAuth } from "@/context/AuthContext"; 
+import { isAxiosError } from "axios"; 
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -52,7 +53,20 @@ export default function RegisterPage() {
 
     } catch (err) {
       console.error(err);
-      setError("Đăng ký thất bại. Email có thể đã tồn tại."); 
+      if (isAxiosError(err)) {
+        // Kiểm tra xem có phải lỗi 409 (Conflict) không
+        if (err.response?.status === 409) {
+          setError("Email này đã được đăng ký. Vui lòng sử dụng email khác.");
+        } else {
+          // Lỗi 400 (validation) hoặc 500 (server)
+          setError("Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.");
+        }
+      } else {
+        // Lỗi không xác định (ví dụ: lỗi mạng)
+        setError("Đã xảy ra lỗi. Vui lòng thử lại sau.");
+      }
+      // === KẾT THÚC TỐI ƯU ===
+      
       setIsLoading(false);
     }
   };
