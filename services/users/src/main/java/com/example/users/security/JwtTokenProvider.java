@@ -1,16 +1,16 @@
 package com.example.users.security;
 
-import com.example.users.entity.User;
+import com.example.users.entity.User; // Import User
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-import io.jsonwebtoken.security.SecurityException; 
-import jakarta.annotation.PostConstruct; 
+import io.jsonwebtoken.security.SecurityException;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication; // Import Authentication
 import org.springframework.stereotype.Component;
-
 import javax.crypto.SecretKey;
 import java.util.Date;
 
@@ -27,34 +27,57 @@ public class JwtTokenProvider {
 
     private SecretKey key;
 
-    /**
-     * Phương thức này sẽ tự động chạy một lần duy nhất sau khi bean được khởi tạo.
-     * Nó tạo ra đối tượng SecretKey và lưu lại để tái sử dụng, giúp tăng hiệu năng.
-     */
     @PostConstruct
     public void init() {
-        byte[] keyBytes = Decoders.BASE64.decode(this.jwtSecret);
-        this.key = Keys.hmacShaKeyFor(keyBytes);
+         try {
+            byte[] keyBytes = Decoders.BASE64.decode(this.jwtSecret);
+            this.key = Keys.hmacShaKeyFor(keyBytes);
+            logger.info("Khởi tạo JWT Secret Key thành công.");
+        } catch (IllegalArgumentException e) {
+            logger.error("Lỗi khi decode JWT Secret Key Base64: {}. Key có thể không hợp lệ hoặc quá ngắn.", e.getMessage());
+        }
     }
 
-     // Tạo ra một access token JWT cho người dùng.
+    /**
+     * Tạo token từ đối tượng User (Dùng sau khi verify OTP hoặc login)
+     */
     public String generateToken(User user) {
+        String username = user.getEmail();
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
         return Jwts.builder()
-                .subject(user.getEmail())
+                .subject(username)
                 .issuedAt(now)
                 .expiration(expiryDate)
-                .signWith(this.key) 
+                .signWith(this.key)
                 .compact();
     }
 
-    
-     // Trích xuất email của người dùng từ một token JWT.
+    /**
+     * TẠO TOKEN TỪ AUTHENTICATION (Dùng cho test hoặc các luồng khác)
+     * (Đây là hàm còn thiếu)
+     */
+    public String generateToken(Authentication authentication) {
+        String username = authentication.getName();
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
+
+        return Jwts.builder()
+                .subject(username)
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(this.key)
+                .compact();
+    }
+
+
+    /**
+     * Trích xuất username (email) từ một token JWT.
+     */
     public String getUsernameFromToken(String token) {
         Claims claims = Jwts.parser()
-                .verifyWith(this.key) 
+                .verifyWith(this.key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
@@ -62,25 +85,25 @@ public class JwtTokenProvider {
         return claims.getSubject();
     }
 
-    
-     // Kiểm tra xem một token JWT có hợp lệ hay không.
+    /**
+     * Kiểm tra xem một token JWT có hợp lệ hay không.
+     */
     public boolean validateToken(String token) {
         try {
             Jwts.parser()
-                    .verifyWith(this.key) 
+                    .verifyWith(this.key)
                     .build()
                     .parse(token);
             return true;
-        } catch (SecurityException | MalformedJwtException ex) { // Gộp các exception tương tự
+        } catch (SecurityException | MalformedJwtException ex) {
             logger.error("Token JWT không hợp lệ: {}", ex.getMessage());
         } catch (ExpiredJwtException ex) {
             logger.error("Token JWT đã hết hạn: {}", ex.getMessage());
         } catch (UnsupportedJwtException ex) {
             logger.error("Token JWT không được hỗ trợ: {}", ex.getMessage());
         } catch (IllegalArgumentException ex) {
-            logger.error("Chuỗi claims của JWT rỗng: {}", ex.getMessage());
+            logger.error("Chuỗi JWT không hợp lệ hoặc rỗng: {}", ex.getMessage());
         }
         return false;
     }
-
 }
