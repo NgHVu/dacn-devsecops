@@ -121,6 +121,7 @@ class UserServiceImplTest {
         // Arrange
         when(userRepository.existsByEmail(registerRequest.email())).thenReturn(false);
         when(passwordEncoder.encode(registerRequest.password())).thenReturn("encodedPassword");
+        
         // Giả lập việc save trả về User có ID
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
             User userToSave = invocation.getArgument(0);
@@ -128,18 +129,25 @@ class UserServiceImplTest {
             return userToSave;
         });
 
+        // === BỔ SUNG MOCK CHO TOKEN PROVIDER ===
+        // Vì hàm registerUser (phiên bản mới) sẽ gọi generateToken
+        when(jwtTokenProvider.generateToken(any(User.class))).thenReturn("dummy.jwt.token");
 
         // Act
-        UserResponse userResponse = userService.registerUser(registerRequest);
+        // === SỬA KIỂU TRẢ VỀ: UserResponse -> AuthResponse ===
+        AuthResponse authResponse = userService.registerUser(registerRequest);
 
         // Assert
-        assertThat(userResponse).isNotNull();
-        assertThat(userResponse.id()).isEqualTo(1L);
-        assertThat(userResponse.email()).isEqualTo(registerRequest.email());
-        assertThat(userResponse.name()).isEqualTo(registerRequest.name());
+        // === SỬA ASSERTION: Kiểm tra accessToken ===
+        assertThat(authResponse).isNotNull();
+        assertThat(authResponse.accessToken()).isEqualTo("dummy.jwt.token");
+        
+        // (Vẫn xác minh các bước cũ)
         verify(userRepository).existsByEmail(registerRequest.email());
         verify(passwordEncoder).encode(registerRequest.password());
         verify(userRepository).save(any(User.class));
+        // (Xác minh bước mới)
+        verify(jwtTokenProvider).generateToken(any(User.class));
     }
 
     @Test

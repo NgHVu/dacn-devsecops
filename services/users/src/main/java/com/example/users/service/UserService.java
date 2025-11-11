@@ -21,7 +21,7 @@ public interface UserService extends UserDetailsService {
      * @param registerRequest DTO chứa thông tin đăng ký.
      * @return DTO chứa thông tin công khai của người dùng đã được tạo.
      */
-    UserResponse registerUser(RegisterRequest registerRequest);
+    AuthResponse registerUser(RegisterRequest registerRequest);
 
     /**
      * Xử lý logic đăng nhập và tạo token.

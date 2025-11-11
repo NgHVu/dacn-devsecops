@@ -57,7 +57,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public UserResponse registerUser(RegisterRequest registerRequest) {
+    public AuthResponse registerUser(RegisterRequest registerRequest) {
         if (userRepository.existsByEmail(registerRequest.email())) {
             throw new EmailAlreadyExistsException("Email '" + registerRequest.email() + "' đã được sử dụng");
         }
@@ -68,7 +68,13 @@ public class UserServiceImpl implements UserService {
                 .password(encodedPassword)
                 .build();
         User savedUser = userRepository.save(user);
-        return UserResponse.fromEntity(savedUser);
+
+        // 2. THÊM LOGIC TẠO TOKEN (Giống hệt hàm login)
+        // Dùng user vừa được lưu để tạo token
+        String accessToken = jwtTokenProvider.generateToken(savedUser);
+        
+        // Trả về AuthResponse (chứa token) thay vì UserResponse
+        return new AuthResponse(accessToken);
     }
 
     @Override

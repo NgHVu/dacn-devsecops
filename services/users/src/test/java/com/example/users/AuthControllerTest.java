@@ -78,15 +78,20 @@ class AuthControllerTest {
     @DisplayName("POST /register: Thành công khi dữ liệu hợp lệ")
     void testRegisterUser_Success() throws Exception {
         RegisterRequest request = new RegisterRequest("Test User", "test@example.com", "password123");
-        UserResponse response = new UserResponse(1L, "Test User", "test@example.com");
+        
+        // === SỬA ĐỐI TƯỢNG RESPONSE MẪU ===
+        // Từ UserResponse -> AuthResponse
+        AuthResponse response = new AuthResponse("dummy.jwt.token");
 
+        // Giả lập service trả về AuthResponse
         when(userService.registerUser(any(RegisterRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(1L));
+                .andExpect(status().isCreated()) // Vẫn là 201 Created
+                // === SỬA ASSERTION: Kiểm tra accessToken ===
+                .andExpect(jsonPath("$.accessToken").value("dummy.jwt.token"));
     }
 
     @Test

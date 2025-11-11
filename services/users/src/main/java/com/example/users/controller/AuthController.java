@@ -30,10 +30,12 @@ public class AuthController {
     @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ")
     @ApiResponse(responseCode = "409", description = "Email đã tồn tại")
     @PostMapping("/register")
-    public ResponseEntity<UserResponse> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
-        UserResponse registeredUser = userService.registerUser(registerRequest);
-        // Dùng cú pháp fluent để nhất quán với endpoint login
-        return ResponseEntity.status(HttpStatus.CREATED).body(registeredUser);
+    public ResponseEntity<AuthResponse> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
+        // === 2. GỌI HÀM SERVICE MỚI (CHÚNG TA SẼ SỬA NÓ Ở BƯỚC 2) ===
+        AuthResponse authResponse = userService.registerUser(registerRequest);
+        
+        // === 3. TRẢ VỀ AUTHRESPONSE VỚI MÃ 201 CREATED ===
+        return ResponseEntity.status(HttpStatus.CREATED).body(authResponse);
     }
 
     @Operation(
