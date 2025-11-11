@@ -15,6 +15,7 @@ yarn-debug.log*
 *.local.yaml
 *.local.yml
 docker-compose.override.yml
+docker-compose.dev.yml
 
 # Secret keys and certificates
 *.pem
