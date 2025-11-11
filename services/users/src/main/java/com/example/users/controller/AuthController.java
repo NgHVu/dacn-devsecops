@@ -3,8 +3,7 @@ package com.example.users.controller;
 import com.example.users.dto.AuthResponse;
 import com.example.users.dto.LoginRequest;
 import com.example.users.dto.RegisterRequest;
-import com.example.users.dto.UserResponse;
-import com.example.users.dto.VerifyRequest;
+import com.example.users.dto.VerifyRequest; // <-- ĐÃ THÊM
 import com.example.users.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -18,32 +17,47 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth") // Base path cho tất cả các endpoint trong controller này
 @RequiredArgsConstructor
-@Tag(name = "Authentication API", description = "Các API dùng để đăng ký và đăng nhập")
+@Tag(name = "Authentication API", description = "Các API dùng để đăng ký, xác thực và đăng nhập")
 public class AuthController {
 
     private final UserService userService;
 
     @Operation(
-            summary = "Đăng ký người dùng mới",
-            description = "Tạo một tài khoản người dùng mới trong hệ thống."
+            summary = "1. Đăng ký tài khoản (Gửi OTP)",
+            description = "Tiếp nhận thông tin đăng ký (tên, email, pass) và gửi mã OTP về email."
     )
-    @ApiResponse(responseCode = "201", description = "Tạo tài khoản thành công")
+    @ApiResponse(responseCode = "201", description = "Đã gửi OTP thành công")
     @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ")
-    @ApiResponse(responseCode = "409", description = "Email đã tồn tại")
+    @ApiResponse(responseCode = "409", description = "Email đã được xác thực (đã tồn tại)")
     @PostMapping("/register")
     public ResponseEntity<String> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
-        // Hàm này giờ chỉ gửi OTP, không trả về token
+        // SỬA: Hàm này giờ là void, chỉ gửi mail
         userService.registerUser(registerRequest); 
         return ResponseEntity.status(HttpStatus.CREATED)
                              .body("Đã gửi OTP đến email. Vui lòng xác thực.");
     }
 
+    // === THÊM ENDPOINT MỚI ===
     @Operation(
-            summary = "Đăng nhập người dùng",
-            description = "Xác thực thông tin người dùng và trả về một JWT access token."
+            summary = "2. Xác thực tài khoản (Verify OTP)",
+            description = "Xác thực email và mã OTP. Trả về JWT token nếu thành công."
+    )
+    @ApiResponse(responseCode = "200", description = "Xác thực thành công, trả về token")
+    @ApiResponse(responseCode = "400", description = "OTP không đúng hoặc đã hết hạn")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy email")
+    @PostMapping("/verify")
+    public ResponseEntity<AuthResponse> verifyAccount(@Valid @RequestBody VerifyRequest verifyRequest) {
+        // Hàm này sẽ xác thực OTP và trả về TOKEN
+        AuthResponse authResponse = userService.verifyAccount(verifyRequest);
+        return ResponseEntity.ok(authResponse);
+    }
+    
+    @Operation(
+            summary = "3. Đăng nhập",
+            description = "Xác thực email/mật khẩu VÀ kiểm tra tài khoản đã được kích hoạt chưa."
     )
     @ApiResponse(responseCode = "200", description = "Đăng nhập thành công")
-    @ApiResponse(responseCode = "401", description = "Thông tin đăng nhập không chính xác")
+    @ApiResponse(responseCode = "401", description = "Sai thông tin hoặc tài khoản chưa được kích hoạt")
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> loginUser(@Valid @RequestBody LoginRequest loginRequest) {
         AuthResponse authResponse = userService.loginUser(loginRequest);
