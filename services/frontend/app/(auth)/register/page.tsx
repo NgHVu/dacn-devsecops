@@ -1,7 +1,10 @@
+// Đặt tại: app/(auth)/register/page.tsx
+
 "use client";
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation"; 
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,30 +14,47 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-// Bỏ import Eye, EyeOff
-// import { Eye, EyeOff } from "lucide-react"; 
-// 1. IMPORT COMPONENT MỚI
-import { PasswordInput } from "@/components/ui/password-input";
+import { PasswordInput } from "@/components/ui/password-input"; // Component tái sử dụng
+import { AlertCircle, Loader2 } from "lucide-react"; 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
+import { authService } from "@/services/authService"; 
 
 export default function RegisterPage() {
-  // 2. BỔ SUNG STATE CHO `name` (Backend cần)
-  const [name, setName] = useState("");
+  const router = useRouter(); 
+  const [name, setName] = useState(""); // <-- 1. BỔ SUNG STATE CHO NAME
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   
-  // 3. XÓA 2 STATE "con mắt" (vì PasswordInput tự quản lý)
-  // const [showPassword, setShowPassword] = useState(false);
-  // const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
+    setIsLoading(true);
+    setError(null); 
+
     if (password !== confirmPassword) {
-      console.error("Mật khẩu không khớp!");
-      // (Sau này chúng ta sẽ hiển thị lỗi này ra UI)
+      setError("Mật khẩu xác nhận không khớp. Vui lòng thử lại.");
+      setIsLoading(false);
       return;
     }
-    // 4. BỔ SUNG `name` VÀO LOGIC
-    console.log("Đang đăng ký với:", { name, email, password });
+
+    try {
+      // 2. TRUYỀN `name` VÀO SERVICE
+      const data = await authService.register({ name, email, password });
+      
+      console.log("Đăng ký thành công!", data);
+
+      // TODO: Lưu token vào Context
+      // localStorage.setItem("authToken", data.token);
+
+      router.push("/"); // Điều hướng về trang chủ
+
+    } catch (err) {
+      console.error(err);
+      setError("Đăng ký thất bại. Email có thể đã tồn tại."); 
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -45,7 +65,15 @@ export default function RegisterPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* 5. THÊM Ô NHẬP TÊN */}
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Đăng ký thất bại</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* 3. THÊM Ô INPUT CHO NAME */}
           <div className="space-y-2">
             <Input
               id="name"
@@ -54,9 +82,9 @@ export default function RegisterPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              disabled={isLoading} 
             />
           </div>
-
           <div className="space-y-2">
             <Input
               id="email"
@@ -65,10 +93,9 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={isLoading}
             />
           </div>
-
-          {/* 6. DÙNG COMPONENT MỚI */}
           <div className="space-y-2">
             <PasswordInput
               id="password"
@@ -76,10 +103,9 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={isLoading}
             />
           </div>
-
-          {/* 7. DÙNG COMPONENT MỚI LẦN NỮA */}
           <div className="space-y-2">
             <PasswordInput
               id="confirmPassword"
@@ -87,13 +113,22 @@ export default function RegisterPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
+              disabled={isLoading}
             />
           </div>
         </CardContent>
 
         <CardFooter className="flex flex-col gap-4">
-          <Button className="w-full" onClick={handleRegister}>
-            Đăng ký
+          <Button 
+            className="w-full" 
+            onClick={handleRegister} 
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              "Đăng ký"
+            )}
           </Button>
           
           <div className="text-center text-sm">
