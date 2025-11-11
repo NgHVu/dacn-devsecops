@@ -1,4 +1,0 @@
-image:
-  repository: example/frontend
-  tag: latest
-replicaCount: 1
