@@ -1,5 +1,4 @@
 // Đặt tại: app/(auth)/login/page.tsx
-
 "use client";
 
 import { useState } from "react";
@@ -13,17 +12,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Eye, EyeOff } from "lucide-react"; // <-- Import thêm icons Eye và EyeOff
+import { PasswordInput } from "@/components/ui/password-input";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false); // <-- Thêm state mới
 
   const handleLogin = () => {
-    // TODO: Bước tiếp theo
     console.log("Đang đăng nhập với:", { email, password });
-    // Chúng ta sẽ gọi API service ở đây
   };
 
   return (
@@ -44,35 +40,15 @@ export default function LoginPage() {
               required
             />
           </div>
-          <div className="space-y-2 relative"> {/* <-- Thêm 'relative' tại đây */}
-            <Input
+          
+          <div className="space-y-2">
+            <PasswordInput
               id="password"
-              // Thay đổi type dựa trên state showPassword
-              type={showPassword ? "text" : "password"} 
               placeholder="Mật khẩu"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              // Thêm padding-right để icon không bị che mất
-              className="pr-10" 
             />
-            <Button 
-              type="button"
-              variant="ghost" 
-              size="icon" 
-              // Cập nhật các class Tailwind để căn giữa tốt hơn
-              className="absolute right-0 inset-y-0 flex items-center justify-center w-10 text-muted-foreground hover:bg-transparent"
-              onClick={() => setShowPassword((prev) => !prev)}
-            >
-              {showPassword ? (
-                <Eye className="h-4 w-4" />
-              ) : (
-                <EyeOff className="h-4 w-4" />
-              )}
-              <span className="sr-only">
-                {showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-              </span>
-            </Button>
           </div>
         </CardContent>
 
