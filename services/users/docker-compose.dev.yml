@@ -46,6 +46,10 @@ services:
       DB_URL: jdbc:postgresql://users-db:5432/users_db 
       DB_USER: admin
       DB_PASSWORD: admin
+      JPA_DDL_AUTO: update
+      SPRING_MAIL_PASSWORD: knfz pbig grvg yitz
+      JWT_SECRET_KEY: dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLWp3dC1hdXRoZW50aWNhdGlvbi1pbi1kZXZzZWNvcHMtcHJvamVjdC1tdXN0LWJlLXZlcnktbG9uZy1hbmQtc2VjdXJl
+      JWT_EXPIRATION_MS: 86400000
       SPRING_PROFILES_ACTIVE: local
     depends_on:
       users-db:
