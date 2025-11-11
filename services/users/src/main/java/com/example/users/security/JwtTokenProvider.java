@@ -14,6 +14,9 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.util.Date;
 
+/**
+ * Utility class để xử lý các thao tác liên quan đến JSON Web Tokens (JWT). 🔑
+ */
 @Component
 public class JwtTokenProvider {
 
@@ -27,6 +30,9 @@ public class JwtTokenProvider {
 
     private SecretKey key;
 
+    /**
+     * Khởi tạo SecretKey một lần sau khi bean được tạo.
+     */
     @PostConstruct
     public void init() {
          try {
@@ -55,8 +61,9 @@ public class JwtTokenProvider {
     }
 
     /**
-     * TẠO TOKEN TỪ AUTHENTICATION (Dùng cho test hoặc các luồng khác)
-     * (Đây là hàm còn thiếu)
+     * SỬA LỖI BIÊN DỊCH:
+     * Thêm phương thức generateToken(Authentication)
+     * (Cần thiết cho test và các luồng Spring Security khác)
      */
     public String generateToken(Authentication authentication) {
         String username = authentication.getName();
