@@ -7,9 +7,6 @@ import jakarta.validation.constraints.Size;
 
 /**
  * DTO (Data Transfer Object) để nhận yêu cầu xác thực OTP.
- *
- * @param email Email của tài khoản cần xác thực.
- * @param otp   Mã OTP (6 chữ số) người dùng nhập.
  */
 @Schema(description = "Payload chứa email và OTP để xác thực tài khoản")
 public record VerifyRequest(
