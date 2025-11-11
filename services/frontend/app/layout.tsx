@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
-import { ThemeProvider } from "@/components/theme-provider"; // <-- 1. IMPORT THEME PROVIDER
+import { ThemeProvider } from "@/components/theme-provider"; 
+import { AuthProvider } from "@/context/AuthContext"; // <-- 1. IMPORT AUTH PROVIDER
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,18 +30,20 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased flex min-h-screen flex-col`}
       >
-        {/* === 2. BỌC MỌI THỨ TRONG THEME PROVIDER === */}
         <ThemeProvider
             attribute="class"
-            defaultTheme="system" // Mặc định theo hệ điều hành
+            defaultTheme="system"
             enableSystem
             disableTransitionOnChange
         >
-          <Navbar />
-          <main className="flex-grow">
-            {children}
-          </main>
-          {/* (Footer... ) */}
+          {/* 2. BỌC AUTH PROVIDER QUANH APP */}
+          <AuthProvider>
+            <Navbar />
+            <main className="flex-grow">
+              {children}
+            </main>
+          </AuthProvider>
+          
         </ThemeProvider>
       </body>
     </html>
