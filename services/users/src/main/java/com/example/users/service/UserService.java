@@ -4,10 +4,13 @@ import com.example.users.dto.AuthResponse;
 import com.example.users.dto.LoginRequest;
 import com.example.users.dto.RegisterRequest;
 import com.example.users.dto.UserResponse;
-import com.example.users.entity.User;
+import com.example.users.dto.VerifyRequest; // <-- THÊM IMPORT
 import org.springframework.security.core.userdetails.UserDetailsService;
 
-import java.util.Optional;
+// Bỏ import Optional và User entity (Interface không nên lộ Entity)
+// import java.util.Optional;
+// import com.example.users.entity.User;
+
 
 /**
  * Interface định nghĩa các nghiệp vụ (business logic) liên quan đến User.
@@ -16,15 +19,24 @@ import java.util.Optional;
 public interface UserService extends UserDetailsService {
 
     /**
-     * Xử lý logic đăng ký người dùng mới.
+     * Sửa đổi: Hàm này giờ chỉ xử lý đăng ký và gửi OTP.
+     * Không trả về token nữa.
      *
      * @param registerRequest DTO chứa thông tin đăng ký.
-     * @return DTO chứa thông tin công khai của người dùng đã được tạo.
      */
-    AuthResponse registerUser(RegisterRequest registerRequest);
+    void registerUser(RegisterRequest registerRequest); // <-- SỬA: Trả về void
 
     /**
-     * Xử lý logic đăng nhập và tạo token.
+     * THÊM MỚI: Hàm này xác thực OTP và trả về token nếu thành công.
+     *
+     * @param verifyRequest DTO chứa email và OTP.
+     * @return DTO chứa access token.
+     */
+    AuthResponse verifyAccount(VerifyRequest verifyRequest); // <-- THÊM MỚI
+
+    /**
+     * Sửa đổi: Hàm này giờ sẽ kiểm tra xem user.isVerified()
+     * trước khi cho phép đăng nhập.
      *
      * @param loginRequest DTO chứa thông tin đăng nhập.
      * @return DTO chứa access token.
@@ -32,15 +44,17 @@ public interface UserService extends UserDetailsService {
     AuthResponse loginUser(LoginRequest loginRequest);
 
     /**
+     * Lấy thông tin người dùng hiện tại (đã xác thực).
      *
      * @return DTO chứa thông tin công khai của người dùng hiện tại.
      */
     UserResponse getCurrentUser();
 
     /**
+     * Lấy thông tin người dùng bằng email (dùng cho nội bộ service).
      *
      * @param email Email cần tìm.
-     * @return Optional chứa User nếu tìm thấy.
+     * @return DTO chứa thông tin công khai của người dùng.
      */
-    Optional<User> findByEmail(String email);
+    UserResponse findUserByEmail(String email); // <-- Sửa: Trả về DTO thay vì Entity
 }
