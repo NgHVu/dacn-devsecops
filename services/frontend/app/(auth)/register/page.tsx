@@ -14,14 +14,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { PasswordInput } from "@/components/ui/password-input"; // Component tái sử dụng
+import { PasswordInput } from "@/components/ui/password-input"; 
 import { AlertCircle, Loader2 } from "lucide-react"; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
 import { authService } from "@/services/authService"; 
+import { useAuth } from "@/context/AuthContext"; // <-- 1. IMPORT USEAUTH
 
 export default function RegisterPage() {
-  const router = useRouter(); 
-  const [name, setName] = useState(""); // <-- 1. BỔ SUNG STATE CHO NAME
+  const router = useRouter();
+  const { login } = useAuth(); // <-- 2. LẤY HÀM LOGIN TỪ CONTEXT 
+  const [name, setName] = useState(""); 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -40,15 +42,13 @@ export default function RegisterPage() {
     }
 
     try {
-      // 2. TRUYỀN `name` VÀO SERVICE
       const data = await authService.register({ name, email, password });
       
       console.log("Đăng ký thành công!", data);
 
-      // TODO: Lưu token vào Context
-      // localStorage.setItem("authToken", data.token);
+      await login(data.token);
 
-      router.push("/"); // Điều hướng về trang chủ
+      router.push("/"); 
 
     } catch (err) {
       console.error(err);
@@ -73,7 +73,6 @@ export default function RegisterPage() {
             </Alert>
           )}
 
-          {/* 3. THÊM Ô INPUT CHO NAME */}
           <div className="space-y-2">
             <Input
               id="name"
