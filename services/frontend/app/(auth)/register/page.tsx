@@ -46,7 +46,7 @@ export default function RegisterPage() {
       
       console.log("Đăng ký thành công!", data);
 
-      await login(data.token);
+      await login(data.accessToken);
 
       router.push("/"); 
 

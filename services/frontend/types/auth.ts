@@ -14,7 +14,7 @@ export interface LoginRequest {
 // Định nghĩa "phản hồi" (Response) mà backend trả về
 
 export interface AuthResponse {
-  token: string;
+  accessToken: string;
   // (Backend của bạn có thể trả về thêm user info, v.v.)
 }
 

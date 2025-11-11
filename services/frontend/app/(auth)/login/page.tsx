@@ -37,7 +37,8 @@ export default function LoginPage() {
       
       console.log("Đăng nhập thành công!", data);
       
-      await login(data.token);
+      await login(data.accessToken);
+
       router.push("/"); 
 
     } catch (err) {
