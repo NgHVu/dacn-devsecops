@@ -15,7 +15,7 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 
 /**
- * Utility class để xử lý các thao tác liên quan đến JSON Web Tokens (JWT). 🔑
+ * Utility class để xử lý các thao tác liên quan đến JSON Web Tokens (JWT). 
  */
 @Component
 public class JwtTokenProvider {
