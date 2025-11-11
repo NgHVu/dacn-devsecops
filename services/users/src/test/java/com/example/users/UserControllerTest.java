@@ -2,7 +2,7 @@ package com.example.users;
 
 import com.example.users.controller.UserController;
 import com.example.users.dto.UserResponse;
-import com.example.users.security.JwtAuthenticationEntryPoint; // <-- Chỉ cần mock cái này
+import com.example.users.security.JwtAuthenticationEntryPoint; 
 import com.example.users.security.JwtTokenProvider;
 import com.example.users.service.UserService;
 import org.junit.jupiter.api.DisplayName;
@@ -13,6 +13,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mail.javamail.JavaMailSender; 
 
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -39,6 +40,8 @@ class UserControllerTest {
     @MockBean
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
+    @MockBean
+    private JavaMailSender javaMailSender;
 
     @Test
     @DisplayName("GET /me: Thành công (200 OK) khi người dùng đã xác thực")

@@ -13,7 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.web.servlet.MockMvc;
-
+import org.springframework.mail.javamail.JavaMailSender;
 import java.util.ArrayList;
 
 import static org.mockito.Mockito.when;
@@ -35,6 +35,9 @@ class SecurityIntegrationTest {
     @SuppressWarnings("removal")
     @MockBean
     private UserService userService;
+
+    @MockBean
+    private JavaMailSender javaMailSender;
 
     private UserDetails mockSpringUserDetails;
     private UserResponse mockUserResponse;

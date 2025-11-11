@@ -25,7 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*; // Thêm content()
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*; 
 
 // Chỉ test AuthController
 @WebMvcTest(controllers = AuthController.class)
@@ -124,19 +124,17 @@ class AuthControllerTest {
     }
 
     // === THÊM: Test /verify (OTP sai) ===
-    @Test
-    @DisplayName("POST /verify: Thất bại (401) khi OTP sai")
+   @Test
+    @DisplayName("POST /verify: Thất bại (403) khi OTP sai")
     void testVerifyAccount_InvalidOtp_ShouldFail() throws Exception {
         VerifyRequest request = new VerifyRequest("test@example.com", "654321");
-
-        // Giả lập service ném lỗi
         when(userService.verifyAccount(any(VerifyRequest.class)))
             .thenThrow(new BadCredentialsException("Mã OTP không chính xác."));
 
         mockMvc.perform(post("/api/auth/verify")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized()); // GlobalExceptionHandler nên map lỗi này về 401
+                .andExpect(status().isForbidden()); // <-- SỬA THÀNH 403
     }
 
     // === Test /login (giữ nguyên) ===
@@ -156,7 +154,7 @@ class AuthControllerTest {
 
     // === Test /login (sai mật khẩu) ===
     @Test
-    @DisplayName("POST /login: Thất bại (401) khi thông tin đăng nhập sai")
+    @DisplayName("POST /login: Thất bại (403) khi thông tin đăng nhập sai")
     void testLoginUser_InvalidCredentials_ShouldFail() throws Exception {
         LoginRequest request = new LoginRequest("test@example.com", "wrongpassword");
         when(userService.loginUser(any(LoginRequest.class)))
@@ -165,23 +163,21 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized()); // GlobalExceptionHandler nên map lỗi này về 401
+                .andExpect(status().isForbidden()); // <-- SỬA THÀNH 403
     }
 
     // === THÊM: Test /login (chưa xác thực) ===
     @Test
-    @DisplayName("POST /login: Thất bại (401) khi tài khoản chưa xác thực OTP")
+    @DisplayName("POST /login: Thất bại (403) khi tài khoản chưa xác thực OTP")
     void testLoginUser_NotVerified_ShouldFail() throws Exception {
         LoginRequest request = new LoginRequest("test@example.com", "password123");
-        
-        // Giả lập lỗi "Disabled" (vì isEnabled() = false)
         when(userService.loginUser(any(LoginRequest.class)))
                 .thenThrow(new BadCredentialsException("Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email."));
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized()) // Mong đợi 401
+                .andExpect(status().isForbidden()) // <-- SỬA THÀNH 403
                 .andExpect(jsonPath("$.message").value("Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email."));
     }
 }
