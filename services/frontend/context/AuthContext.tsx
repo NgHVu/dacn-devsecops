@@ -25,14 +25,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Hàm này sẽ được gọi từ trang Login/Register
   const login = async (token: string) => {
     try {
-      // 1. Lưu token vào localStorage
+      // 1. Lưu token vào localStorage (như cũ)
       localStorage.setItem("authToken", token);
       
-      // 2. (Quan trọng) Gọi API /me để lấy thông tin user VÀ xác thực token
-      //    (apiClient sẽ tự động gắn token vào header, chúng ta sẽ sửa nó ở Bước 3)
-      const response = await apiClient.get<UserResponse>("/api/users/me");
+      // 2. SỬA LỖI: Gọi API /me VÀ GỬI TOKEN TRỰC TIẾP
+      //    Điều này tránh được "race condition" với interceptor
+      const response = await apiClient.get<UserResponse>("/api/users/me", {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
-      // 3. Lưu thông tin user vào state
+      // 3. Lưu thông tin user vào state (như cũ)
       setUser(response.data);
 
     } catch (error) {
