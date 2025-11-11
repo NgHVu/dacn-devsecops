@@ -1,9 +1,5 @@
 import axios from "axios";
 
-/**
- * Tạo một axios instance được cấu hình sẵn cho
- * việc gọi API đến users-service.
- */
 const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_USERS_API_URL,
   headers: {
@@ -11,19 +7,21 @@ const apiClient = axios.create({
   },
 });
 
-/*
- * BƯỚC NÂNG CAO (CHO TƯƠNG LAI):
- * Chúng ta sẽ thêm "interceptors" (bộ đánh chặn) ở đây.
- * Interceptor sẽ tự động lấy token từ localStorage
- * và gắn vào header "Authorization" cho MỌI request.
- *
- * apiClient.interceptors.request.use( (config) => {
- * const token = localStorage.getItem('authToken');
- * if (token) {
- * config.headers.Authorization = `Bearer ${token}`;
- * }
- * return config;
- * });
- */
+// *** THÊM KHỐI INTERCEPTOR NÀY VÀO ***
+apiClient.interceptors.request.use(
+  (config) => {
+    // Chỉ chạy ở client-side
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("authToken");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 export default apiClient;
