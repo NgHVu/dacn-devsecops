@@ -3,6 +3,7 @@ package com.example.users.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async; // <-- 1. IMPORT
 import org.springframework.stereotype.Service;
 
 @Service
@@ -11,6 +12,7 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
+    @Async
     public void sendOtpEmail(String toEmail, String otp) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
@@ -22,8 +24,7 @@ public class EmailService {
             
             mailSender.send(message);
         } catch (Exception e) {
-            // (Trong thực tế, bạn nên xử lý lỗi này kỹ hơn, ví dụ: dùng queue)
-            throw new RuntimeException("Không thể gửi email OTP", e);
+            System.err.println("Lỗi khi gửi mail @Async: " + e.getMessage());
         }
     }
 }

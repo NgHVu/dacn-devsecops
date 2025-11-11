@@ -2,7 +2,7 @@ package com.example.users;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-
+import org.springframework.scheduling.annotation.EnableAsync; 
 /**
  * Đây là điểm khởi chạy (entry point) chính của Users Service.
  * <p>
@@ -15,6 +15,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * </ul>
  */
 @SpringBootApplication
+@EnableAsync
 public class UserServiceApplication {
 
     /**

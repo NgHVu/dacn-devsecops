@@ -4,6 +4,7 @@ import com.example.users.dto.AuthResponse;
 import com.example.users.dto.LoginRequest;
 import com.example.users.dto.RegisterRequest;
 import com.example.users.dto.UserResponse;
+import com.example.users.dto.VerifyRequest;
 import com.example.users.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -30,12 +31,11 @@ public class AuthController {
     @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ")
     @ApiResponse(responseCode = "409", description = "Email đã tồn tại")
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
-        // === 2. GỌI HÀM SERVICE MỚI (CHÚNG TA SẼ SỬA NÓ Ở BƯỚC 2) ===
-        AuthResponse authResponse = userService.registerUser(registerRequest);
-        
-        // === 3. TRẢ VỀ AUTHRESPONSE VỚI MÃ 201 CREATED ===
-        return ResponseEntity.status(HttpStatus.CREATED).body(authResponse);
+    public ResponseEntity<String> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
+        // Hàm này giờ chỉ gửi OTP, không trả về token
+        userService.registerUser(registerRequest); 
+        return ResponseEntity.status(HttpStatus.CREATED)
+                             .body("Đã gửi OTP đến email. Vui lòng xác thực.");
     }
 
     @Operation(
