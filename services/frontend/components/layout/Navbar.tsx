@@ -1,13 +1,10 @@
 "use client"; 
 
 import Link from "next/link";
-import { ShoppingCart, User } from "lucide-react"; 
-import { Button } from "@/components/ui/button";     
+import { ShoppingCart, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ModeToggle } from "@/components/layout/mode-toggle"; // <-- 1. IMPORT NÚT MỚI
 
-/**
- * Navbar (Thanh điều hướng) chính của trang web.
- * Đây là Client Component vì nó sẽ cần đọc Context (Auth, Cart) sau này.
- */
 export default function Navbar() {
   return (
     <nav className="border-b bg-background">
@@ -15,7 +12,6 @@ export default function Navbar() {
         
         {/* === Phần Bên Trái: Logo & Điều hướng === */}
         <div className="flex items-center gap-6">
-          {/* Logo */}
           <Link
             href="/"
             className="text-2xl font-bold text-primary"
@@ -23,7 +19,6 @@ export default function Navbar() {
             FoodApp
           </Link>
 
-          {/* Nav Links */}
           <div className="hidden md:flex md:gap-4">
             <Button variant="ghost" asChild>
               <Link href="/products">Sản Phẩm</Link>
@@ -43,6 +38,9 @@ export default function Navbar() {
               <span className="sr-only">Giỏ hàng</span>
             </Link>
           </Button>
+          
+          {/* === 2. THÊM NÚT CHUYỂN THEME VÀO ĐÂY === */}
+          <ModeToggle /> 
 
           {/* Nút Đăng nhập */}
           <Button asChild>
