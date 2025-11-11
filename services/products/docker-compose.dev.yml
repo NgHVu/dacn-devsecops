@@ -46,6 +46,7 @@ services:
       DB_URL: jdbc:postgresql://products-db:5432/products_db
       DB_USER: admin
       DB_PASSWORD: admin
+      JPA_DDL_AUTO: update
       SPRING_PROFILES_ACTIVE: local
     depends_on:
       products-db: # <-- THAY ĐỔI QUAN TRỌNG
