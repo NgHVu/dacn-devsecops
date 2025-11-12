@@ -118,8 +118,13 @@ class ProductServiceTest {
 
     @Test
     void testList_InvalidPriceRange_ShouldThrowException() {
+        String name = null;
+        BigDecimal minPrice = new BigDecimal("50000");
+        BigDecimal maxPrice = new BigDecimal("10000");
+        Pageable pageable = Pageable.unpaged();
+
         assertThrows(ResponseStatusException.class, 
-        () ->  productService.list(null, new BigDecimal("50000"), new BigDecimal("10000"), Pageable.unpaged())
+            () ->  productService.list(name, minPrice, maxPrice, pageable)
         );
     }
 
