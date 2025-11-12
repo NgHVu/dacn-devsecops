@@ -17,14 +17,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.Collections;
 
-/**
- * Filter cho orders-service.
- * Chỉ xác thực token và trích xuất email (principal).
- */
-@RequiredArgsConstructor 
+@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -37,24 +33,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String jwt = getJwtFromRequest(request);
 
             if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
-                // Chỉ lấy username (email) từ token
                 String username = jwtTokenProvider.getUsernameFromToken(jwt);
 
-                // Tạo đối tượng Authentication với principal là email (String)
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        username, // Principal là String (email)
+                        username, 
                         null,
-                        Collections.emptyList() // Không cần quyền (authorities)
+                        Collections.emptyList() 
                 );
 
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                // Đặt vào Security Context
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-                logger.debug("Đã thiết lập Security Context cho user: {}", username);
+                LOGGER.debug("Đã thiết lập Security Context cho user: {}", username);
             }
         } catch (Exception ex) {
-            logger.error("Không thể thiết lập xác thực người dùng: {}", ex.getMessage());
+            LOGGER.error("Không thể thiết lập xác thực người dùng: {}", ex.getMessage());
         }
 
         filterChain.doFilter(request, response);
