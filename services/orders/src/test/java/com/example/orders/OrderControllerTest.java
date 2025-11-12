@@ -13,10 +13,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-// Bỏ các import exclude
-// import org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration;
-// import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-// import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
@@ -25,7 +21,6 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
-// THÊM IMPORT NÀY:
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 
 import java.math.BigDecimal;
@@ -35,34 +30,32 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+// --- THÊM DÒNG NÀY ---
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// SỬA LỖI: Xóa 'excludeAutoConfiguration'
 @WebMvcTest(controllers = OrderController.class)
 @DisplayName("OrderController Tests")
 class OrderControllerTest {
 
     @Autowired
-    private MockMvc mockMvc; 
+    private MockMvc mockMvc;
 
     @Autowired
     private ObjectMapper objectMapper;
 
     // --- Mock các Bean phụ thuộc ---
     @MockBean
-    private OrderService orderService; 
+    private OrderService orderService;
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
     @MockBean
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
-    // SỬA LỖI: Thêm MockBean này
-    // Cung cấp một bean JpaMappingContext giả để "thỏa mãn"
-    // JpaAuditingHandler (vốn được kích hoạt bởi @EnableJpaAuditing)
     @MockBean
     private JpaMetamodelMappingContext jpaMetamodelMappingContext;
 
@@ -74,7 +67,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("POST /orders: Thành công (201 Created) khi đã xác thực và DTO hợp lệ")
-    @WithMockUser 
+    @WithMockUser // Giữ nguyên @WithMockUser để kích hoạt Security Context
     void testCreateOrder_Success() throws Exception {
         // Arrange
         OrderItemRequest itemRequest = new OrderItemRequest(101L, 2);
@@ -91,31 +84,33 @@ class OrderControllerTest {
 
         // Act & Assert
         mockMvc.perform(post("/api/v1/orders")
-                .header("Authorization", MOCK_TOKEN)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createRequest)))
-                .andExpect(status().isCreated())
+                        .header("Authorization", MOCK_TOKEN)
+                        .with(csrf()) // <--- SỬA LỖI: Thêm token CSRF vào request
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isCreated()) // Sẽ pass (201)
                 .andExpect(jsonPath("$.id").value(1L));
     }
 
     @Test
     @DisplayName("POST /orders: Thất bại (400 Bad Request) khi DTO không hợp lệ")
-    @WithMockUser 
+    @WithMockUser // Giữ nguyên @WithMockUser để kích hoạt Security Context
     void testCreateOrder_InvalidInput_ShouldReturnBadRequest() throws Exception {
-        OrderCreateRequest badRequest = new OrderCreateRequest(List.of()); 
+        OrderCreateRequest badRequest = new OrderCreateRequest(List.of());
 
         mockMvc.perform(post("/api/v1/orders")
-                .header("Authorization", MOCK_TOKEN)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(badRequest)))
-                .andExpect(status().isBadRequest()); 
+                        .header("Authorization", MOCK_TOKEN)
+                        .with(csrf()) // <--- SỬA LỖI: Thêm token CSRF vào request
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(badRequest)))
+                .andExpect(status().isBadRequest()); // Sẽ pass (400)
 
         verify(orderService, never()).createOrder(any(), any());
     }
 
     @Test
     @DisplayName("GET /orders/my: Thành công (200 OK) khi đã xác thực")
-    @WithMockUser(username = MOCK_EMAIL) 
+    @WithMockUser(username = MOCK_EMAIL)
     void testGetMyOrders_Success() throws Exception {
         Page<OrderResponse> mockPage = Page.empty();
 
@@ -123,10 +118,10 @@ class OrderControllerTest {
                 .thenReturn(mockPage);
 
         mockMvc.perform(get("/api/v1/orders/my")
-                .header("Authorization", MOCK_TOKEN)
-                .accept(MediaType.APPLICATION_JSON))
+                        .header("Authorization", MOCK_TOKEN)
+                        .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").isArray()) 
+                .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.empty").value(true));
     }
 
@@ -134,7 +129,7 @@ class OrderControllerTest {
     @DisplayName("GET /orders/my: Thất bại (401 Unauthorized) khi chưa xác thực")
     void testGetMyOrders_Unauthorized() throws Exception {
         mockMvc.perform(get("/api/v1/orders/my"))
-                .andExpect(status().isUnauthorized()); 
+                .andExpect(status().isUnauthorized());
 
         verify(orderService, never()).getOrders(any(), any(), any());
     }
@@ -148,7 +143,7 @@ class OrderControllerTest {
                 .thenThrow(new OrderNotFoundException("Không tìm thấy đơn hàng"));
 
         mockMvc.perform(get("/api/v1/orders/{orderId}", orderId)
-                .header("Authorization", MOCK_TOKEN))
+                        .header("Authorization", MOCK_TOKEN))
                 .andExpect(status().isNotFound());
     }
 }
