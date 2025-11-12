@@ -30,7 +30,6 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-// --- THÊM DÒNG NÀY ---
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -47,7 +46,6 @@ class OrderControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    // --- Mock các Bean phụ thuộc ---
     @MockBean
     private OrderService orderService;
 
@@ -59,17 +57,13 @@ class OrderControllerTest {
     @MockBean
     private JpaMetamodelMappingContext jpaMetamodelMappingContext;
 
-    // --- Dữ liệu mẫu ---
     private final String MOCK_EMAIL = "test.user@example.com";
     private final String MOCK_TOKEN = "Bearer dummy.token.123";
 
-    // ... (Toàn bộ phần còn lại của file test (các hàm @Test) giữ nguyên) ...
-
     @Test
     @DisplayName("POST /orders: Thành công (201 Created) khi đã xác thực và DTO hợp lệ")
-    @WithMockUser // Giữ nguyên @WithMockUser để kích hoạt Security Context
+    @WithMockUser
     void testCreateOrder_Success() throws Exception {
-        // Arrange
         OrderItemRequest itemRequest = new OrderItemRequest(101L, 2);
         OrderCreateRequest createRequest = new OrderCreateRequest(List.of(itemRequest));
 
@@ -82,28 +76,27 @@ class OrderControllerTest {
         when(orderService.createOrder(any(OrderCreateRequest.class), eq(MOCK_TOKEN)))
                 .thenReturn(responseDto);
 
-        // Act & Assert
         mockMvc.perform(post("/api/v1/orders")
                         .header("Authorization", MOCK_TOKEN)
-                        .with(csrf()) // <--- SỬA LỖI: Thêm token CSRF vào request
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest)))
-                .andExpect(status().isCreated()) // Sẽ pass (201)
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1L));
     }
 
     @Test
     @DisplayName("POST /orders: Thất bại (400 Bad Request) khi DTO không hợp lệ")
-    @WithMockUser // Giữ nguyên @WithMockUser để kích hoạt Security Context
+    @WithMockUser
     void testCreateOrder_InvalidInput_ShouldReturnBadRequest() throws Exception {
         OrderCreateRequest badRequest = new OrderCreateRequest(List.of());
 
         mockMvc.perform(post("/api/v1/orders")
                         .header("Authorization", MOCK_TOKEN)
-                        .with(csrf()) // <--- SỬA LỖI: Thêm token CSRF vào request
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(badRequest)))
-                .andExpect(status().isBadRequest()); // Sẽ pass (400)
+                .andExpect(status().isBadRequest());
 
         verify(orderService, never()).createOrder(any(), any());
     }
@@ -139,7 +132,8 @@ class OrderControllerTest {
     @WithMockUser(username = MOCK_EMAIL)
     void testGetOrderById_NotFound() throws Exception {
         Long orderId = 99L;
-        when(orderService.getOrderById(eq(orderId), eq(MOCK_EMAIL), eq(MOCK_TOKEN)))
+        
+        when(orderService.getOrderById(orderId, MOCK_EMAIL, MOCK_TOKEN))
                 .thenThrow(new OrderNotFoundException("Không tìm thấy đơn hàng"));
 
         mockMvc.perform(get("/api/v1/orders/{orderId}", orderId)
