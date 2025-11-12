@@ -27,7 +27,7 @@ class ProductServiceClientImplTest {
 
     private MockWebServer mockWebServer;
     private ProductServiceClient productServiceClient;
-    private ObjectMapper objectMapper = new ObjectMapper(); 
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() throws IOException {
@@ -62,8 +62,7 @@ class ProductServiceClientImplTest {
 
         List<ProductDto> result = productServiceClient.getProductsByIds(productIds, "Bearer token");
 
-        assertThat(result).isNotNull();
-        assertThat(result).hasSize(1);
+        assertThat(result).isNotNull().hasSize(1);
         assertThat(result.get(0).name()).isEqualTo("Sản phẩm 1");
 
         var recordedRequest = mockWebServer.takeRequest();
@@ -82,8 +81,9 @@ class ProductServiceClientImplTest {
                 .setResponseCode(404)
                 .setBody("Không tìm thấy sản phẩm"));
 
+        Set<Long> productIds = Set.of(101L);
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> {
-            productServiceClient.getProductsByIds(Set.of(101L), "Bearer token");
+            productServiceClient.getProductsByIds(productIds, "Bearer token");
         });
 
         assertThat(ex.getMessage()).contains("Không tìm thấy sản phẩm");
@@ -96,8 +96,9 @@ class ProductServiceClientImplTest {
                 .setResponseCode(500)
                 .setBody("Lỗi server nội bộ"));
 
+        Set<Long> productIds = Set.of(101L);
         RuntimeException ex = assertThrows(RuntimeException.class, () -> {
-            productServiceClient.getProductsByIds(Set.of(101L), "Bearer token");
+            productServiceClient.getProductsByIds(productIds, "Bearer token");
         });
 
         assertThat(ex.getMessage()).contains("Lỗi phía Product Service");
