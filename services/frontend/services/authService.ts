@@ -2,40 +2,40 @@ import apiClient from "@/lib/apiClient";
 import { 
   type LoginRequest, 
   type RegisterRequest, 
-  type AuthResponse 
-} from "@/types/auth"; // Import các kiểu dữ liệu chúng ta vừa định nghĩa
+  type AuthResponse,
+  type VerifyRequest 
+} from "@/types/auth"; 
 
 /**
- * Gọi API để đăng nhập
+ * Gọi API để đăng nhập.
+ * Không cần try...catch, vì apiClient interceptor sẽ tự động log lỗi.
  */
 const login = async (data: LoginRequest): Promise<AuthResponse> => {
-  try {
-    // Gọi đến endpoint /api/auth/login của users-service
-    const response = await apiClient.post<AuthResponse>("/api/auth/login", data);
-    return response.data;
-  } catch (error) {
-    console.error("Lỗi khi đăng nhập:", error);
-    // (Sau này chúng ta sẽ xử lý lỗi này tốt hơn)
-    throw error;
-  }
+  const response = await apiClient.post<AuthResponse>("/api/auth/login", data);
+  return response.data;
 };
 
 /**
- * Gọi API để đăng ký
+ * Gọi API để đăng ký (gửi OTP).
+ * Trả về message từ server (ví dụ: "Đã gửi OTP...").
  */
-const register = async (data: RegisterRequest): Promise<AuthResponse> => {
-  try {
-    // Gọi đến endpoint /api/auth/register của users-service
-    const response = await apiClient.post<AuthResponse>("/api/auth/register", data);
-    return response.data;
-  } catch (error) {
-    console.error("Lỗi khi đăng ký:", error);
-    throw error;
-  }
+const register = async (data: RegisterRequest): Promise<string> => {
+  const response = await apiClient.post<string>("/api/auth/register", data);
+  return response.data;
+};
+
+/**
+ * Gọi API để xác thực OTP.
+ * Trả về AuthResponse (token).
+ */
+const verifyAccount = async (data: VerifyRequest): Promise<AuthResponse> => {
+  const response = await apiClient.post<AuthResponse>("/api/auth/verify", data);
+  return response.data;
 };
 
 // Export các hàm để UI có thể sử dụng
 export const authService = {
   login,
   register,
+  verifyAccount,
 };
