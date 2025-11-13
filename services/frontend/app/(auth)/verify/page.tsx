@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react"; 
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/input-otp";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { authService } from "@/services/authService"; 
+import { authService } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
 import { isAxiosError } from "axios";
 
@@ -31,39 +31,48 @@ export default function VerifyPage() {
   const searchParams = useSearchParams();
   const { login } = useAuth();
 
+  // Tạo ref để auto-focus
+  const otpInputRef = useRef<HTMLInputElement>(null);
+
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isResending, setIsResending] = useState(false); 
+  const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
 
   const email = searchParams.get("email") || "";
 
+  // Hook chạy đồng hồ đếm ngược 
   useEffect(() => {
     if (resendCooldown > 0) {
       const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
-      return () => clearTimeout(timer); 
+      return () => clearTimeout(timer);
     }
   }, [resendCooldown]);
 
-  const handleVerify = async () => {
+  // Hook để tự động FOCUS khi trang tải
+  useEffect(() => {
+    otpInputRef.current?.focus();
+  }, []); 
+
+  const handleVerify = async (finalOtp: string) => {
+    if (isLoading) return; 
+    
     setIsLoading(true);
     setError(null);
-    setResendMessage(null); // Xóa thông báo gửi lại (nếu có)
+    setResendMessage(null);
 
-    if (!email || otp.length < 6) {
+    if (!email || finalOtp.length < 6) {
       setError("Vui lòng nhập đủ 6 chữ số OTP.");
       setIsLoading(false);
       return;
     }
 
     try {
-      const data = await authService.verifyAccount({ email, otp });
+      const data = await authService.verifyAccount({ email, otp: finalOtp }); 
       await login(data.accessToken);
-      router.push("/"); 
-
+      router.push("/");
     } catch (err) {
       console.error("Lỗi khi xác thực OTP:", err);
       let errorMessage = "Đã xảy ra lỗi không xác định.";
@@ -71,30 +80,28 @@ export default function VerifyPage() {
         errorMessage = err.response?.data || "Mã OTP không hợp lệ hoặc đã hết hạn.";
       }
       setError(errorMessage);
+      setOtp(""); 
       setIsLoading(false);
     }
   };
 
-  // Hàm xử lý khi nhấn "Gửi lại mã"
   const handleResendOtp = async () => {
     if (resendCooldown > 0 || isResending) return; 
 
-    setIsResending(true); 
+    setIsResending(true);
     setError(null);
     setResendMessage(null);
+    setOtp(""); 
 
     if (!email) {
       setError("Không tìm thấy email để gửi lại mã.");
       setIsResending(false);
       return;
     }
-
     try {
       const message = await authService.resendOtp(email);
-      
       setResendMessage(message); 
-      setResendCooldown(RESEND_COOLDOWN); 
-
+      setResendCooldown(RESEND_COOLDOWN);
     } catch (err) {
       console.error("Lỗi khi gửi lại OTP:", err);
       let errorMessage = "Không thể gửi lại mã OTP.";
@@ -106,6 +113,14 @@ export default function VerifyPage() {
       setIsResending(false);
     }
   };
+
+  // Tự động xóa lỗi khi người dùng nhập lại
+  const handleOtpChange = (value: string) => {
+    setOtp(value);
+    if (error) {
+      setError(null); 
+    }
+  }
 
   return (
     <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-muted/40 p-4">
@@ -119,18 +134,15 @@ export default function VerifyPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Alert Lỗi */}
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Đã xảy ra lỗi</AlertTitle>
+              <AlertTitle>Xác thực thất bại</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
-            </Alert>
+            </Alert> 
           )}
-          
-          {/* Alert Thành công (chỉ cho việc gửi lại) */}
           {resendMessage && (
-            <Alert>
+            <Alert> 
               <CheckCircle2 className="h-4 w-4" />
               <AlertTitle>Thành công</AlertTitle>
               <AlertDescription>{resendMessage}</AlertDescription>
@@ -139,10 +151,12 @@ export default function VerifyPage() {
           
           <div className="flex justify-center">
             <InputOTP
+              ref={otpInputRef} 
               maxLength={6}
               value={otp}
-              onChange={(value) => setOtp(value)}
-              disabled={isLoading || isResending} 
+              onChange={handleOtpChange} 
+              onComplete={handleVerify} 
+              disabled={isLoading || isResending}
             >
               <InputOTPGroup>
                 <InputOTPSlot index={0} />
@@ -162,7 +176,7 @@ export default function VerifyPage() {
         <CardFooter className="flex flex-col gap-4">
           <Button 
             className="w-full" 
-            onClick={handleVerify} 
+            onClick={() => handleVerify(otp)} 
             disabled={isLoading || isResending || otp.length < 6}
           >
             {isLoading ? (
