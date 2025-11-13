@@ -3,7 +3,8 @@ import {
   type LoginRequest, 
   type RegisterRequest, 
   type AuthResponse,
-  type VerifyRequest 
+  type VerifyRequest,
+  type GoogleAuthRequest
 } from "@/types/auth"; 
 
 // Gọi API để đăng nhập.
@@ -18,7 +19,6 @@ const register = async (data: RegisterRequest): Promise<string> => {
   return response.data;
 };
 
-
 // Gọi API để xác thực OTP.
 const verifyAccount = async (data: VerifyRequest): Promise<AuthResponse> => {
   const response = await apiClient.post<AuthResponse>("/api/auth/verify", data);
@@ -31,10 +31,17 @@ const resendOtp = async (email: string): Promise<string> => {
   return response.data; 
 }
 
+//  Gửi authorization_code lên backend để đổi lấy JWT token
+const loginWithGoogle = async (data: GoogleAuthRequest): Promise<AuthResponse> => {
+  const response = await apiClient.post<AuthResponse>("/api/auth/oauth/google", data);
+  return response.data;
+};
+
 // Export các hàm để UI có thể sử dụng
 export const authService = {
   login,
   register,
   verifyAccount,
   resendOtp,
+  loginWithGoogle,
 };
