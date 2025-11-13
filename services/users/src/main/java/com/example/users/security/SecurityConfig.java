@@ -24,18 +24,16 @@ public class SecurityConfig {
     private final UserService userService;
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtAuthenticationEntryPoint unauthorizedHandler;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter; 
 
     public SecurityConfig(@Lazy UserService userService, 
                           JwtTokenProvider jwtTokenProvider, 
-                          JwtAuthenticationEntryPoint unauthorizedHandler) {
+                          JwtAuthenticationEntryPoint unauthorizedHandler,
+                          JwtAuthenticationFilter jwtAuthenticationFilter) { 
         this.userService = userService;
         this.jwtTokenProvider = jwtTokenProvider;
         this.unauthorizedHandler = unauthorizedHandler;
-    }
-
-    @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter() {
-        return new JwtAuthenticationFilter(jwtTokenProvider, userService);
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter; 
     }
 
     @Bean
@@ -57,14 +55,12 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() 
-                        
                         .requestMatchers("/api/auth/**").permitAll() 
-                        
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
