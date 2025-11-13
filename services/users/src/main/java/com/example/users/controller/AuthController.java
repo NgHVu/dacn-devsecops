@@ -1,9 +1,10 @@
 package com.example.users.controller;
 
+import com.example.users.dto.ResendOtpRequest; 
 import com.example.users.dto.AuthResponse;
 import com.example.users.dto.LoginRequest;
 import com.example.users.dto.RegisterRequest;
-import com.example.users.dto.VerifyRequest; // <-- ĐÃ THÊM
+import com.example.users.dto.VerifyRequest; 
 import com.example.users.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -15,7 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/auth") // Base path cho tất cả các endpoint trong controller này
+@RequestMapping("/api/auth") 
 @RequiredArgsConstructor
 @Tag(name = "Authentication API", description = "Các API dùng để đăng ký, xác thực và đăng nhập")
 public class AuthController {
@@ -31,13 +32,11 @@ public class AuthController {
     @ApiResponse(responseCode = "409", description = "Email đã được xác thực (đã tồn tại)")
     @PostMapping("/register")
     public ResponseEntity<String> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
-        // SỬA: Hàm này giờ là void, chỉ gửi mail
         userService.registerUser(registerRequest); 
         return ResponseEntity.status(HttpStatus.CREATED)
                              .body("Đã gửi OTP đến email. Vui lòng xác thực.");
     }
 
-    // === THÊM ENDPOINT MỚI ===
     @Operation(
             summary = "2. Xác thực tài khoản (Verify OTP)",
             description = "Xác thực email và mã OTP. Trả về JWT token nếu thành công."
@@ -47,7 +46,7 @@ public class AuthController {
     @ApiResponse(responseCode = "404", description = "Không tìm thấy email")
     @PostMapping("/verify")
     public ResponseEntity<AuthResponse> verifyAccount(@Valid @RequestBody VerifyRequest verifyRequest) {
-        // Hàm này sẽ xác thực OTP và trả về TOKEN
+        // Xác thực OTP và trả về TOKEN
         AuthResponse authResponse = userService.verifyAccount(verifyRequest);
         return ResponseEntity.ok(authResponse);
     }
@@ -62,5 +61,17 @@ public class AuthController {
     public ResponseEntity<AuthResponse> loginUser(@Valid @RequestBody LoginRequest loginRequest) {
         AuthResponse authResponse = userService.loginUser(loginRequest);
         return ResponseEntity.ok(authResponse);
+    }
+
+    @Operation(
+            summary = "Gửi lại mã OTP",
+            description = "Tạo và gửi lại mã OTP mới cho email chưa được xác thực."
+    )
+    @ApiResponse(responseCode = "200", description = "Đã gửi lại OTP thành công")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy email")
+    @PostMapping("/resend-otp")
+    public ResponseEntity<String> resendOtp(@Valid @RequestBody ResendOtpRequest resendRequest) {
+        userService.resendOtp(resendRequest.email());
+        return ResponseEntity.ok("Đã gửi lại mã OTP. Vui lòng kiểm tra email.");
     }
 }
