@@ -1,75 +1,74 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { UserResponse } from "@/types/auth"; // Import kiểu User
-import apiClient from "@/lib/apiClient"; // Import apiClient
-import { Loader2 } from "lucide-react"; // Import icon loading
+import { UserResponse } from "@/types/auth";
+import apiClient from "@/lib/apiClient"; 
+import { Loader2 } from "lucide-react";
 
-// 1. Định nghĩa kiểu dữ liệu cho Context
+// Định nghĩa kiểu dữ liệu cho Context
 interface AuthContextType {
-  user: UserResponse | null; // Thông tin user (hoặc null nếu chưa đăng nhập)
-  isAuthenticated: boolean;    // Cờ (flag) tiện ích
-  isLoading: boolean;          // Cờ kiểm tra phiên đăng nhập (session) khi tải trang
-  login: (token: string) => Promise<void>; // Hàm để gọi sau khi API login thành công
-  logout: () => void;                      // Hàm để đăng xuất
+  user: UserResponse | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (token: string) => Promise<void>; 
+  logout: () => void;
 }
 
-// 2. Tạo Context
+// Tạo Context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// 3. Tạo Provider (Component bọc ứng dụng)
+// Tạo Provider
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Bắt đầu = true, vì ta cần kiểm tra session
+  const [isLoading, setIsLoading] = useState(true); // Bắt đầu = true, để kiểm tra session
 
-  // Hàm này sẽ được gọi từ trang Login/Register
+  // Hàm này sẽ được gọi từ trang Login hoặc Verify
   const login = async (token: string) => {
     try {
-      // 1. Lưu token vào localStorage (như cũ)
+      // Lưu token vào localStorage
       localStorage.setItem("authToken", token);
       
-      // 2. SỬA LỖI: Gọi API /me VÀ GỬI TOKEN TRỰC TIẾP
-      //    Điều này tránh được "race condition" với interceptor
+      // Interceptor trong apiClient.ts sẽ tự động đọc token từ localstorage và đính kèm header.
       const response = await apiClient.get<UserResponse>("/api/users/me", {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      
-      // 3. Lưu thông tin user vào state (như cũ)
+
+      // Lưu thông tin user vào state
       setUser(response.data);
 
     } catch (error) {
-      console.error("Lỗi khi lấy thông tin user:", error);
-      // Nếu có lỗi (token hỏng, v.v.), hãy đăng xuất
-      logout();
+      console.error("Lỗi khi lấy thông tin user (trong hàm login):", error);
+      logout(); 
     }
   };
 
   // Hàm đăng xuất
   const logout = () => {
-    // 1. Xóa user khỏi state
     setUser(null);
-    // 2. Xóa token khỏi localStorage
     localStorage.removeItem("authToken");
   };
 
-  // 4. KIỂM TRA PHIÊN ĐĂNG NHẬP KHI TẢI TRANG
+  // KIỂM TRA PHIÊN ĐĂNG NHẬP KHI TẢI TRANG
   useEffect(() => {
     const checkUserSession = async () => {
-      const storedToken = localStorage.getItem("authToken");
-      if (storedToken) {
-        // Nếu có token, thử đăng nhập bằng token đó
-        await login(storedToken);
+      try {
+        const storedToken = localStorage.getItem("authToken");
+        if (storedToken) {
+          await login(storedToken);
+        }
+      } catch (error) {
+        console.error("Lỗi khi kiểm tra session:", error);
+      } finally {
+        setIsLoading(false); 
       }
-      // Dù thành công hay không, cũng phải dừng loading
-      setIsLoading(false); 
     };
 
     checkUserSession();
-  }, []); // [] = Chỉ chạy 1 lần khi component được mount
+  }, []);
 
-  // 5. Nếu đang kiểm tra session, hiển thị màn hình loading toàn trang
+  // Hiển thị màn hình loading toàn trang
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -78,10 +77,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
   }
 
-  // 6. Cung cấp state và các hàm cho toàn bộ ứng dụng
+  // Cung cấp state cho ứng dụng
   const value = {
     user,
-    isAuthenticated: !!user, // (true nếu user tồn tại, false nếu user là null)
+    isAuthenticated: !!user,
     isLoading,
     login,
     logout,
@@ -90,7 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// 7. Tạo Hook tùy chỉnh (để dễ dàng sử dụng)
+// Tạo Hook tùy chỉnh
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
