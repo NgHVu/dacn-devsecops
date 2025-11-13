@@ -11,18 +11,21 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Lazy; 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth") 
-@RequiredArgsConstructor
 @Tag(name = "Authentication API", description = "Các API dùng để đăng ký, xác thực và đăng nhập")
 public class AuthController {
 
     private final UserService userService;
+
+    public AuthController(@Lazy UserService userService) {
+        this.userService = userService;
+    }
 
     @Operation(
             summary = "1. Đăng ký tài khoản (Gửi OTP)",
@@ -47,7 +50,6 @@ public class AuthController {
     @ApiResponse(responseCode = "404", description = "Không tìm thấy email")
     @PostMapping("/verify")
     public ResponseEntity<AuthResponse> verifyAccount(@Valid @RequestBody VerifyRequest verifyRequest) {
-        // Xác thực OTP và trả về TOKEN
         AuthResponse authResponse = userService.verifyAccount(verifyRequest);
         return ResponseEntity.ok(authResponse);
     }
@@ -65,7 +67,7 @@ public class AuthController {
     }
 
     @Operation(
-            summary = "Gửi lại mã OTP",
+            summary = "4. Gửi lại mã OTP",
             description = "Tạo và gửi lại mã OTP mới cho email chưa được xác thực."
     )
     @ApiResponse(responseCode = "200", description = "Đã gửi lại OTP thành công")
@@ -77,7 +79,7 @@ public class AuthController {
     }
 
      @Operation(
-            summary = "Đăng nhập bằng Google",
+            summary = "5. Đăng nhập bằng Google",
             description = "Trao đổi 'authorization code' để lấy JWT token."
     )
     @ApiResponse(responseCode = "200", description = "Đăng nhập Google thành công, trả về token")
