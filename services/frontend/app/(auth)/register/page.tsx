@@ -1,5 +1,3 @@
-// Đặt tại: app/(auth)/register/page.tsx
-
 "use client";
 
 import { useState } from "react";
@@ -14,16 +12,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { PasswordInput } from "@/components/ui/password-input"; 
+import { PasswordInput } from "@/components/ui/password-input";
 import { AlertCircle, Loader2 } from "lucide-react"; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
-import { authService } from "@/services/authService"; 
-import { useAuth } from "@/context/AuthContext"; 
-import { isAxiosError } from "axios"; 
+import { authService } from "@/services/authService";
+import { isAxiosError } from "axios";
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const { login } = useAuth(); // <-- 2. LẤY HÀM LOGIN TỪ CONTEXT 
+  const router = useRouter(); 
+  
   const [name, setName] = useState(""); 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,30 +40,26 @@ export default function RegisterPage() {
     }
 
     try {
-      const data = await authService.register({ name, email, password });
+      const message = await authService.register({ name, email, password });
       
-      console.log("Đăng ký thành công!", data);
+      console.log("Đăng ký (bước 1) thành công:", message);
 
-      await login(data.accessToken);
-
-      router.push("/"); 
+      router.push(`/verify?email=${encodeURIComponent(email)}`);
 
     } catch (err) {
-      console.error(err);
-      if (isAxiosError(err)) {
-        // Kiểm tra xem có phải lỗi 409 (Conflict) không
-        if (err.response?.status === 409) {
-          setError("Email này đã được đăng ký. Vui lòng sử dụng email khác.");
-        } else {
-          // Lỗi 400 (validation) hoặc 500 (server)
-          setError("Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.");
-        }
-      } else {
-        // Lỗi không xác định (ví dụ: lỗi mạng)
-        setError("Đã xảy ra lỗi. Vui lòng thử lại sau.");
-      }
-      // === KẾT THÚC TỐI ƯU ===
+      console.error("Lỗi khi đăng ký (register):", err);
       
+      let errorMessage = "Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.";
+
+      if (isAxiosError(err)) {
+        if (err.response?.status === 409) {
+          errorMessage = "Email này đã được đăng ký. Vui lòng sử dụng email khác.";
+        } else if (err.response?.data) {
+          errorMessage = err.response.data.message || err.response.data || "Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.";
+        }
+      }
+      
+      setError(errorMessage);
       setIsLoading(false);
     }
   };
@@ -79,6 +72,7 @@ export default function RegisterPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
+          {/* Hiển thị lỗi 'error' */}
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -87,6 +81,7 @@ export default function RegisterPage() {
             </Alert>
           )}
 
+          {/* Các ô Input */}
           <div className="space-y-2">
             <Input
               id="name"
@@ -140,7 +135,7 @@ export default function RegisterPage() {
             {isLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              "Đăng ký"
+              "Tiếp tục" 
             )}
           </Button>
           
