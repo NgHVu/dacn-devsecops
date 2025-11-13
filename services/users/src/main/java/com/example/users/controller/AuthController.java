@@ -2,6 +2,7 @@ package com.example.users.controller;
 
 import com.example.users.dto.ResendOtpRequest; 
 import com.example.users.dto.AuthResponse;
+import com.example.users.dto.GoogleAuthRequest;
 import com.example.users.dto.LoginRequest;
 import com.example.users.dto.RegisterRequest;
 import com.example.users.dto.VerifyRequest; 
@@ -73,5 +74,17 @@ public class AuthController {
     public ResponseEntity<String> resendOtp(@Valid @RequestBody ResendOtpRequest resendRequest) {
         userService.resendOtp(resendRequest.email());
         return ResponseEntity.ok("Đã gửi lại mã OTP. Vui lòng kiểm tra email.");
+    }
+
+     @Operation(
+            summary = "Đăng nhập bằng Google",
+            description = "Trao đổi 'authorization code' để lấy JWT token."
+    )
+    @ApiResponse(responseCode = "200", description = "Đăng nhập Google thành công, trả về token")
+    @ApiResponse(responseCode = "400", description = "Code không hợp lệ hoặc có lỗi khi gọi Google")
+    @PostMapping("/oauth/google")
+    public ResponseEntity<AuthResponse> googleLogin(@Valid @RequestBody GoogleAuthRequest request) {
+        AuthResponse authResponse = userService.loginWithGoogle(request.code());
+        return ResponseEntity.ok(authResponse);
     }
 }
