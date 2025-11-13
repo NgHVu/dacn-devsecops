@@ -46,8 +46,8 @@ public class UserServiceImpl implements UserService {
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailService emailService;
 
-    private final ClientRegistrationRepository clientRegistrationRepository;
-    private final WebClient.Builder webClientBuilder;
+    @Lazy private final ClientRegistrationRepository clientRegistrationRepository;
+    @Lazy private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper; 
 
     @Value("${app.otp.expiration-minutes:10}")
@@ -258,13 +258,13 @@ public class UserServiceImpl implements UserService {
             throw new IllegalStateException("Không thể xác định tên người dùng từ Security Context");
         }
         return userRepository.findByEmail(currentUserName)
-                      .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng đã xác thực: " + currentUserName));
+                        .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng đã xác thực: " + currentUserName));
     }
     
     private String generateOtp() {
         return OTP_RANDOM.ints(100000, 999999)
-                           .findFirst()
-                           .getAsInt()
-                           + "";
+                            .findFirst()
+                            .getAsInt()
+                            + "";
     }
 }
