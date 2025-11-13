@@ -1,16 +1,16 @@
 import axios from "axios";
 
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_USERS_API_URL,
+  // Dùng relative path. Next.js sẽ lo phần còn lại.
+  baseURL: "/", 
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// *** THÊM KHỐI INTERCEPTOR NÀY VÀO ***
+// Gửi Request (Tự động đính kèm token)
 apiClient.interceptors.request.use(
   (config) => {
-    // Chỉ chạy ở client-side
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("authToken");
       if (token) {
@@ -19,7 +19,22 @@ apiClient.interceptors.request.use(
     }
     return config;
   },
+  (error) => Promise.reject(error)
+);
+
+// Nhận Response (Gom log lỗi về 1 chỗ)
+apiClient.interceptors.response.use(
+  (response) => response,
   (error) => {
+    if (axios.isAxiosError(error)) {
+      const method = error.config?.method?.toUpperCase();
+      const url = error.config?.url;
+      const status = error.response?.status;
+      const data = error.response?.data;
+      console.error(`LỖI API [${method} ${url}] (Status: ${status}):`, data || error.message);
+    } else {
+      console.error("Lỗi không xác định:", error);
+    }
     return Promise.reject(error);
   }
 );
