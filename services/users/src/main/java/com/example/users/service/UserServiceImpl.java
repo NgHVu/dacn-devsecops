@@ -6,7 +6,6 @@ import com.example.users.exception.EmailAlreadyExistsException;
 import com.example.users.repository.UserRepository;
 import com.example.users.security.JwtTokenProvider;
 import com.fasterxml.jackson.databind.ObjectMapper; 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
@@ -37,17 +36,15 @@ import java.util.UUID;
 @Service
 @Transactional
 @Slf4j
-@RequiredArgsConstructor 
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
-    @Lazy private final PasswordEncoder passwordEncoder;
-    @Lazy private final AuthenticationManager authenticationManager;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailService emailService;
-
-    @Lazy private final ClientRegistrationRepository clientRegistrationRepository;
-    @Lazy private final WebClient.Builder webClientBuilder;
+    private final ClientRegistrationRepository clientRegistrationRepository;
+    private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper; 
 
     @Value("${app.otp.expiration-minutes:10}")
@@ -58,6 +55,24 @@ public class UserServiceImpl implements UserService {
 
     private static final Random OTP_RANDOM = new SecureRandom();
     private static final String USER_NOT_FOUND_MSG = "Không tìm thấy người dùng với email: ";
+
+    public UserServiceImpl(UserRepository userRepository,
+                           @Lazy PasswordEncoder passwordEncoder,
+                           @Lazy AuthenticationManager authenticationManager, 
+                           JwtTokenProvider jwtTokenProvider,
+                           EmailService emailService,
+                           @Lazy ClientRegistrationRepository clientRegistrationRepository,
+                           @Lazy WebClient.Builder webClientBuilder,
+                           ObjectMapper objectMapper) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.authenticationManager = authenticationManager;
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.emailService = emailService;
+        this.clientRegistrationRepository = clientRegistrationRepository;
+        this.webClientBuilder = webClientBuilder;
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     @Transactional(readOnly = true)
