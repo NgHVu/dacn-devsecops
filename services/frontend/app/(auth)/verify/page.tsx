@@ -18,7 +18,7 @@ import {
   InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authService } from "@/services/authService"; 
 import { useAuth } from "@/context/AuthContext";
@@ -130,7 +130,7 @@ export default function VerifyPage() {
           
           {/* Alert Thành công (chỉ cho việc gửi lại) */}
           {resendMessage && (
-            <Alert variant="success">
+            <Alert>
               <CheckCircle2 className="h-4 w-4" />
               <AlertTitle>Thành công</AlertTitle>
               <AlertDescription>{resendMessage}</AlertDescription>
