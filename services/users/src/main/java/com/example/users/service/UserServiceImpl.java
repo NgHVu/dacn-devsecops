@@ -158,6 +158,30 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
+    public void resendOtp(String email) {
+        log.info("Yêu cầu gửi lại OTP cho email: {}", email);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng với email: " + email));
+
+        // Nếu tài khoản đã được kích hoạt, không cần gửi lại
+        if (user.isVerified()) {
+            log.warn("Tài khoản {} đã được xác thực, không cần gửi lại OTP.", email);
+            throw new IllegalStateException("Tài khoản này đã được kích hoạt.");
+        }
+
+        // Tạo OTP mới và cập nhật
+        String otp = generateOtp();
+        user.setVerificationOtp(otp);
+        user.setOtpGeneratedTime(LocalDateTime.now());
+        userRepository.save(user);
+
+        // Gửi email bất đồng bộ
+        emailService.sendOtpEmail(user.getEmail(), otp);
+        log.info("Đã gửi lại OTP (mới) đến email: {}", user.getEmail());
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public UserResponse getCurrentUser() {
         User authenticatedUser = getAuthenticatedUser();
