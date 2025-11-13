@@ -40,4 +40,6 @@ public interface UserService extends UserDetailsService {
      * @return DTO chứa thông tin công khai của người dùng.
      */
     UserResponse findUserByEmail(String email);
+
+    void resendOtp(String email);
 }
