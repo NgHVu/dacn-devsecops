@@ -1,5 +1,4 @@
-// Định nghĩa các "yêu cầu" (Request) mà chúng ta gửi đi
-
+// Định nghĩa các "yêu cầu" mà chúng ta gửi đi
 export interface RegisterRequest {
   name: string;
   email: string;
@@ -11,16 +10,19 @@ export interface LoginRequest {
   password: string;
 }
 
-// Định nghĩa "phản hồi" (Response) mà backend trả về
+// Dùng cho việc xác thực OTP
+export interface VerifyRequest {
+  email: string;
+  otp: string;
+}
 
+// Định nghĩa "phản hồi" mà backend trả về
 export interface AuthResponse {
   accessToken: string;
-  // (Backend của bạn có thể trả về thêm user info, v.v.)
 }
 
 export interface UserResponse {
   id: number;
   name: string;
   email: string;
-  // (Thêm các trường khác từ DTO UserResponse của bạn)
 }
