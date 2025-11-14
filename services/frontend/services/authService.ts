@@ -33,7 +33,11 @@ const resendOtp = async (email: string): Promise<string> => {
 
 //  Gửi authorization_code lên backend để đổi lấy JWT token
 const loginWithGoogle = async (data: GoogleAuthRequest): Promise<AuthResponse> => {
-  const response = await apiClient.post<AuthResponse>("/api/auth/oauth/google", data);
+  const response = await apiClient.post<AuthResponse>("/api/auth/oauth/google", data, {
+    headers: {
+      'X-Skip-Auth': 'true'
+    }
+  });
   return response.data;
 };
 

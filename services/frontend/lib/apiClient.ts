@@ -1,7 +1,6 @@
 import axios from "axios";
 
 const apiClient = axios.create({
-  // Dùng relative path. Next.js sẽ lo phần còn lại.
   baseURL: "/", 
   headers: {
     "Content-Type": "application/json",
@@ -11,6 +10,11 @@ const apiClient = axios.create({
 // Gửi Request (Tự động đính kèm token)
 apiClient.interceptors.request.use(
   (config) => {
+    if (config.headers['X-Skip-Auth']) {
+      delete config.headers['X-Skip-Auth'];
+      return config;
+    }
+
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("authToken");
       if (token) {
