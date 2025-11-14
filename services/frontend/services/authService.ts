@@ -31,7 +31,7 @@ const resendOtp = async (email: string): Promise<string> => {
   return response.data; 
 }
 
-//  Gửi authorization_code lên backend để đổi lấy JWT token
+// Gửi authorization_code lên backend để đổi lấy JWT token
 const loginWithGoogle = async (data: GoogleAuthRequest): Promise<AuthResponse> => {
   const response = await apiClient.post<AuthResponse>("/api/auth/oauth/google", data, {
     headers: {
@@ -41,7 +41,6 @@ const loginWithGoogle = async (data: GoogleAuthRequest): Promise<AuthResponse> =
   return response.data;
 };
 
-// Export các hàm để UI có thể sử dụng
 export const authService = {
   login,
   register,
