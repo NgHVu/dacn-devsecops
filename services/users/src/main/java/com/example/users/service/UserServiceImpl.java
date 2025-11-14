@@ -47,7 +47,7 @@ public class UserServiceImpl implements UserService {
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper; 
 
-    @Value("${app.otp.expiration-minutes:10}")
+    @Value("${app.otp.expiration-minutes:3}")
     private long otpExpirationMinutes;
     
     @Value("${app.oauth.google.redirect-uri}") 
