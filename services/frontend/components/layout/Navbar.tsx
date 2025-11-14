@@ -1,13 +1,12 @@
 "use client"; 
 
 import Link from "next/link";
-// 1. IMPORT THÊM ICON LogOut
+import { useRouter } from "next/navigation"; 
 import { ShoppingCart, User, LogOut } from "lucide-react"; 
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/layout/mode-toggle";
-import { useAuth } from "@/context/AuthContext"; // <-- 2. IMPORT HOOK AUTH
+import { useAuth } from "@/context/AuthContext"; 
 
-// 3. IMPORT CÁC COMPONENT MỚI
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,10 +22,9 @@ import {
 } from "@/components/ui/avatar";
 
 export default function Navbar() {
-  // 4. LẤY TRẠNG THÁI TỪ CONTEXT
+  const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
 
-  // Hàm tiện ích lấy 2 chữ cái đầu của tên (ví dụ: "Vũ Nguyễn" -> "VN")
   const getInitials = (name: string | undefined) => {
     if (!name) return "??";
     const parts = name.split(' ');
@@ -36,11 +34,15 @@ export default function Navbar() {
     return name.substring(0, 2).toUpperCase();
   };
 
+  const handleLogout = () => {
+    logout(); 
+    router.push("/login"); 
+  };
+
   return (
     <nav className="border-b bg-background">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
         
-        {/* === Phần Bên Trái (Giữ nguyên) === */}
         <div className="flex items-center gap-6">
           <Link href="/" className="text-2xl font-bold text-primary">
             FoodApp
@@ -55,7 +57,6 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* === Phần Bên Phải: Actions === */}
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
             <Link href="/cart">
@@ -65,15 +66,11 @@ export default function Navbar() {
           
           <ModeToggle /> 
 
-          {/* === 5. LOGIC HIỂN THỊ ĐIỀU KIỆN === */}
           {isAuthenticated ? (
-            // --- NẾU ĐÃ ĐĂNG NHẬP: HIỂN THỊ AVATAR & DROPDOWN ---
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10">
-                    {/* (Sau này có thể thêm AvatarImage nếu user có ảnh) */}
-                    {/* <AvatarImage src={user?.avatarUrl} alt={user?.name} /> */}
                     <AvatarFallback>{getInitials(user?.name)}</AvatarFallback>
                   </Avatar>
                 </Button>
@@ -97,7 +94,8 @@ export default function Navbar() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="cursor-pointer">
+
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Đăng xuất</span>
                 </DropdownMenuItem>
@@ -105,7 +103,6 @@ export default function Navbar() {
             </DropdownMenu>
 
           ) : (
-            // --- NẾU CHƯA ĐĂNG NHẬP: HIỂN THỊ NÚT ĐĂNG NHẬP ---
             <Button asChild>
               <Link href="/login">
                 <User className="mr-2 h-4 w-4" />
