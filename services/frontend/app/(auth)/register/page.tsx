@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation"; 
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,25 +13,37 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
-import { AlertCircle, Loader2 } from "lucide-react"; 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
+import { AlertCircle, Loader2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authService } from "@/services/authService";
 import { isAxiosError } from "axios";
 
 export default function RegisterPage() {
-  const router = useRouter(); 
-  
-  const [name, setName] = useState(""); 
+  const router = useRouter();
+
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const clearErrorOnChange = () => {
+    if (error) {
+      setError(null);
+    }
+  };
+
   const handleRegister = async () => {
     setIsLoading(true);
-    setError(null); 
+    setError(null);
+
+    if (password.length < 8) {
+      setError("Mật khẩu phải từ 8 ký tự trở lên.");
+      setIsLoading(false);
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Mật khẩu xác nhận không khớp. Vui lòng thử lại.");
@@ -41,14 +53,14 @@ export default function RegisterPage() {
 
     try {
       const message = await authService.register({ name, email, password });
-      
+
       console.log("Đăng ký (bước 1) thành công:", message);
 
       router.push(`/verify?email=${encodeURIComponent(email)}`);
 
     } catch (err) {
       console.error("Lỗi khi đăng ký (register):", err);
-      
+
       let errorMessage = "Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.";
 
       if (isAxiosError(err)) {
@@ -72,7 +84,6 @@ export default function RegisterPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Hiển thị lỗi 'error' */}
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -81,16 +92,18 @@ export default function RegisterPage() {
             </Alert>
           )}
 
-          {/* Các ô Input */}
           <div className="space-y-2">
             <Input
               id="name"
               type="text"
               placeholder="Họ và Tên"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                clearErrorOnChange();
+              }}
               required
-              disabled={isLoading} 
+              disabled={isLoading}
             />
           </div>
           <div className="space-y-2">
@@ -99,7 +112,10 @@ export default function RegisterPage() {
               type="email"
               placeholder="Email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                clearErrorOnChange();
+              }}
               required
               disabled={isLoading}
             />
@@ -109,7 +125,10 @@ export default function RegisterPage() {
               id="password"
               placeholder="Mật khẩu"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                clearErrorOnChange();
+              }}
               required
               disabled={isLoading}
             />
@@ -119,7 +138,10 @@ export default function RegisterPage() {
               id="confirmPassword"
               placeholder="Xác nhận mật khẩu"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                clearErrorOnChange();
+              }}
               required
               disabled={isLoading}
             />
@@ -127,15 +149,15 @@ export default function RegisterPage() {
         </CardContent>
 
         <CardFooter className="flex flex-col gap-4">
-          <Button 
-            className="w-full" 
-            onClick={handleRegister} 
+          <Button
+            className="w-full"
+            onClick={handleRegister}
             disabled={isLoading}
           >
             {isLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              "Tiếp tục" 
+              "Tiếp tục"
             )}
           </Button>
           
