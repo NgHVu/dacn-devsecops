@@ -1,8 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,6 +15,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { AlertCircle, Loader2 } from "lucide-react";
@@ -18,73 +30,68 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authService } from "@/services/authService";
 import { isAxiosError } from "axios";
 
+const formSchema = z
+  .object({
+    name: z.string().min(2, {
+      message: "Tên phải có ít nhất 2 ký tự.",
+    }),
+    email: z.string().email({
+      message: "Email không đúng định dạng.",
+    }),
+    password: z.string().min(8, {
+      message: "Mật khẩu phải có ít nhất 8 ký tự.",
+    }),
+    confirmPassword: z.string().min(8, {
+      message: "Vui lòng xác nhận mật khẩu.",
+    }),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Mật khẩu xác nhận không khớp.",
+    path: ["confirmPassword"], 
+  });
+
 const OTP_LIFESPAN_SECONDS = 180;
-const PENDING_VERIFICATION_KEY = "pendingVerification"; 
+const PENDING_VERIFICATION_KEY = "pendingVerification";
 
 export default function RegisterPage() {
   const router = useRouter();
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null); 
 
-  useEffect(() => {
-    const pendingData = localStorage.getItem(PENDING_VERIFICATION_KEY);
-    
-    if (pendingData) {
-      try {
-        const { email: pendingEmail, expiry } = JSON.parse(pendingData);
-        
-        if (expiry > Date.now()) {
-          console.log("Phát hiện phiên OTP đang chờ. Chuyển hướng về /verify...");
-          router.push(`/verify?email=${encodeURIComponent(pendingEmail)}`);
-        } else {
-          localStorage.removeItem(PENDING_VERIFICATION_KEY);
-        }
-      } catch (e) {
-        localStorage.removeItem(PENDING_VERIFICATION_KEY);
-      }
-    }
-  }, [router]);
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema), 
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
 
-  const clearErrorOnChange = () => {
-    if (error) {
-      setError(null);
-    }
-  };
-
-  const handleRegister = async () => {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     setError(null);
-
-    if (password.length < 8) {
-      setError("Mật khẩu phải từ 8 ký tự trở lên.");
-      setIsLoading(false);
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("Mật khẩu xác nhận không khớp. Vui lòng thử lại.");
-      setIsLoading(false);
-      return;
-    }
-
+    
     try {
-      const message = await authService.register({ name, email, password });
+      const message = await authService.register({
+        name: values.name,
+        email: values.email,
+        password: values.password,
+      });
+
       console.log("Đăng ký (bước 1) thành công:", message);
 
+      // eslint-disable-next-line react-hooks/purity
       const newExpiry = Date.now() + OTP_LIFESPAN_SECONDS * 1000;
+
       const verificationData = {
-        email: email,
+        email: values.email,
         expiry: newExpiry,
       };
       localStorage.setItem(PENDING_VERIFICATION_KEY, JSON.stringify(verificationData));
 
-      router.push(`/verify?email=${encodeURIComponent(email)}`);
+      router.push(`/verify?email=${encodeURIComponent(values.email)}`);
 
     } catch (err) {
       console.error("Lỗi khi đăng ký (register):", err);
@@ -92,8 +99,9 @@ export default function RegisterPage() {
       if (isAxiosError(err)) {
         if (err.response?.status === 409) {
           errorMessage = "Email này đã được đăng ký. Vui lòng sử dụng email khác.";
+          form.setError("email", { message: errorMessage });
         } else if (err.response?.data) {
-          errorMessage = err.response.data.message || err.response.data || "Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.";
+          errorMessage = err.response.data.message || err.response.data || "Đăng ký thất bại.";
         }
       }
       setError(errorMessage);
@@ -108,91 +116,117 @@ export default function RegisterPage() {
           <CardTitle className="text-2xl font-bold">Tạo tài khoản</CardTitle>
         </CardHeader>
 
-        <CardContent className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Đăng ký thất bại</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <CardContent className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Đăng ký thất bại</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-          <div className="space-y-2">
-            <Input
-              id="name"
-              type="text"
-              placeholder="Họ và Tên"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                clearErrorOnChange();
-              }}
-              required
-              disabled={isLoading}
-            />
-          </div>
-          <div className="space-y-2">
-            <Input
-              id="email"
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                clearErrorOnChange();
-              }}
-              required
-              disabled={isLoading}
-            />
-          </div>
-          <div className="space-y-2">
-            <PasswordInput
-              id="password"
-              placeholder="Mật khẩu"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                clearErrorOnChange();
-              }}
-              required
-              disabled={isLoading}
-            />
-          </div>
-          <div className="space-y-2">
-            <PasswordInput
-              id="confirmPassword"
-              placeholder="Xác nhận mật khẩu"
-              value={confirmPassword}
-              onChange={(e) => {
-                setConfirmPassword(e.target.value);
-                clearErrorOnChange();
-              }}
-              required
-              disabled={isLoading}
-            />
-          </div>
-        </CardContent>
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Họ và Tên</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Nguyễn Văn A"
+                        {...field}
+                        disabled={isLoading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-        <CardFooter className="flex flex-col gap-4">
-          <Button
-            className="w-full"
-            onClick={handleRegister}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              "Tiếp tục"
-            )}
-          </Button>
-          
-          <div className="text-center text-sm">
-            Đã có tài khoản?{" "}
-            <Link href="/login" className="font-medium text-primary underline">
-              Đăng nhập ngay
-            </Link>
-          </div>
-        </CardFooter>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="example@gmail.com"
+                        {...field}
+                        disabled={isLoading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mật khẩu</FormLabel>
+                    <FormControl>
+                      <PasswordInput
+                        placeholder="Mật khẩu của bạn"
+                        {...field}
+                        disabled={isLoading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Xác nhận mật khẩu</FormLabel>
+                    <FormControl>
+                      <PasswordInput
+                        placeholder="Nhập lại mật khẩu"
+                        {...field}
+                        disabled={isLoading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+
+            <CardFooter className="flex flex-col gap-4 pt-6">
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  "Tiếp tục"
+                )}
+              </Button>
+              
+              <div className="text-center text-sm w-full">
+                Đã có tài khoản?{" "}
+                <Link
+                  href="/login"
+                  className="font-medium text-primary underline"
+                >
+                  Đăng nhập ngay
+                </Link>
+              </div>
+            </CardFooter>
+            
+          </form>
+        </Form>
+
       </Card>
     </div>
   );
