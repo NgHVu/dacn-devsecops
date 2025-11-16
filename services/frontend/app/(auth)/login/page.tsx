@@ -1,5 +1,3 @@
-// Đặt tại: app/(auth)/login/page.tsx
-
 "use client";
 
 import { useState } from "react";
@@ -108,7 +106,7 @@ export default function LoginPage() {
             <Input
               id="email"
               type="email"
-              placeholder="Email/Số điện thoại/Tên đăng nhập"
+              placeholder="Email" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -126,6 +124,16 @@ export default function LoginPage() {
               disabled={isLoading} 
             />
           </div>
+
+          <div className="flex justify-end">
+            <Link
+              href="/forgot-password"
+              className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Quên mật khẩu?
+            </Link>
+          </div>
+          
         </CardContent>
 
         <CardFooter className="flex flex-col gap-4">

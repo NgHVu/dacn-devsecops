@@ -4,7 +4,9 @@ import {
   type RegisterRequest, 
   type AuthResponse,
   type VerifyRequest,
-  type GoogleAuthRequest
+  type GoogleAuthRequest,
+  type ForgotPasswordRequest, 
+  type ResetPasswordRequest   
 } from "@/types/auth"; 
 
 // Gọi API để đăng nhập.
@@ -41,10 +43,43 @@ const loginWithGoogle = async (data: GoogleAuthRequest): Promise<AuthResponse> =
   return response.data;
 };
 
+
+// Yêu cầu backend gửi email reset mật khẩu.
+ 
+const forgotPassword = async (data: ForgotPasswordRequest): Promise<string> => {
+  const response = await apiClient.post<string>(
+    '/api/auth/forgot-password',
+    data,
+    {
+      headers: {
+        'X-Skip-Auth': 'true', 
+      },
+    }
+  );
+  return response.data;
+};
+
+
+// Gửi token và mật khẩu mới lên backend.
+const resetPassword = async (data: ResetPasswordRequest): Promise<string> => {
+  const response = await apiClient.post<string>(
+    '/api/auth/reset-password',
+    data,
+    {
+      headers: {
+        'X-Skip-Auth': 'true',
+      },
+    }
+  );
+  return response.data;
+};
+
 export const authService = {
   login,
   register,
   verifyAccount,
   resendOtp,
   loginWithGoogle,
+  forgotPassword, 
+  resetPassword,  
 };
