@@ -27,3 +27,12 @@ export interface UserResponse {
 export interface GoogleAuthRequest {
   code: string;
 }
+
+export type ForgotPasswordRequest = {
+  email: string;
+};
+
+export type ResetPasswordRequest = {
+  token: string;
+  newPassword: string;
+};
