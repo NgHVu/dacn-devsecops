@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { PasswordStrength } from "@/components/ui/password-strength"; 
 import { AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authService } from "@/services/authService";
@@ -67,8 +68,9 @@ export default function RegisterPage() {
       password: "",
       confirmPassword: "",
     },
+    mode: "onChange",
   });
-
+  
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     setError(null);
@@ -84,7 +86,6 @@ export default function RegisterPage() {
 
       // eslint-disable-next-line react-hooks/purity
       const newExpiry = Date.now() + OTP_LIFESPAN_SECONDS * 1000;
-
       const verificationData = {
         email: values.email,
         expiry: newExpiry,
@@ -176,6 +177,7 @@ export default function RegisterPage() {
                         disabled={isLoading}
                       />
                     </FormControl>
+                    <PasswordStrength password={field.value} />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -226,7 +228,6 @@ export default function RegisterPage() {
             
           </form>
         </Form>
-
       </Card>
     </div>
   );

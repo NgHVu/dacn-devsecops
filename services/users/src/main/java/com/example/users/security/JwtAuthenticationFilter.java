@@ -16,9 +16,10 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component; 
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
-
+import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 
+@Slf4j
 @Component 
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -37,6 +38,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
         try {
+            String skipAuth = request.getHeader("X-Skip-Auth");
+            if ("true".equals(skipAuth)) {
+                log.debug("Bỏ qua JwtAuthenticationFilter (X-Skip-Auth=true) cho: {}", request.getRequestURI());
+                filterChain.doFilter(request, response);
+                return; 
+            }
+
             String jwt = getJwtFromRequest(request);
 
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
