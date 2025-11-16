@@ -24,7 +24,7 @@ import { useAuth } from "@/context/AuthContext";
 import { isAxiosError } from "axios";
 
 const OTP_LIFESPAN_SECONDS = 180;
-const OTP_EXPIRY_KEY = "otpExpiryTimestamp";
+const PENDING_VERIFICATION_KEY = "pendingVerification"; 
 
 function formatTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -50,28 +50,31 @@ export default function VerifyPage() {
 
   useEffect(() => {
     const calculateRemainingTime = () => {
-      const expiryTimestamp = localStorage.getItem(OTP_EXPIRY_KEY);
+      const pendingData = localStorage.getItem(PENDING_VERIFICATION_KEY);
 
-      if (!expiryTimestamp) {
-        const newExpiry = Date.now() + OTP_LIFESPAN_SECONDS * 1000;
-        localStorage.setItem(OTP_EXPIRY_KEY, String(newExpiry));
-        setCountdown(OTP_LIFESPAN_SECONDS);
-      } else {
-        const remainingTimeMs = Number(expiryTimestamp) - Date.now();
+      if (!pendingData) {
+        setCountdown(0);
+        return;
+      }
+
+      try {
+        const { expiry } = JSON.parse(pendingData);
+        const remainingTimeMs = Number(expiry) - Date.now();
         const remainingTimeSec = Math.max(0, Math.floor(remainingTimeMs / 1000));
         
         setCountdown(remainingTimeSec);
 
         if (remainingTimeSec <= 0) {
-          localStorage.removeItem(OTP_EXPIRY_KEY);
+          localStorage.removeItem(PENDING_VERIFICATION_KEY); 
         }
+      } catch(e) {
+        localStorage.removeItem(PENDING_VERIFICATION_KEY);
+        setCountdown(0);
       }
     };
 
     calculateRemainingTime();
-
     const interval: NodeJS.Timeout = setInterval(calculateRemainingTime, 1000);
-
     return () => clearInterval(interval);
   }, [isResending]); 
 
@@ -100,7 +103,7 @@ export default function VerifyPage() {
 
     try {
       const data = await authService.verifyAccount({ email, otp: finalOtp }); 
-      localStorage.removeItem(OTP_EXPIRY_KEY);
+      localStorage.removeItem(PENDING_VERIFICATION_KEY); 
       await login(data.accessToken);
       router.push("/");
     } catch (err) {
@@ -133,7 +136,11 @@ export default function VerifyPage() {
       setResendMessage(message); 
       
       const newExpiry = Date.now() + OTP_LIFESPAN_SECONDS * 1000;
-      localStorage.setItem(OTP_EXPIRY_KEY, String(newExpiry));
+      const verificationData = {
+        email: email, 
+        expiry: newExpiry,
+      };
+      localStorage.setItem(PENDING_VERIFICATION_KEY, JSON.stringify(verificationData));
       
     } catch (err) {
       console.error("Lỗi khi gửi lại OTP:", err);
@@ -155,10 +162,10 @@ export default function VerifyPage() {
   }
 
   const handleChangeEmail = () => {
-    localStorage.removeItem(OTP_EXPIRY_KEY);
+    localStorage.removeItem(PENDING_VERIFICATION_KEY); 
     router.push("/register");
   };
-
+  
   return (
     <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
