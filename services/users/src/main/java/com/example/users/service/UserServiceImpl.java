@@ -332,4 +332,20 @@ public class UserServiceImpl implements UserService {
         userRepository.save(user);
         log.info("Reset mật khẩu thành công cho user: {}", user.getEmail());
     }
+
+    @Override
+    @Transactional(readOnly = true) 
+    public void validateResetToken(String token) {
+        log.info("Đang kiểm tra tính hợp lệ của token: {}", token);
+
+        User user = userRepository.findByResetPasswordToken(token)
+                .orElseThrow(() -> new BadCredentialsException("Link này không hợp lệ hoặc đã được sử dụng. Vui lòng yêu cầu link mới."));
+
+        if (user.getResetTokenExpiry() == null || user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            log.warn("Token reset mật khẩu đã hết hạn (khi kiểm tra): {}", user.getEmail());
+            throw new BadCredentialsException("Link này đã hết hạn. Vui lòng yêu cầu link mới.");
+        }
+
+        log.info("Token hợp lệ cho user: {}", user.getEmail());
+    }
 }

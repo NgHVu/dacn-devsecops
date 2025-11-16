@@ -45,7 +45,6 @@ const loginWithGoogle = async (data: GoogleAuthRequest): Promise<AuthResponse> =
 
 
 // Yêu cầu backend gửi email reset mật khẩu.
- 
 const forgotPassword = async (data: ForgotPasswordRequest): Promise<string> => {
   const response = await apiClient.post<string>(
     '/api/auth/forgot-password',
@@ -59,6 +58,17 @@ const forgotPassword = async (data: ForgotPasswordRequest): Promise<string> => {
   return response.data;
 };
 
+const validateResetToken = async (token: string): Promise<void> => {
+  await apiClient.get(
+    `/api/auth/validate-reset-token?token=${encodeURIComponent(token)}`,
+    {
+      headers: {
+        'X-Skip-Auth': 'true',
+      },
+    }
+  );
+
+};
 
 // Gửi token và mật khẩu mới lên backend.
 const resetPassword = async (data: ResetPasswordRequest): Promise<string> => {
@@ -80,6 +90,7 @@ export const authService = {
   verifyAccount,
   resendOtp,
   loginWithGoogle,
-  forgotPassword, 
-  resetPassword,  
+  forgotPassword,
+  validateResetToken, 
+  resetPassword, 
 };

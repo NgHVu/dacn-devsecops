@@ -26,6 +26,8 @@ export default function ResetPasswordPageWrapper() {
   );
 }
 
+type TokenStatus = 'loading' | 'valid' | 'invalid';
+
 function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -34,21 +36,44 @@ function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); 
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  const [tokenStatus, setTokenStatus] = useState<TokenStatus>('loading');
 
   useEffect(() => {
     const tokenFromUrl = searchParams.get("token");
-    if (tokenFromUrl) {
-      setToken(tokenFromUrl);
-    } else {
-      setError("Token không hợp lệ hoặc bị thiếu. Vui lòng thử lại.");
+
+    if (!tokenFromUrl) {
+      setError("Token không hợp lệ hoặc bị thiếu.");
+      setTokenStatus('invalid');
+      return;
     }
+
+    setToken(tokenFromUrl);
+
+    const validateToken = async () => {
+      try {
+        await authService.validateResetToken(tokenFromUrl);
+        setTokenStatus('valid');
+      } catch (err) {
+        console.error("Lỗi khi xác thực token:", err);
+        let errorMessage = "Link không hợp lệ.";
+        if (isAxiosError(err) && err.response?.data) {
+          errorMessage = err.response.data.message || err.response.data;
+        }
+        setError(errorMessage);
+        setTokenStatus('invalid');
+      }
+    };
+
+    validateToken();
+    
   }, [searchParams]);
 
   const handleSubmit = async () => {
-    if (!token) return;
+    if (!token || tokenStatus !== 'valid') return; 
 
     setIsLoading(true);
     setError(null);
@@ -58,7 +83,6 @@ function ResetPasswordPage() {
       setIsLoading(false);
       return;
     }
-
     if (password !== confirmPassword) {
       setError("Mật khẩu xác nhận không khớp.");
       setIsLoading(false);
@@ -71,6 +95,7 @@ function ResetPasswordPage() {
         newPassword: password,
       });
       setSuccessMessage(message);
+      setTokenStatus('invalid'); 
 
       setTimeout(() => {
         router.push("/login");
@@ -80,9 +105,10 @@ function ResetPasswordPage() {
       console.error("Lỗi khi reset mật khẩu:", err);
       let errorMessage = "Đã xảy ra lỗi không xác định.";
       if (isAxiosError(err) && err.response?.data) {
-        errorMessage = err.response.data.message || err.response.data || "Token không hợp lệ hoặc đã hết hạn.";
+        errorMessage = err.response.data.message || err.response.data;
       }
       setError(errorMessage);
+      setTokenStatus('invalid'); 
     } finally {
       setIsLoading(false);
     }
@@ -91,16 +117,25 @@ function ResetPasswordPage() {
   return (
     <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Đặt lại mật khẩu</CardTitle>
-          <CardDescription>
-            Nhập mật khẩu mới cho tài khoản của bạn.
-          </CardDescription>
-        </CardHeader>
+        
+        {tokenStatus === 'loading' && (
+          <CardHeader className="text-center p-8">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-12 w-12 animate-spin" />
+              <p className="text-muted-foreground">Đang xác thực link...</p>
+            </div>
+          </CardHeader>
+        )}
 
-        <CardContent className="space-y-4">
-          {!successMessage && (
-            <>
+        {tokenStatus === 'valid' && (
+          <>
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl font-bold">Đặt lại mật khẩu</CardTitle>
+              <CardDescription>
+                Nhập mật khẩu mới cho tài khoản của bạn.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               {error && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
@@ -128,43 +163,56 @@ function ResetPasswordPage() {
                   disabled={isLoading}
                 />
               </div>
-            </>
-          )}
+            </CardContent>
+            <CardFooter>
+              <Button
+                className="w-full"
+                onClick={handleSubmit}
+                disabled={isLoading || !token}
+              >
+                {isLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  "Cập nhật mật khẩu"
+                )}
+              </Button>
+            </CardFooter>
+          </>
+        )}
 
-          {successMessage && (
-            <Alert className="border-green-500/50 text-green-700 dark:text-green-400 [&>svg]:text-green-700 dark:[&>svg]:text-green-400">
-              <CheckCircle2 className="h-4 w-4" />
-              <AlertTitle>Thành công!</AlertTitle>
-              <AlertDescription>
-                {successMessage} Bạn sẽ được chuyển hướng đến trang Đăng nhập
-                trong 3 giây...
-              </AlertDescription>
-            </Alert>
-          )}
-
-        </CardContent>
-
-        <CardFooter>
-          {!successMessage && (
-            <Button
-              className="w-full"
-              onClick={handleSubmit}
-              disabled={isLoading || !token}
-            >
-              {isLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        {tokenStatus === 'invalid' && (
+          <>
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl font-bold">Link không hợp lệ</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {successMessage ? (
+                <Alert className="border-green-500/50 text-green-700 dark:text-green-400 [&>svg]:text-green-700 dark:[&>svg]:text-green-400">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <AlertTitle>Thành công!</AlertTitle>
+                  <AlertDescription>
+                    {successMessage} Bạn sẽ được chuyển hướng đến trang Đăng nhập
+                    trong 3 giây...
+                  </AlertDescription>
+                </Alert>
               ) : (
-                "Cập nhật mật khẩu"
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Đặt lại thất bại</AlertTitle>
+                  <AlertDescription>
+                    {error || "Link reset này không còn hợp lệ."}
+                  </AlertDescription>
+                </Alert>
               )}
-            </Button>
-          )}
-
-          {successMessage && (
-            <Button asChild className="w-full">
-              <Link href="/login">Đi đến Đăng nhập ngay</Link>
-            </Button>
-          )}
-        </CardFooter>
+            </CardContent>
+            <CardFooter>
+              <Button asChild className="w-full">
+                <Link href="/login">Quay lại trang Đăng nhập</Link>
+              </Button>
+            </CardFooter>
+          </>
+        )}
+        
       </Card>
     </div>
   );

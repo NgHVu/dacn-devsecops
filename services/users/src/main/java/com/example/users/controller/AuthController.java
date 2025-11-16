@@ -18,6 +18,8 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @RequestMapping("/api/auth") 
@@ -101,8 +103,19 @@ public class AuthController {
         return ResponseEntity.ok("Chúng tôi đã gửi cách lấy lại mật khẩu cho bạn.");
     }
 
+    @GetMapping("/validate-reset-token")
+    @Operation(summary = "7.Kiểm tra tính hợp lệ của token reset mật khẩu", description = "Kiểm tra token ngay khi trang reset được tải")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Token hợp lệ"),
+        @ApiResponse(responseCode = "400", description = "Token không hợp lệ, đã sử dụng, hoặc hết hạn")
+    })
+    public ResponseEntity<Void> validateResetToken(@RequestParam String token) {
+        userService.validateResetToken(token);
+        return ResponseEntity.ok().build(); 
+    }
+
     @PostMapping("/reset-password")
-    @Operation(summary = "7. Đặt lại mật khẩu mới", description = "Sử dụng token từ email để đặt lại mật khẩu.")
+    @Operation(summary = "8. Đặt lại mật khẩu mới", description = "Sử dụng token từ email để đặt lại mật khẩu.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Mật khẩu đã được reset thành công"),
         @ApiResponse(responseCode = "400", description = "Token không hợp lệ hoặc đã hết hạn")
