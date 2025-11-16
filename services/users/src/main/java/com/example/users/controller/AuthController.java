@@ -98,7 +98,7 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "Yêu cầu đã được xử lý (luôn trả về 200 để tránh email enumeration)")
     public ResponseEntity<String> forgotPassword(@Valid @RequestBody EmailRequest emailRequest) {
         userService.processForgotPassword(emailRequest.email());
-        return ResponseEntity.ok("Nếu tài khoản của bạn tồn tại, một email reset mật khẩu đã được gửi.");
+        return ResponseEntity.ok("Chúng tôi đã gửi cách lấy lại mật khẩu cho bạn.");
     }
 
     @PostMapping("/reset-password")
