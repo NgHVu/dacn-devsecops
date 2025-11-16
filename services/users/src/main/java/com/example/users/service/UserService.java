@@ -22,4 +22,8 @@ public interface UserService extends UserDetailsService {
     void resendOtp(String email);
 
     AuthResponse loginWithGoogle(String authorizationCode);
+
+    void processForgotPassword(String email);
+    
+    void resetPassword(String token, String newPassword);
 }

@@ -30,6 +30,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.security.SecureRandom; 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 
@@ -55,6 +56,8 @@ public class UserServiceImpl implements UserService {
 
     private static final Random OTP_RANDOM = new SecureRandom();
     private static final String USER_NOT_FOUND_MSG = "Không tìm thấy người dùng với email: ";
+
+    private static final long RESET_TOKEN_EXPIRATION_MINUTES = 15; 
 
     public UserServiceImpl(UserRepository userRepository,
                            @Lazy PasswordEncoder passwordEncoder,
@@ -281,5 +284,56 @@ public class UserServiceImpl implements UserService {
                             .findFirst()
                             .getAsInt()
                             + "";
+    }
+
+    @Override
+    @Transactional
+    public void processForgotPassword(String email) {
+        log.info("Xử lý yêu cầu quên mật khẩu cho email: {}", email);
+        Optional<User> userOptional = userRepository.findByEmail(email);
+
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+        
+            if (!user.isVerified()) {
+                log.warn("Yêu cầu reset mật khẩu cho tài khoản chưa xác thực: {}", email);
+                return; 
+            }
+
+            String token = UUID.randomUUID().toString();
+            user.setResetPasswordToken(token);
+            user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(RESET_TOKEN_EXPIRATION_MINUTES));
+            userRepository.save(user);
+
+            emailService.sendPasswordResetEmail(user.getEmail(), token);
+            log.info("Đã tạo token reset và gửi email cho: {}", email);
+        } else {
+            log.warn("Yêu cầu reset mật khẩu cho email không tồn tại: {}", email);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        log.info("Đang xử lý reset mật khẩu với token: {}", token);
+    
+        User user = userRepository.findByResetPasswordToken(token)
+                .orElseThrow(() -> new BadCredentialsException("Token reset mật khẩu không hợp lệ.")); // 400
+
+        if (user.getResetTokenExpiry() == null || user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            log.warn("Token reset mật khẩu đã hết hạn cho user: {}", user.getEmail());
+            user.setResetPasswordToken(null);
+            user.setResetTokenExpiry(null);
+            userRepository.save(user);
+            throw new BadCredentialsException("Token reset mật khẩu đã hết hạn."); // 400
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+    
+        user.setResetPasswordToken(null);
+        user.setResetTokenExpiry(null);
+    
+        userRepository.save(user);
+        log.info("Reset mật khẩu thành công cho user: {}", user.getEmail());
     }
 }

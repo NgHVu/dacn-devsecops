@@ -56,6 +56,13 @@ public class User implements UserDetails {
     @Builder.Default // Đảm bảo giá trị mặc định khi dùng @Builder
     private boolean isVerified = false; // Mặc định là CHƯA xác thực
 
+    // Thêm 2 cột vào database lưu token reset và thời gian hết hạn
+    @Column(name = "reset_password_token")
+    private String resetPasswordToken;
+
+    @Column(name = "reset_token_expiry")
+    private LocalDateTime resetTokenExpiry;
+
     // --- Các phương thức của UserDetails ---
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -86,5 +93,21 @@ public class User implements UserDetails {
     public boolean isEnabled() {
         // Tài khoản chỉ "Enabled" (hoạt động) khi đã được xác thực
         return this.isVerified;
+    }
+
+    public String getResetPasswordToken() {
+        return resetPasswordToken;
+    }
+
+    public void setResetPasswordToken(String resetPasswordToken) {
+    this.resetPasswordToken = resetPasswordToken;
+    }
+
+    public LocalDateTime getResetTokenExpiry() {
+        return resetTokenExpiry;
+    }
+
+    public void setResetTokenExpiry(LocalDateTime resetTokenExpiry) {
+        this.resetTokenExpiry = resetTokenExpiry;
     }
 }

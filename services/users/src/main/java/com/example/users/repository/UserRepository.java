@@ -25,4 +25,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @return true nếu email đã tồn tại, false nếu chưa.
      */
     boolean existsByEmail(String email);
+
+    // Tìm users bằng token reset
+    Optional<User> findByResetPasswordToken(String token);
 }

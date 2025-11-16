@@ -1,7 +1,9 @@
 package com.example.users.controller;
 
-import com.example.users.dto.ResendOtpRequest; 
+import com.example.users.dto.ResendOtpRequest;
+import com.example.users.dto.ResetPasswordRequest;
 import com.example.users.dto.AuthResponse;
+import com.example.users.dto.EmailRequest;
 import com.example.users.dto.GoogleAuthRequest;
 import com.example.users.dto.LoginRequest;
 import com.example.users.dto.RegisterRequest;
@@ -9,6 +11,7 @@ import com.example.users.dto.VerifyRequest;
 import com.example.users.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.context.annotation.Lazy; 
@@ -88,5 +91,24 @@ public class AuthController {
     public ResponseEntity<AuthResponse> googleLogin(@Valid @RequestBody GoogleAuthRequest request) {
         AuthResponse authResponse = userService.loginWithGoogle(request.code());
         return ResponseEntity.ok(authResponse);
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "6. Yêu cầu link reset mật khẩu", description = "Bắt đầu luồng quên mật khẩu. Sẽ gửi email nếu user tồn tại.")
+    @ApiResponse(responseCode = "200", description = "Yêu cầu đã được xử lý (luôn trả về 200 để tránh email enumeration)")
+    public ResponseEntity<String> forgotPassword(@Valid @RequestBody EmailRequest emailRequest) {
+        userService.processForgotPassword(emailRequest.email());
+        return ResponseEntity.ok("Nếu tài khoản của bạn tồn tại, một email reset mật khẩu đã được gửi.");
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "7. Đặt lại mật khẩu mới", description = "Sử dụng token từ email để đặt lại mật khẩu.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Mật khẩu đã được reset thành công"),
+        @ApiResponse(responseCode = "400", description = "Token không hợp lệ hoặc đã hết hạn")
+    })
+    public ResponseEntity<String> resetPassword(@Valid @RequestBody ResetPasswordRequest resetRequest) {
+        userService.resetPassword(resetRequest.token(), resetRequest.newPassword());
+        return ResponseEntity.ok("Mật khẩu của bạn đã được cập nhật thành công.");
     }
 }
