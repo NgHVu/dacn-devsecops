@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react"; 
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,6 @@ import {
 import {
   InputOTP,
   InputOTPGroup,
-  InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
@@ -24,37 +23,61 @@ import { authService } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
 import { isAxiosError } from "axios";
 
-const RESEND_COOLDOWN = 60; 
+const OTP_LIFESPAN_SECONDS = 180;
+const OTP_EXPIRY_KEY = "otpExpiryTimestamp";
+
+function formatTime(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
 
 export default function VerifyPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
 
-  // Tạo ref để auto-focus
   const otpInputRef = useRef<HTMLInputElement>(null);
 
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resendCooldown, setResendCooldown] = useState(0);
+  const [countdown, setCountdown] = useState(OTP_LIFESPAN_SECONDS);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
 
   const email = searchParams.get("email") || "";
 
-  // Hook chạy đồng hồ đếm ngược 
   useEffect(() => {
-    if (resendCooldown > 0) {
-      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [resendCooldown]);
+    const calculateRemainingTime = () => {
+      const expiryTimestamp = localStorage.getItem(OTP_EXPIRY_KEY);
 
-  // Hook để tự động FOCUS khi trang tải
+      if (!expiryTimestamp) {
+        const newExpiry = Date.now() + OTP_LIFESPAN_SECONDS * 1000;
+        localStorage.setItem(OTP_EXPIRY_KEY, String(newExpiry));
+        setCountdown(OTP_LIFESPAN_SECONDS);
+      } else {
+        const remainingTimeMs = Number(expiryTimestamp) - Date.now();
+        const remainingTimeSec = Math.max(0, Math.floor(remainingTimeMs / 1000));
+        
+        setCountdown(remainingTimeSec);
+
+        if (remainingTimeSec <= 0) {
+          localStorage.removeItem(OTP_EXPIRY_KEY);
+        }
+      }
+    };
+
+    calculateRemainingTime();
+
+    const interval: NodeJS.Timeout = setInterval(calculateRemainingTime, 1000);
+
+    return () => clearInterval(interval);
+  }, [isResending]); 
+
   useEffect(() => {
     otpInputRef.current?.focus();
-  }, []); 
+  }, []);
 
   const handleVerify = async (finalOtp: string) => {
     if (isLoading) return; 
@@ -62,6 +85,12 @@ export default function VerifyPage() {
     setIsLoading(true);
     setError(null);
     setResendMessage(null);
+
+    if (countdown <= 0) {
+        setError("Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.");
+        setIsLoading(false);
+        return;
+    }
 
     if (!email || finalOtp.length < 6) {
       setError("Vui lòng nhập đủ 6 chữ số OTP.");
@@ -71,13 +100,14 @@ export default function VerifyPage() {
 
     try {
       const data = await authService.verifyAccount({ email, otp: finalOtp }); 
+      localStorage.removeItem(OTP_EXPIRY_KEY);
       await login(data.accessToken);
       router.push("/");
     } catch (err) {
       console.error("Lỗi khi xác thực OTP:", err);
       let errorMessage = "Đã xảy ra lỗi không xác định.";
       if (isAxiosError(err)) {
-        errorMessage = err.response?.data || "Mã OTP không hợp lệ hoặc đã hết hạn.";
+        errorMessage = err.response?.data?.message || err.response?.data || "Mã OTP không hợp lệ hoặc đã hết hạn.";
       }
       setError(errorMessage);
       setOtp(""); 
@@ -86,7 +116,7 @@ export default function VerifyPage() {
   };
 
   const handleResendOtp = async () => {
-    if (resendCooldown > 0 || isResending) return; 
+    if (isResending || countdown > 0) return;
 
     setIsResending(true);
     setError(null);
@@ -101,12 +131,15 @@ export default function VerifyPage() {
     try {
       const message = await authService.resendOtp(email);
       setResendMessage(message); 
-      setResendCooldown(RESEND_COOLDOWN);
+      
+      const newExpiry = Date.now() + OTP_LIFESPAN_SECONDS * 1000;
+      localStorage.setItem(OTP_EXPIRY_KEY, String(newExpiry));
+      
     } catch (err) {
       console.error("Lỗi khi gửi lại OTP:", err);
       let errorMessage = "Không thể gửi lại mã OTP.";
       if (isAxiosError(err)) {
-        errorMessage = err.response?.data || "Không thể gửi lại mã vào lúc này.";
+        errorMessage = err.response?.data?.message || err.response?.data || "Không thể gửi lại mã vào lúc này.";
       }
       setError(errorMessage);
     } finally {
@@ -114,7 +147,6 @@ export default function VerifyPage() {
     }
   };
 
-  // Tự động xóa lỗi khi người dùng nhập lại
   const handleOtpChange = (value: string) => {
     setOtp(value);
     if (error) {
@@ -122,13 +154,21 @@ export default function VerifyPage() {
     }
   }
 
+  const handleChangeEmail = () => {
+    localStorage.removeItem(OTP_EXPIRY_KEY);
+    router.push("/register");
+  };
+
   return (
     <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Xác thực Email</CardTitle>
           <CardDescription>
-            Chúng tôi đã gửi mã 6 chữ số đến <strong>{email}</strong>.
+            Chúng tôi đã gửi mã OTP đến email:
+            <br />
+            <span className="font-medium text-primary">{email || "..."}</span>
+            <br />
             Vui lòng nhập mã vào ô bên dưới.
           </CardDescription>
         </CardHeader>
@@ -139,44 +179,51 @@ export default function VerifyPage() {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Xác thực thất bại</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
-            </Alert> 
+            </Alert>
           )}
           {resendMessage && (
-            <Alert> 
+            <Alert>
               <CheckCircle2 className="h-4 w-4" />
               <AlertTitle>Thành công</AlertTitle>
               <AlertDescription>{resendMessage}</AlertDescription>
             </Alert>
           )}
           
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center gap-4">
             <InputOTP
-              ref={otpInputRef} 
+              ref={otpInputRef}
               maxLength={6}
               value={otp}
-              onChange={handleOtpChange} 
-              onComplete={handleVerify} 
+              onChange={handleOtpChange}
+              onComplete={handleVerify}
               disabled={isLoading || isResending}
             >
               <InputOTPGroup>
                 <InputOTPSlot index={0} />
                 <InputOTPSlot index={1} />
                 <InputOTPSlot index={2} />
-              </InputOTPGroup>
-              <InputOTPSeparator />
-              <InputOTPGroup>
                 <InputOTPSlot index={3} />
                 <InputOTPSlot index={4} />
                 <InputOTPSlot index={5} />
               </InputOTPGroup>
             </InputOTP>
+            
+            {countdown > 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Mã sẽ hết hạn sau: <span className="font-medium text-primary">{formatTime(countdown)}</span>
+              </p>
+            ) : (
+              <p className="text-sm font-medium text-destructive">
+                Mã OTP đã hết hạn.
+              </p>
+            )}
           </div>
         </CardContent>
 
         <CardFooter className="flex flex-col gap-4">
           <Button 
             className="w-full" 
-            onClick={() => handleVerify(otp)} 
+            onClick={() => handleVerify(otp)}
             disabled={isLoading || isResending || otp.length < 6}
           >
             {isLoading ? (
@@ -186,15 +233,27 @@ export default function VerifyPage() {
             )}
           </Button>
           
-          <div className="text-center text-sm">
-            Chưa nhận được mã?{" "}
-            <button
-              className="font-medium text-primary underline disabled:cursor-not-allowed disabled:text-muted-foreground"
-              onClick={handleResendOtp}
-              disabled={isLoading || isResending || resendCooldown > 0}
-            >
-              {isResending ? "Đang gửi..." : (resendCooldown > 0 ? `Gửi lại sau (${resendCooldown}s)` : "Gửi lại mã")}
-            </button>
+          <div className="text-center text-sm w-full">
+            <div className="flex justify-between items-center w-full">
+              <button
+                className="font-medium text-sm text-muted-foreground underline hover:text-primary"
+                onClick={handleChangeEmail}
+                disabled={isLoading || isResending}
+              >
+                Đổi email?
+              </button>
+
+              <div className="text-muted-foreground">
+                Chưa nhận được mã?{" "}
+                <button
+                  className="font-medium text-primary underline disabled:cursor-not-allowed disabled:text-muted-foreground"
+                  onClick={handleResendOtp}
+                  disabled={isLoading || isResending || countdown > 0} 
+                >
+                  {isResending ? "Đang gửi..." : "Gửi lại"}
+                </button>
+              </div>
+            </div>
           </div>
         </CardFooter>
       </Card>
