@@ -55,7 +55,21 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() 
-                        .requestMatchers("/api/auth/**").permitAll() 
+                        
+                        .requestMatchers(HttpMethod.POST, 
+                            "/api/auth/register",
+                            "/api/auth/login",
+                            "/api/auth/verify",
+                            "/api/auth/resend-otp",
+                            "/api/auth/oauth/google",
+                            "/api/auth/forgot-password",
+                            "/api/auth/reset-password"
+                        ).permitAll()
+                        
+                        .requestMatchers(HttpMethod.GET, 
+                            "/api/auth/validate-reset-token"
+                        ).permitAll()
+
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         .anyRequest().authenticated()
