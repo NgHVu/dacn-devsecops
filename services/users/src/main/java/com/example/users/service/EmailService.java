@@ -9,15 +9,17 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.scheduling.annotation.Async; 
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import org.springframework.mail.MailException; 
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j 
+@Slf4j
 public class EmailService {
 
     private final JavaMailSender mailSender;
@@ -28,13 +30,13 @@ public class EmailService {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
-    @Async 
+    @Async
     public void sendOtpEmail(String toEmail, String otp) {
         log.info("Đang chuẩn bị gửi OTP đến {}...", toEmail);
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             
-            message.setFrom(senderEmail); 
+            message.setFrom(String.format("FoodApp <%s>", senderEmail)); 
             
             message.setTo(toEmail);
             message.setSubject("Mã Xác Thực OTP cho FoodApp");
@@ -43,7 +45,7 @@ public class EmailService {
             
             mailSender.send(message);
             log.info("Đã gửi OTP đến {} thành công.", toEmail);
-        } catch (Exception e) {
+        } catch (MailException e) { 
             log.error("Không thể gửi email OTP đến {}: {}", toEmail, e.getMessage());
         }
     }
@@ -74,7 +76,8 @@ public class EmailService {
             mailSender.send(message);
             
             log.info("Đã gửi email reset mật khẩu thành công đến: {}", userEmail);
-        } catch (MessagingException | UnsupportedEncodingException e) {
+        
+        } catch (MessagingException | UnsupportedEncodingException | MailException e) { 
             log.error("Lỗi khi gửi email reset mật khẩu đến {}: {}", userEmail, e.getMessage());
         }
     }

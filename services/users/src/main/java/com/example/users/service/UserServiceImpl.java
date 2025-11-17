@@ -1,15 +1,16 @@
 package com.example.users.service;
 
+import com.example.users.exception.ResourceNotFoundException;
 import com.example.users.dto.*;
 import com.example.users.entity.User;
 import com.example.users.exception.EmailAlreadyExistsException;
 import com.example.users.repository.UserRepository;
 import com.example.users.security.JwtTokenProvider;
-import com.fasterxml.jackson.databind.ObjectMapper; 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.http.HttpHeaders; 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -18,7 +19,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException; // Vẫn giữ import này
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -28,7 +29,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.security.SecureRandom; 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Random;
@@ -46,22 +47,23 @@ public class UserServiceImpl implements UserService {
     private final EmailService emailService;
     private final ClientRegistrationRepository clientRegistrationRepository;
     private final WebClient.Builder webClientBuilder;
-    private final ObjectMapper objectMapper; 
+    private final ObjectMapper objectMapper;
 
     @Value("${app.otp.expiration-minutes:3}")
     private long otpExpirationMinutes;
-    
-    @Value("${app.oauth.google.redirect-uri}") 
+
+    @Value("${app.oauth.google.redirect-uri}")
     private String googleRedirectUri;
 
     private static final Random OTP_RANDOM = new SecureRandom();
-    private static final String USER_NOT_FOUND_MSG = "Không tìm thấy người dùng với email: ";
+    
+    private static final String USER_NOT_FOUND_MSG_TPL = "Email '%s' chưa được đăng ký.";
 
-    private static final long RESET_TOKEN_EXPIRATION_MINUTES = 15; 
+    private static final long RESET_TOKEN_EXPIRATION_MINUTES = 15;
 
     public UserServiceImpl(UserRepository userRepository,
                            @Lazy PasswordEncoder passwordEncoder,
-                           @Lazy AuthenticationManager authenticationManager, 
+                           @Lazy AuthenticationManager authenticationManager,
                            JwtTokenProvider jwtTokenProvider,
                            EmailService emailService,
                            @Lazy ClientRegistrationRepository clientRegistrationRepository,
@@ -81,7 +83,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException(USER_NOT_FOUND_MSG + email));
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng với email: " + email));
     }
 
     @Override
@@ -109,8 +111,10 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public AuthResponse verifyAccount(VerifyRequest verifyRequest) {
         log.info("Đang xác thực OTP cho email: {}", verifyRequest.email());
+        
         User user = userRepository.findByEmail(verifyRequest.email())
-                .orElseThrow(() -> new UsernameNotFoundException(USER_NOT_FOUND_MSG + verifyRequest.email()));
+                .orElseThrow(() -> new ResourceNotFoundException(String.format(USER_NOT_FOUND_MSG_TPL, verifyRequest.email())));
+
         if (user.isVerified()) {
             throw new IllegalStateException("Tài khoản đã được xác thực trước đó.");
         }
@@ -162,8 +166,10 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void resendOtp(String email) {
         log.info("Yêu cầu gửi lại OTP cho email: {}", email);
+        
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException(USER_NOT_FOUND_MSG + email));
+                .orElseThrow(() -> new ResourceNotFoundException(String.format(USER_NOT_FOUND_MSG_TPL, email)));
+
         if (user.isVerified()) {
             log.warn("Tài khoản {} đã được xác thực, không cần gửi lại OTP.", email);
             throw new IllegalStateException("Tài khoản này đã được kích hoạt.");
@@ -206,12 +212,12 @@ public class UserServiceImpl implements UserService {
 
     private GoogleTokenResponse exchangeCodeForToken(String code, ClientRegistration registration) {
         log.debug("Đang gửi request đến Google Token Endpoint...");
-        
+
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
         formData.add("code", code);
         formData.add("client_id", registration.getClientId());
         formData.add("client_secret", registration.getClientSecret());
-        formData.add("redirect_uri", googleRedirectUri); 
+        formData.add("redirect_uri", googleRedirectUri);
         formData.add("grant_type", "authorization_code");
 
         return webClientBuilder.build()
@@ -222,13 +228,14 @@ public class UserServiceImpl implements UserService {
                 .retrieve()
                 .bodyToMono(GoogleTokenResponse.class)
                 .doOnError(error -> log.error("Lỗi khi trao đổi code lấy token: {}", error.getMessage()))
-                .block(); 
+                .block();
     }
 
     private GoogleUserInfo getGoogleUserInfo(String accessToken, ClientRegistration registration) {
+        // (Không thay đổi logic)
         log.debug("Đang gửi request đến Google UserInfo Endpoint...");
         String userInfoUri = registration.getProviderDetails().getUserInfoEndpoint().getUri();
-        
+
         return webClientBuilder.build()
                 .get()
                 .uri(userInfoUri)
@@ -245,7 +252,7 @@ public class UserServiceImpl implements UserService {
                 .name(userInfo.name())
                 .email(userInfo.email())
                 .password(passwordEncoder.encode(UUID.randomUUID().toString()))
-                .isVerified(true) 
+                .isVerified(true)
                 .build();
         return userRepository.save(newUser);
     }
@@ -261,8 +268,10 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public UserResponse findUserByEmail(String email) {
         log.info("Đang tìm người dùng bằng email (cho service nội bộ): {}", email);
+        
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException(USER_NOT_FOUND_MSG + email));
+                .orElseThrow(() -> new ResourceNotFoundException(String.format(USER_NOT_FOUND_MSG_TPL, email)));
+        
         return UserResponse.fromEntity(user);
     }
 
@@ -276,27 +285,27 @@ public class UserServiceImpl implements UserService {
             throw new IllegalStateException("Không thể xác định tên người dùng từ Security Context");
         }
         return userRepository.findByEmail(currentUserName)
-                        .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng đã xác thực: " + currentUserName));
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng đã xác thực: " + currentUserName));
     }
-    
+
     private String generateOtp() {
         return OTP_RANDOM.ints(100000, 999999)
-                            .findFirst()
-                            .getAsInt()
-                            + "";
+                .findFirst()
+                .getAsInt()
+                + "";
     }
 
     @Override
     @Transactional
     public void processForgotPassword(String email) {
         log.info("Xử lý yêu cầu quên mật khẩu cho email: {}", email);
-    
+
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("Email này chưa được đăng ký."));
+                .orElseThrow(() -> new ResourceNotFoundException(String.format(USER_NOT_FOUND_MSG_TPL, email)));
 
         if (!user.isVerified()) {
             log.warn("Yêu cầu reset mật khẩu cho tài khoản chưa xác thực: {}", email);
-            return; 
+            throw new BadCredentialsException("Tài khoản này chưa được xác thực, không thể reset mật khẩu.");
         }
 
         String token = UUID.randomUUID().toString();
@@ -312,7 +321,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void resetPassword(String token, String newPassword) {
         log.info("Đang xử lý reset mật khẩu với token: {}", token);
-    
+
         User user = userRepository.findByResetPasswordToken(token)
                 .orElseThrow(() -> new BadCredentialsException("Link này không hợp lệ hoặc đã được sử dụng. Vui lòng yêu cầu link mới."));
 
@@ -325,16 +334,16 @@ public class UserServiceImpl implements UserService {
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
-    
+
         user.setResetPasswordToken(null);
         user.setResetTokenExpiry(null);
-    
+
         userRepository.save(user);
         log.info("Reset mật khẩu thành công cho user: {}", user.getEmail());
     }
 
     @Override
-    @Transactional(readOnly = true) 
+    @Transactional(readOnly = true)
     public void validateResetToken(String token) {
         log.info("Đang kiểm tra tính hợp lệ của token: {}", token);
 
