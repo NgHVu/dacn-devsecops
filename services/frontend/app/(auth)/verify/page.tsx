@@ -167,7 +167,6 @@ export default function VerifyPage() {
   };
   
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Xác thực Email</CardTitle>
@@ -264,6 +263,5 @@ export default function VerifyPage() {
           </div>
         </CardFooter>
       </Card>
-    </div>
   );
 }

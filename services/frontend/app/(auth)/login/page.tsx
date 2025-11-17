@@ -113,14 +113,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Đăng nhập</CardTitle>
         </CardHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
+          <form onSubmit={form.handleSubmit(onSubmit)} noValidate> 
             <CardContent className="space-y-4">
               {error && (
                 <Alert variant="destructive">
@@ -212,6 +211,5 @@ export default function LoginPage() {
           </form>
         </Form>
       </Card>
-    </div>
   );
 }

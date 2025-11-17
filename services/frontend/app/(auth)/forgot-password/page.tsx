@@ -29,15 +29,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authService } from "@/services/authService";
 import { isAxiosError } from "axios";
 
-// Schema Zod (giữ nguyên)
 const formSchema = z.object({
   email: z.string().email({
-    message: "Email không đúng định dạng.", // Zod sẽ hiển thị thông báo này
+    message: "Email không đúng định dạng.", 
   }),
 });
 
 export default function ForgotPasswordPage() {
-  // (Tất cả logic hooks giữ nguyên)
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null); 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -49,7 +47,6 @@ export default function ForgotPasswordPage() {
     },
   });
 
-  // (Hàm onSubmit giữ nguyên)
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setError(null);
     setSuccessMessage(null);
@@ -79,7 +76,6 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Quên mật khẩu</CardTitle>
@@ -89,10 +85,8 @@ export default function ForgotPasswordPage() {
         </CardHeader>
 
         <Form {...form}>
-          {/* === SỬA LỖI: Thêm 'noValidate' để tắt thông báo của trình duyệt === */}
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate> 
             <CardContent className="space-y-4">
-              {/* (Nội dung CardContent giữ nguyên) */}
               {!successMessage && (
                 <>
                   {error && (
@@ -118,7 +112,7 @@ export default function ForgotPasswordPage() {
                             disabled={isLoading}
                           />
                         </FormControl>
-                        <FormMessage /> {/* Lỗi "Email không đúng định dạng." của Zod sẽ hiện ở đây */}
+                        <FormMessage /> 
                       </FormItem>
                     )}
                   />
@@ -134,7 +128,6 @@ export default function ForgotPasswordPage() {
               )}
             </CardContent>
 
-            {/* (CardFooter giữ nguyên) */}
             <CardFooter className="flex flex-col gap-4 pt-6">
               {!successMessage && (
                 <Button
@@ -163,6 +156,5 @@ export default function ForgotPasswordPage() {
           </form>
         </Form>
       </Card>
-    </div>
   );
 }
