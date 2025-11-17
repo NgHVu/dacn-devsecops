@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider"; 
 import { AuthProvider } from "@/context/AuthContext";
+import { CartProvider } from "@/context/CartContext";
+import { Toaster } from "@/components/ui/sonner"; 
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FoodApp Đồ Án",
+  title: "FoodApp - Đặt món ăn",
   description: "Dự án DevSecOps Microservice",
 };
 
@@ -36,9 +38,13 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            {children}
+            <CartProvider>
+              {children}
+            </CartProvider>
           </AuthProvider>
           
+          <Toaster richColors />
+
         </ThemeProvider>
       </body>
     </html>

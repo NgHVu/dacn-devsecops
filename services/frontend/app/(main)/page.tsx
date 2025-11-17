@@ -3,7 +3,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { productService } from "@/services/productService";
 import { type PageableResponse, type Product } from "@/types/product";
-import { ProductCard } from "@/components/ProductCard"; 
+import { ProductCard } from "@/components/ProductCard";
+
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   let productResponse: PageableResponse<Product>;
@@ -12,7 +14,7 @@ export default async function HomePage() {
   try {
     productResponse = await productService.getProducts({ page: 0, size: 20 });
   } catch (err) {
-    console.error(err); 
+    console.error("Lỗi khi tải sản phẩm (Server Component):", err); 
     error = "Không thể tải sản phẩm. Vui lòng thử lại sau.";
     productResponse = { content: [], totalPages: 0, totalElements: 0, size: 0, number: 0, last: true, first: true, empty: true };
   }

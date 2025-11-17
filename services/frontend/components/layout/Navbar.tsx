@@ -7,6 +7,8 @@ import { ShoppingCart, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/layout/mode-toggle";
 import { useAuth } from "@/context/AuthContext"; 
+import { useCart } from "@/context/CartContext"; 
+import { Badge } from "@/components/ui/badge";
 
 import {
   DropdownMenu,
@@ -25,6 +27,8 @@ import {
 export default function Navbar() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
+  
+  const { totalItems } = useCart();
 
   const getInitials = (name: string | undefined) => {
     if (!name) return "??";
@@ -49,8 +53,9 @@ export default function Navbar() {
             FoodApp
           </Link>
           <div className="hidden md:flex md:gap-4">
+            {/* Sửa: Dùng Link component "sạch" hơn cho Trang chủ */}
             <Button variant="ghost" asChild>
-              <Link href="/products">Sản Phẩm</Link>
+              <Link href="/">Sản Phẩm</Link> 
             </Button>
             <Button variant="ghost" asChild>
               <Link href="/orders">Đơn Hàng</Link>
@@ -59,9 +64,25 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" asChild>
+          
+          <Button 
+            variant="outline" 
+            size="icon" 
+            asChild 
+            className="relative" 
+          >
             <Link href="/cart">
               <ShoppingCart className="h-5 w-5" />
+              <span className="sr-only">Giỏ hàng</span>
+
+              {totalItems > 0 && (
+                <Badge 
+                  variant="destructive" 
+                  className="absolute -top-2 -right-2 h-5 w-5 justify-center rounded-full p-0 text-xs"
+                >
+                  {totalItems}
+                </Badge>
+              )}
             </Link>
           </Button>
           

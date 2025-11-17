@@ -11,3 +11,21 @@ export function formatPrice(price: number): string {
     currency: "VND",
   }).format(price);
 }
+
+export const getImageUrl = (imagePath?: string | null): string => {
+  const placeholder = "https://placehold.co/400x300/e0e0e0/7c7c7c?text=FoodApp";
+  
+  if (!imagePath) {
+    return placeholder;
+  }
+  
+  if (imagePath.startsWith("http")) {
+    return imagePath;
+  }
+  
+  if (imagePath.startsWith("/")) {
+    return imagePath;
+  }
+  
+  return `/images/${imagePath}`;
+}

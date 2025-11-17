@@ -9,21 +9,40 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"; 
+} from "@/components/ui/card";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { Button } from "@/components/ui/button"; 
+import { Button } from "@/components/ui/button";
 import { ShoppingCart } from "lucide-react";
 import { type Product } from "@/types/product";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, getImageUrl } from "@/lib/utils"; // <-- 1. IMPORT TỪ 'utils'
+import { useCart } from "@/context/CartContext"; 
+import { toast } from "sonner"; 
 
 interface ProductCardProps {
   product: Product;
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  
+  const { addItem } = useCart(); 
+  const safeImageUrl = getImageUrl(product.image); // <-- 3. Vẫn dùng bình thường
+
   const handleAddToCart = () => {
-    console.log("Thêm vào giỏ hàng:", product.id);
+    addItem(product);
+    toast.success("Đã thêm vào giỏ hàng", {
+      description: (
+        <div className="flex items-center gap-2">
+          <Image 
+            src={safeImageUrl} 
+            alt={product.name} 
+            width={40} 
+            height={40}
+            className="rounded-md"
+          />
+          <span>{product.name}</span>
+        </div>
+      ),
+      duration: 2000,
+    });
   };
 
   return (
@@ -31,12 +50,15 @@ export function ProductCard({ product }: ProductCardProps) {
       <CardHeader className="p-0">
         <AspectRatio ratio={4 / 3}>
           <Image
-            src={product.image || "https://placehold.co/400x300/e0e0e0/7c7c7c?text=FoodApp"}
+            src={safeImageUrl} 
             alt={product.name}
             fill
             className="object-cover"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-            priority={true} 
+            priority={true}
+            onError={(e) => {
+              e.currentTarget.srcset = "https://placehold.co/400x300/e0e0e0/7c7c7c?text=Hinh+Loi";
+            }}
           />
         </AspectRatio>
       </CardHeader>
@@ -45,7 +67,7 @@ export function ProductCard({ product }: ProductCardProps) {
         <CardTitle className="text-lg font-semibold hover:text-primary transition-colors">
           {product.name}
         </CardTitle>
-        <CardDescription className="mt-2 text-sm line-clamp-2 h-[2.5em]"> 
+        <CardDescription className="mt-2 text-sm line-clamp-2 h-[2.5em]">
           {product.description || "Chưa có mô tả cho sản phẩm này."}
         </CardDescription>
       </CardContent>

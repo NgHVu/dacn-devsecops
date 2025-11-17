@@ -1,13 +1,21 @@
 import axios from "axios";
 
+const getBaseUrl = () => {
+  if (typeof window !== "undefined") {
+
+    return "/";
+  }
+  
+  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+};
+
 const apiClient = axios.create({
-  baseURL: "/", 
+  baseURL: getBaseUrl(),
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Gửi Request (Tự động đính kèm token)
 apiClient.interceptors.request.use(
   (config) => {
     if (config.headers['X-Skip-Auth']) {
@@ -26,18 +34,19 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Nhận Response (Gom log lỗi về 1 chỗ)
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (axios.isAxiosError(error)) {
-      const method = error.config?.method?.toUpperCase();
-      const url = error.config?.url;
-      const status = error.response?.status;
-      const data = error.response?.data;
-      console.error(`LỖI API [${method} ${url}] (Status: ${status}):`, data || error.message);
-    } else {
-      console.error("Lỗi không xác định:", error);
+    if (typeof window !== "undefined") {
+      if (axios.isAxiosError(error)) {
+        const method = error.config?.method?.toUpperCase();
+        const url = error.config?.url;
+        const status = error.response?.status;
+        const data = error.response?.data;
+        console.error(`LỖI API [${method} ${url}] (Status: ${status}):`, data || error.message);
+      } else {
+        console.error("Lỗi không xác định:", error);
+      }
     }
     return Promise.reject(error);
   }

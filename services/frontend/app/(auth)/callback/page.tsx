@@ -32,6 +32,8 @@ export default function GoogleCallbackPage() {
     const handleGoogleCallback = async () => {
       const code = searchParams.get("code");
       const errorParam = searchParams.get("error");
+      
+      const state = searchParams.get("state"); 
 
       if (errorParam) {
         setError(`Đăng nhập Google thất bại: ${errorParam}`);
@@ -43,12 +45,24 @@ export default function GoogleCallbackPage() {
         return;
       }
 
+      let redirectUrl = "/"; 
+      if (state) {
+        try {
+          const decodedState = JSON.parse(atob(state));
+          if (decodedState.redirect) {
+            redirectUrl = decodedState.redirect;
+          }
+        } catch (e) {
+          console.error("Không thể giải mã 'state' của Google:", e);
+        }
+      }
+
       try {
         const data = await authService.loginWithGoogle({ code });
 
         await login(data.accessToken); 
 
-        router.push("/"); 
+        router.push(redirectUrl); 
 
       } catch (err) {
         console.error("Lỗi khi xác thực Google Callback:", err);
