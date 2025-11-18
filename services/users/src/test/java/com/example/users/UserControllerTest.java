@@ -21,7 +21,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
-// @Import(SecurityConfig.class)
 @DisplayName("UserController Tests")
 class UserControllerTest {
 
@@ -45,38 +44,26 @@ class UserControllerTest {
 
     @Test
     @DisplayName("GET /me: Thành công (200 OK) khi người dùng đã xác thực")
-    @WithMockUser
+    @WithMockUser 
     void testGetCurrentUser_Success() throws Exception {
-        UserResponse response = new UserResponse(1L, "Test User", "test@example.com");
+        UserResponse response = new UserResponse(1L, "Test User", "test@example.com", "ROLE_USER");
         when(userService.getCurrentUser()).thenReturn(response);
 
-        // Thêm header Accept để đảm bảo nhận về JSON
         mockMvc.perform(get("/api/users/me")
                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.name").value("Test User"))
-                .andExpect(jsonPath("$.email").value("test@example.com"));
+                .andExpect(jsonPath("$.email").value("test@example.com"))
+                .andExpect(jsonPath("$.role").value("ROLE_USER"));
 
         verify(userService).getCurrentUser();
     }
 
-    /* Xóa bài test này vì nó không đáng tin cậy trong @WebMvcTest
-    @Test
-    @DisplayName("GET /me: Thất bại (401 Unauthorized) khi chưa xác thực")
-    void testGetCurrentUser_Unauthorized() throws Exception {
-        mockMvc.perform(get("/api/users/me"))
-                .andExpect(status().isUnauthorized());
-
-        verify(userService, never()).getCurrentUser();
-    }
-    */
-
     @Test
     @DisplayName("GET /me: Thất bại (401) khi không có @WithMockUser")
     void testGetCurrentUser_WithoutMockUser_ShouldReturnUnauthorized() throws Exception {
-        // Test này không có @WithMockUser
         mockMvc.perform(get("/api/users/me"))
-                .andExpect(status().isUnauthorized()); // Mong đợi 401
+                .andExpect(status().isUnauthorized()); 
     }
 }

@@ -3,6 +3,7 @@ package com.example.users.service;
 import com.example.users.exception.ResourceNotFoundException;
 import com.example.users.dto.*;
 import com.example.users.entity.User;
+import com.example.users.entity.Role; // === 1. IMPORT ENUM MỚI ===
 import com.example.users.exception.EmailAlreadyExistsException;
 import com.example.users.repository.UserRepository;
 import com.example.users.security.JwtTokenProvider;
@@ -51,14 +52,10 @@ public class UserServiceImpl implements UserService {
 
     @Value("${app.otp.expiration-minutes:3}")
     private long otpExpirationMinutes;
-
     @Value("${app.oauth.google.redirect-uri}")
     private String googleRedirectUri;
-
     private static final Random OTP_RANDOM = new SecureRandom();
-    
     private static final String USER_NOT_FOUND_MSG_TPL = "Email '%s' chưa được đăng ký.";
-
     private static final long RESET_TOKEN_EXPIRATION_MINUTES = 15;
 
     public UserServiceImpl(UserRepository userRepository,
@@ -102,6 +99,7 @@ public class UserServiceImpl implements UserService {
         user.setVerificationOtp(otp);
         user.setOtpGeneratedTime(LocalDateTime.now());
         user.setVerified(false);
+        user.setRole(Role.ROLE_USER);
         userRepository.save(user);
         emailService.sendOtpEmail(user.getEmail(), otp);
         log.info("Đã lưu user và gửi OTP đến email: {}", user.getEmail());
@@ -126,16 +124,20 @@ public class UserServiceImpl implements UserService {
             log.warn("Mã OTP không chính xác cho email: {}", verifyRequest.email());
             throw new BadCredentialsException("Mã OTP không chính xác.");
         }
+        
         user.setVerified(true);
         user.setVerificationOtp(null);
         user.setOtpGeneratedTime(null);
         userRepository.save(user);
         log.info("Xác thực tài khoản thành công cho email: {}", user.getEmail());
+        
         Authentication authentication = new UsernamePasswordAuthenticationToken(
                 user, null, user.getAuthorities()
         );
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        String accessToken = jwtTokenProvider.generateToken(user);
+        
+        String accessToken = jwtTokenProvider.generateToken(authentication);
+
         return new AuthResponse(accessToken);
     }
 
@@ -150,9 +152,10 @@ public class UserServiceImpl implements UserService {
                     )
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            User user = (User) authentication.getPrincipal();
-            String accessToken = jwtTokenProvider.generateToken(user);
+            
+            String accessToken = jwtTokenProvider.generateToken(authentication);
             return new AuthResponse(accessToken);
+            
         } catch (DisabledException e) {
             log.warn("Đăng nhập thất bại: Tài khoản chưa được kích hoạt cho email: {}", loginRequest.email());
             throw new BadCredentialsException("Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email để xác thực OTP.");
@@ -203,10 +206,16 @@ public class UserServiceImpl implements UserService {
         }
 
         User user = userRepository.findByEmail(userInfo.email())
-                .orElseGet(() -> createNewGoogleUser(userInfo));
+                .orElseGet(() -> createNewGoogleUser(userInfo)); // <-- Sẽ gọi hàm đã cập nhật
 
         log.info("Đăng nhập/Đăng ký Google thành công cho: {}", user.getEmail());
-        String accessToken = jwtTokenProvider.generateToken(user);
+        
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                user, null, user.getAuthorities()
+        );
+
+        String accessToken = jwtTokenProvider.generateToken(authentication);
+
         return new AuthResponse(accessToken);
     }
 
@@ -232,7 +241,6 @@ public class UserServiceImpl implements UserService {
     }
 
     private GoogleUserInfo getGoogleUserInfo(String accessToken, ClientRegistration registration) {
-        // (Không thay đổi logic)
         log.debug("Đang gửi request đến Google UserInfo Endpoint...");
         String userInfoUri = registration.getProviderDetails().getUserInfoEndpoint().getUri();
 
@@ -245,7 +253,7 @@ public class UserServiceImpl implements UserService {
                 .doOnError(error -> log.error("Lỗi khi lấy UserInfo từ Google: {}", error.getMessage()))
                 .block();
     }
-
+    
     private User createNewGoogleUser(GoogleUserInfo userInfo) {
         log.info("Tạo tài khoản mới từ Google cho email: {}", userInfo.email());
         User newUser = User.builder()
@@ -253,6 +261,7 @@ public class UserServiceImpl implements UserService {
                 .email(userInfo.email())
                 .password(passwordEncoder.encode(UUID.randomUUID().toString()))
                 .isVerified(true)
+                .role(Role.ROLE_USER) 
                 .build();
         return userRepository.save(newUser);
     }

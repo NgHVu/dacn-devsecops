@@ -1,6 +1,5 @@
 package com.example.users.security;
 
-import com.example.users.entity.User; // Import User
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -9,14 +8,16 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.Authentication; // Import Authentication
+import org.springframework.security.core.Authentication; 
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import java.util.Collection;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.util.Date;
 
-/**
- * Utility class để xử lý các thao tác liên quan đến JSON Web Tokens (JWT). 
- */
 @Component
 public class JwtTokenProvider {
 
@@ -30,71 +31,63 @@ public class JwtTokenProvider {
 
     private SecretKey key;
 
-    /**
-     * Khởi tạo SecretKey một lần sau khi bean được tạo.
-     */
     @PostConstruct
     public void init() {
          try {
-            byte[] keyBytes = Decoders.BASE64.decode(this.jwtSecret);
-            this.key = Keys.hmacShaKeyFor(keyBytes);
-            logger.info("Khởi tạo JWT Secret Key thành công.");
-        } catch (IllegalArgumentException e) {
-            logger.error("Lỗi khi decode JWT Secret Key Base64: {}. Key có thể không hợp lệ hoặc quá ngắn.", e.getMessage());
-        }
+             byte[] keyBytes = Decoders.BASE64.decode(this.jwtSecret);
+             this.key = Keys.hmacShaKeyFor(keyBytes);
+             logger.info("Khởi tạo JWT Secret Key thành công.");
+         } catch (IllegalArgumentException e) {
+             logger.error("Lỗi khi decode JWT Secret Key Base64: {}. Key có thể không hợp lệ hoặc quá ngắn.", e.getMessage());
+         }
     }
 
-    /**
-     * Tạo token từ đối tượng User (Dùng sau khi verify OTP hoặc login)
-     */
-    public String generateToken(User user) {
-        String username = user.getEmail();
-        Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
-        return Jwts.builder()
-                .subject(username)
-                .issuedAt(now)
-                .expiration(expiryDate)
-                .signWith(this.key)
-                .compact();
-    }
-
-    /**
-     * SỬA LỖI BIÊN DỊCH:
-     * Thêm phương thức generateToken(Authentication)
-     * (Cần thiết cho test và các luồng Spring Security khác)
-     */
     public String generateToken(Authentication authentication) {
         String username = authentication.getName();
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
+        Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
+        List<String> roles = authorities.stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
         return Jwts.builder()
                 .subject(username)
+                .claim("roles", roles)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(this.key)
                 .compact();
     }
 
-
-    /**
-     * Trích xuất username (email) từ một token JWT.
-     */
-    public String getUsernameFromToken(String token) {
-        Claims claims = Jwts.parser()
+    private Claims parseClaims(String token) {
+        return Jwts.parser()
                 .verifyWith(this.key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-
-        return claims.getSubject();
     }
 
-    /**
-     * Kiểm tra xem một token JWT có hợp lệ hay không.
-     */
+    public String getUsername(String token) {
+        return parseClaims(token).getSubject();
+    }
+
+    @SuppressWarnings("unchecked")
+    public Collection<? extends GrantedAuthority> getAuthorities(String token) {
+        Claims claims = parseClaims(token);
+        List<String> roles = claims.get("roles", List.class);
+        
+        if (roles == null) {
+            return List.of(); 
+        }
+        
+        return roles.stream()
+                .map(SimpleGrantedAuthority::new)
+                .collect(Collectors.toList());
+    }
+
     public boolean validateToken(String token) {
         try {
             Jwts.parser()

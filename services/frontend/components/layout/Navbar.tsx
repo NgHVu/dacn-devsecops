@@ -3,9 +3,9 @@
 import React from "react"; 
 import Link from "next/link";
 import { useRouter } from "next/navigation"; 
-import { ShoppingCart, User, LogOut } from "lucide-react"; 
+import { ShoppingCart, User, LogOut, LayoutDashboard } from "lucide-react"; // <-- Thêm icon LayoutDashboard
 import { Button } from "@/components/ui/button";
-import { ModeToggle } from "@/components/layout/mode-toggle";
+import { ModeToggle } from "@/components/layout/mode-toggle"; 
 import { useAuth } from "@/context/AuthContext"; 
 import { useCart } from "@/context/CartContext"; 
 import { Badge } from "@/components/ui/badge";
@@ -21,13 +21,11 @@ import {
 import {
   Avatar,
   AvatarFallback,
-  AvatarImage,
 } from "@/components/ui/avatar";
 
 export default function Navbar() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
-  
   const { totalItems } = useCart();
 
   const getInitials = (name: string | undefined) => {
@@ -53,33 +51,33 @@ export default function Navbar() {
             FoodApp
           </Link>
           <div className="hidden md:flex md:gap-4">
-            {/* Sửa: Dùng Link component "sạch" hơn cho Trang chủ */}
             <Button variant="ghost" asChild>
               <Link href="/">Sản Phẩm</Link> 
             </Button>
             <Button variant="ghost" asChild>
               <Link href="/orders">Đơn Hàng</Link>
             </Button>
+            
+            {isAuthenticated && user?.role === "ROLE_ADMIN" && (
+               <Button variant="ghost" asChild className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                 <Link href="/admin/products">
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    Quản lý
+                 </Link>
+               </Button>
+            )}
+
           </div>
         </div>
 
         <div className="flex items-center gap-4">
           
-          <Button 
-            variant="outline" 
-            size="icon" 
-            asChild 
-            className="relative" 
-          >
+          <Button variant="outline" size="icon" asChild className="relative">
             <Link href="/cart">
               <ShoppingCart className="h-5 w-5" />
               <span className="sr-only">Giỏ hàng</span>
-
               {totalItems > 0 && (
-                <Badge 
-                  variant="destructive" 
-                  className="absolute -top-2 -right-2 h-5 w-5 justify-center rounded-full p-0 text-xs"
-                >
+                <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 justify-center rounded-full p-0 text-xs">
                   {totalItems}
                 </Badge>
               )}
@@ -106,9 +104,25 @@ export default function Navbar() {
                     <p className="text-xs leading-none text-muted-foreground">
                       {user?.email}
                     </p>
+                    <p className="text-xs font-bold text-blue-500 mt-1">
+                      {user?.role}
+                    </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                
+                {user?.role === "ROLE_ADMIN" && (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/products" className="text-red-600 focus:text-red-600">
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        <span>Trang Quản trị</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+
                 <DropdownMenuItem asChild>
                   <Link href="/profile">
                     <User className="mr-2 h-4 w-4" />

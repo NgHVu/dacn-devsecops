@@ -6,12 +6,13 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import java.util.List;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.OffsetDateTime;
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.Collections;
 
 @Getter
 @Setter
@@ -29,7 +30,6 @@ public class User implements UserDetails {
     @Column(nullable = false, unique = true)
     private String email;
 
-    // JsonIgnore để không trả về password trong các response API
     @JsonIgnore
     @Column(nullable = false)
     private String password;
@@ -37,7 +37,6 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String name; 
 
-    // Thêm các trường auditing để ghi vết thời gian
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -47,26 +46,29 @@ public class User implements UserDetails {
     private OffsetDateTime updatedAt;
 
     @Column(name = "verification_otp")
-    private String verificationOtp; // Mã OTP
+    private String verificationOtp; 
 
     @Column(name = "otp_generated_time")
-    private LocalDateTime otpGeneratedTime; // Thời gian tạo OTP (để check hết hạn)
+    private LocalDateTime otpGeneratedTime; 
 
     @Column(name = "is_verified", columnDefinition = "boolean default false")
-    @Builder.Default // Đảm bảo giá trị mặc định khi dùng @Builder
-    private boolean isVerified = false; // Mặc định là CHƯA xác thực
+    @Builder.Default 
+    private boolean isVerified = false; 
 
-    // Thêm 2 cột vào database lưu token reset và thời gian hết hạn
     @Column(name = "reset_password_token")
     private String resetPasswordToken;
 
     @Column(name = "reset_token_expiry")
     private LocalDateTime resetTokenExpiry;
 
-    // --- Các phương thức của UserDetails ---
+    @Enumerated(EnumType.STRING) 
+    @Column(nullable = false)
+    @Builder.Default 
+    private Role role = Role.ROLE_USER; 
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.emptyList();
+        return List.of(new SimpleGrantedAuthority(this.role.name()));
     }
 
     @Override
@@ -91,7 +93,6 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        // Tài khoản chỉ "Enabled" (hoạt động) khi đã được xác thực
         return this.isVerified;
     }
 

@@ -9,9 +9,13 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'placehold.co',
       },
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
     ],
   },
-  
+
   async rewrites() {
     return [
       // Điều hướng /api/auth/** -> users-service (Port 8082)
@@ -21,19 +25,19 @@ const nextConfig: NextConfig = {
       },
       // Điều hướng /api/users/** -> users-service (Port 8082)
       {
-        source: '/api/users/:path*', 
+        source: '/api/users/:path*',
         destination: 'http://localhost:8082/api/users/:path*',
       },
-      
+
       // Điều hướng /api/products/** -> products-service (Port 8081)
       {
         source: '/api/products/:path*',
         destination: 'http://localhost:8081/api/products/:path*',
       },
-      
+
       // Điều hướng /api/orders/** -> orders-service (Port 8083)
       {
-        source: '/api/orders/:path*', 
+        source: '/api/orders/:path*',
         destination: 'http://localhost:8083/api/v1/orders/:path*',
       },
     ];
