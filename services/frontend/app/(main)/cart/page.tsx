@@ -21,11 +21,11 @@ import { Separator } from "@/components/ui/separator";
 import { ShoppingCart, Loader2, PackageOpen } from "lucide-react"; 
 import { CartItemRow } from "@/components/cart/CartItemRow";
 import { formatPrice } from "@/lib/utils";
-import { CartItemSkeleton } from "@/components/skeletons/CartItemSkeleton"; // Import Skeleton
+import { CartItemSkeleton } from "@/components/skeletons/CartItemSkeleton"; 
 
 export default function CartPage() {
   const { items, totalItems, totalPrice, clearCart } = useCart();
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuth(); // Lấy thêm isLoading của Auth
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth(); 
   const router = useRouter(); 
   
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false); 
@@ -85,6 +85,10 @@ export default function CartPage() {
       items: items.map(item => ({
         productId: item.id,
         quantity: item.quantity,
+        // QUAN TRỌNG: Gửi kèm tên đầy đủ (có option) vào trường note (hoặc description)
+        // cần đảm bảo DTO ở Backend (CreateOrderRequest) có trường 'note' hoặc tương tự
+        // Nếu Backend chưa có, hãy vào types/order.ts thêm 'note?: string' để không bị lỗi TS
+        note: item.name 
       })),
     };
 
@@ -124,7 +128,8 @@ export default function CartPage() {
         <div className="lg:col-span-2">
           <div className="flex flex-col space-y-4">
             {items.map((item) => (
-              <CartItemRow key={item.id} item={item} />
+              // === [FIX] Dùng uniqueKey làm key ===
+              <CartItemRow key={item.uniqueKey} item={item} />
             ))}
           </div>
         </div>

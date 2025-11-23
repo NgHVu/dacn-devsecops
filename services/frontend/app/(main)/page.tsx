@@ -13,11 +13,13 @@ import { FadeIn } from "@/components/animations/FadeIn";
 export const dynamic = 'force-dynamic';
 
 interface HomePageProps {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export default async function HomePage({ searchParams }: HomePageProps) {
-  const pageParam = searchParams?.page;
+  const resolvedSearchParams = await searchParams;
+  const pageParam = resolvedSearchParams?.page;
+
   const urlPage = typeof pageParam === 'string' ? parseInt(pageParam) : 1;
   const backendPage = urlPage > 0 ? urlPage - 1 : 0;
   const PAGE_SIZE = 12;
@@ -45,7 +47,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   if (error) {
     return (
       <div className="container py-8">
-        <Alert variant="destructive">...</Alert> 
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Đã xảy ra lỗi</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -65,7 +71,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </FadeIn>
       )}
 
-      <div id="products">
+      <div id="products" className="scroll-mt-20">
         <FadeIn delay={0.3}>
           <h2 className="text-3xl font-bold mb-6 flex items-center">
             Món Ngon Hôm Nay
@@ -81,14 +87,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {products.map((product, index) => (
-                <FadeIn key={product.id} delay={index * 0.05}> 
+                <FadeIn key={product.id} delay={index * 0.05}>
                   <ProductCard product={product} />
                 </FadeIn>
               ))}
             </div>
 
             {totalPages > 1 && (
-              <div className="mt-12 border-t pt-8">
+              <div className="mt-12 border-t pt-8 flex justify-center">
                 <PaginationUrlControl 
                   currentPage={backendPage} 
                   totalPages={totalPages} 

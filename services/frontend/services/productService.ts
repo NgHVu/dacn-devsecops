@@ -31,6 +31,11 @@ const getProducts = async (
   return response.data;
 };
 
+const getProductById = async (id: number): Promise<Product> => {
+  const response = await apiClient.get<Product>(`/api/products/${id}`);
+  return response.data;
+};
+
 const createProduct = async (
   data: CreateProductRequest
 ): Promise<Product> => {
@@ -50,9 +55,22 @@ const deleteProduct = async (id: number): Promise<void> => {
   await apiClient.delete(`/api/products/${id}`);
 };
 
+const uploadImage = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  
+  const response = await apiClient.post<string>("/api/products/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+  });
+  
+  return response.data;
+};
+
 export const productService = {
   getProducts,
+  getProductById, 
   createProduct,
   updateProduct,
   deleteProduct,
+  uploadImage,    
 };
