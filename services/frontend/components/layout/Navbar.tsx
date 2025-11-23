@@ -3,7 +3,7 @@
 import React from "react"; 
 import Link from "next/link";
 import { useRouter } from "next/navigation"; 
-import { ShoppingCart, User, LogOut, LayoutDashboard } from "lucide-react"; // <-- Thêm icon LayoutDashboard
+import { ShoppingCart, User, LogOut, LayoutDashboard } from "lucide-react"; 
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/layout/mode-toggle"; 
 import { useAuth } from "@/context/AuthContext"; 
@@ -43,7 +43,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="border-b bg-background">
+    <nav className="fixed top-0 left-0 z-50 w-full border-b bg-background">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
         
         <div className="flex items-center gap-6">
