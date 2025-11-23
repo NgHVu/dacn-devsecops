@@ -70,8 +70,11 @@ public class SecurityConfig {
                             "/api/auth/validate-reset-token"
                         ).permitAll()
 
+                        .requestMatchers("/api/internal/**").permitAll()
+
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
+                        
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

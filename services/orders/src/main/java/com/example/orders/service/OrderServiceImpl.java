@@ -1,12 +1,6 @@
 package com.example.orders.service;
 
-import com.example.orders.dto.ProductDto;
-import com.example.orders.dto.UserDto;
-import com.example.orders.dto.OrderCreateRequest;
-import com.example.orders.dto.OrderItemRequest;
-import com.example.orders.dto.OrderItemResponse;
-import com.example.orders.dto.OrderResponse;
-
+import com.example.orders.dto.*;
 import com.example.orders.entity.Order;
 import com.example.orders.entity.OrderItem;
 import com.example.orders.entity.OrderStatus;
@@ -29,101 +23,90 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Implementation (hiện thực) của {@link OrderService}.
- * Chứa logic nghiệp vụ chính, bao gồm cả việc gọi API
- * sang các service khác (Users, Products).
- */
 @Service
-@RequiredArgsConstructor 
-@Slf4j 
-@Transactional 
+@RequiredArgsConstructor
+@Slf4j
+@Transactional
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final UserServiceClient userServiceClient;
     private final ProductServiceClient productServiceClient;
 
-    /**
-     * {@inheritDoc}
-     */
+    private void triggerEmailNotification(Order order, String token) {
+        try {
+            List<SendOrderEmailRequest.OrderItemDto> itemDtos = order.getItems().stream()
+                .map(item -> new SendOrderEmailRequest.OrderItemDto(
+                        item.getProductName(), 
+                        item.getQuantity(), 
+                        item.getPrice()))
+                .collect(Collectors.toList());
+
+            SendOrderEmailRequest emailRequest = SendOrderEmailRequest.builder()
+                    .userId(order.getUserId())
+                    .orderId(order.getId())
+                    .status(order.getStatus().name())
+                    .totalAmount(order.getTotalAmount())
+                    .items(itemDtos)
+                    .build();
+
+            userServiceClient.sendOrderNotification(emailRequest, token);
+        } catch (Exception e) {
+            log.error("Lỗi khi tạo request gửi mail: {}", e.getMessage());
+        }
+    }
+
     @Override
-    @Transactional 
+    @Transactional
     public OrderResponse createOrder(OrderCreateRequest orderRequest, String bearerToken) {
         log.info("Bắt đầu xử lý tạo đơn hàng mới...");
 
-        // --- 1. Lấy thông tin người dùng từ User Service (dùng /me) ---
-        // Lấy thông tin xác thực (đã được JwtAuthenticationFilter xử lý)
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getName() == null) {
-            log.warn("Không thể lấy thông tin xác thực từ Security Context.");
             throw new BadCredentialsException("Không có thông tin xác thực hợp lệ.");
         }
-        String userEmail = authentication.getName(); // Email từ token
-        log.info("Đã xác thực người dùng với email: {}", userEmail);
-
-        // Gọi UserServiceClient (đã được cấu hình WebClient)
-        // Service này sẽ gọi đến GET /api/users/me của User Service
+        
         UserDto userDto = userServiceClient.getCurrentUser(bearerToken);
         if (userDto == null || userDto.id() == null) {
              throw new IllegalStateException("Không thể lấy được ID người dùng từ User Service.");
         }
-        Long userId = userDto.id(); // Lấy userId thật
-        log.info("Lấy được userId thật: {}", userId);
+        Long userId = userDto.id();
 
-        // --- 2. Lấy thông tin sản phẩm từ Products Service ---
         Set<Long> productIds = orderRequest.items().stream()
                 .map(OrderItemRequest::productId)
                 .collect(Collectors.toSet());
-        log.info("Danh sách productId cần kiểm tra: {}", productIds);
 
         if (productIds.isEmpty()) {
             throw new IllegalArgumentException("Đơn hàng phải có ít nhất một sản phẩm.");
         }
 
-        // Gọi ProductServiceClient (đã được cấu hình WebClient)
         List<ProductDto> productDtos = productServiceClient.getProductsByIds(productIds, bearerToken);
 
-        // Client đã xử lý lỗi 4xx, 5xx. Ở đây ta kiểm tra logic nghiệp vụ.
         if (productDtos.size() != productIds.size()) {
-             log.warn("Số lượng sản phẩm trả về ({}) không khớp số lượng yêu cầu ({})", productDtos.size(), productIds.size());
-             throw new IllegalArgumentException("Không thể lấy thông tin đầy đủ cho tất cả sản phẩm được yêu cầu. Một số sản phẩm có thể không tồn tại.");
+             throw new IllegalArgumentException("Một số sản phẩm không tồn tại hoặc không thể lấy thông tin.");
         }
-        log.info("Lấy được thông tin {} sản phẩm.", productDtos.size());
 
-        // Chuyển sang Map để tra cứu thông tin (bao gồm tên và giá)
         Map<Long, ProductDto> productMap = productDtos.stream()
                 .collect(Collectors.toMap(ProductDto::id, dto -> dto));
 
-        // --- 3. Tạo đối tượng Order và OrderItem ---
         Order order = Order.builder()
-                .userId(userId) // Sử dụng userId thật
-                .status(OrderStatus.PENDING) // Trạng thái ban đầu
-                .build(); // totalAmount sẽ được tính và set sau
+                .userId(userId)
+                .status(OrderStatus.PENDING)
+                .build();
 
         BigDecimal totalAmount = BigDecimal.ZERO;
 
         for (OrderItemRequest itemRequest : orderRequest.items()) {
-            // Validation số lượng
             if (itemRequest.quantity() <= 0) {
-                log.warn("Số lượng không hợp lệ cho productId {}: {}", itemRequest.productId(), itemRequest.quantity());
-                throw new IllegalArgumentException("Số lượng sản phẩm " + itemRequest.productId() + " phải lớn hơn 0.");
+                throw new IllegalArgumentException("Số lượng sản phẩm phải lớn hơn 0.");
             }
 
             Long productId = itemRequest.productId();
             ProductDto product = productMap.get(productId);
             
-            // Lấy thông tin snapshot
             BigDecimal price = product.price();
             String name = product.name();
 
-            // Validation giá
-            if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
-                log.error("Giá sản phẩm không hợp lệ cho productId {}: {}", productId, price);
-                throw new IllegalStateException("Lỗi dữ liệu: Giá sản phẩm " + productId + " không hợp lệ.");
-            }
-
-            // Tạo OrderItem với thông tin snapshot
             OrderItem orderItem = OrderItem.builder()
                     .productId(productId)
                     .productName(name)
@@ -131,110 +114,112 @@ public class OrderServiceImpl implements OrderService {
                     .price(price) 
                     .build();
             
-            order.addItem(orderItem); // Thêm item vào order (và set quan hệ 2 chiều)
-
-            // Cộng dồn tổng tiền
+            order.addItem(orderItem);
             totalAmount = totalAmount.add(price.multiply(BigDecimal.valueOf(itemRequest.quantity())));
         }
 
-        // Validation tổng tiền
-        if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
-            log.error("Tổng tiền không hợp lệ: {}", totalAmount);
-            throw new IllegalStateException("Lỗi tính toán: Tổng tiền đơn hàng không thể âm.");
-        }
         order.setTotalAmount(totalAmount);
-        log.info("Tổng tiền đơn hàng được tính toán: {}", totalAmount);
 
-        // --- 4. Lưu vào CSDL (do cascade = CascadeType.ALL, OrderItems sẽ tự động được lưu) ---
         Order savedOrder = orderRepository.save(order);
         log.info("Đã lưu đơn hàng thành công với ID: {}", savedOrder.getId());
 
-        // --- 5. Chuyển đổi sang DTO để trả về ---
+        triggerEmailNotification(savedOrder, bearerToken);
+
         return mapOrderToOrderResponse(savedOrder);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    @Transactional(readOnly = true) // Giao dịch chỉ đọc (tối ưu hiệu năng)
+    @Transactional(readOnly = true)
     public Page<OrderResponse> getOrders(String userEmail, String bearerToken, Pageable pageable) {
-        log.info("Lấy danh sách đơn hàng cho email: {} với pageable: {}", userEmail, pageable);
-
-        // 1. Lấy userId từ UserServiceClient (để đảm bảo user là chính chủ)
         UserDto userDto = userServiceClient.getCurrentUser(bearerToken);
-        Long userId = userDto.id();
-        log.info("Lấy được userId: {} cho email: {}", userId, userEmail);
-
-        // 2. Gọi Repository với userId
-        Page<Order> orderPage = orderRepository.findByUserId(userId, pageable);
-        log.info("Tìm thấy {} đơn hàng trên trang này (tổng cộng {} đơn hàng)",
-                 orderPage.getNumberOfElements(), orderPage.getTotalElements());
-
-        // 3. Map kết quả Page<Order> sang Page<OrderResponse>
-        return orderPage.map(this::mapOrderToOrderResponse);
+        return orderRepository.findByUserId(userDto.id(), pageable).map(this::mapOrderToOrderResponse);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     @Transactional(readOnly = true)
     public OrderResponse getOrderById(Long orderId, String userEmail, String bearerToken) {
-        log.info("Lấy chi tiết đơn hàng ID: {} cho email: {}", orderId, userEmail);
-
-        // 1. Lấy userId từ UserServiceClient
         UserDto userDto = userServiceClient.getCurrentUser(bearerToken);
-        Long userId = userDto.id();
-        log.info("Lấy được userId: {} cho email: {}", userId, userEmail);
+        Order order = orderRepository.findByIdAndUserId(orderId, userDto.id())
+                .orElseThrow(() -> new OrderNotFoundException("Không tìm thấy đơn hàng hoặc bạn không có quyền xem."));
 
-        // 2. Gọi Repository với orderId VÀ userId để kiểm tra quyền sở hữu
-        Order order = orderRepository.findByIdAndUserId(orderId, userId)
-                .orElseThrow(() -> {
-                    // Log lý do cụ thể
-                    log.warn("Không tìm thấy đơn hàng ID: {} hoặc không thuộc userId: {} (email: {})", orderId, userId, userEmail);
-                    // Ném lỗi 404
-                    return new OrderNotFoundException("Không tìm thấy đơn hàng hoặc bạn không có quyền xem đơn hàng này.");
-                });
-
-        log.info("Tìm thấy đơn hàng ID: {}", order.getId());
-        // 3. Map kết quả
         return mapOrderToOrderResponse(order);
     }
 
-    /**
-     * Phương thức helper private để chuyển đổi Order (Entity) sang OrderResponse (DTO).
-     * @param order Entity Order cần chuyển đổi.
-     * @return DTO OrderResponse.
-     */
-    private OrderResponse mapOrderToOrderResponse(Order order) {
-        // Kiểm tra đầu vào
-        if (order == null) {
-            return null;
+    @Override
+    @Transactional(readOnly = true)
+    public Page<OrderResponse> getAllOrders(Pageable pageable) {
+        log.info("Admin đang lấy toàn bộ danh sách đơn hàng...");
+        return orderRepository.findAll(pageable).map(this::mapOrderToOrderResponse);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updateOrderStatus(Long orderId, OrderStatusUpdate statusUpdate) {
+        log.info("Admin yêu cầu cập nhật trạng thái đơn hàng ID: {}", orderId);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
+
+        OrderStatus newStatus;
+        try {
+            if (statusUpdate.getStatus() == null) throw new IllegalArgumentException("Status không được null");
+            newStatus = OrderStatus.valueOf(statusUpdate.getStatus().trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Trạng thái không hợp lệ: " + statusUpdate.getStatus());
         }
 
-        List<OrderItemResponse> itemResponses;
-        if (order.getItems() != null) {
-            itemResponses = order.getItems().stream()
+        validateStatusTransition(order.getStatus(), newStatus);
+
+        log.info("Chuyển đổi trạng thái đơn hàng {}: {} -> {}", orderId, order.getStatus(), newStatus);
+        order.setStatus(newStatus);
+        Order savedOrder = orderRepository.save(order);
+
+        triggerEmailNotification(savedOrder, "");
+
+        return mapOrderToOrderResponse(savedOrder);
+    }
+
+    private void validateStatusTransition(OrderStatus currentStatus, OrderStatus newStatus) {
+        if (currentStatus == newStatus) return;
+        if (currentStatus == OrderStatus.DELIVERED || currentStatus == OrderStatus.CANCELLED) {
+            throw new IllegalStateException("Không thể cập nhật đơn hàng đã hoàn tất.");
+        }
+        
+        if (currentStatus == OrderStatus.PENDING && 
+           (newStatus != OrderStatus.CONFIRMED && newStatus != OrderStatus.CANCELLED)) {
+             throw new IllegalStateException("PENDING chỉ có thể sang CONFIRMED hoặc CANCELLED");
+        }
+        if (currentStatus == OrderStatus.CONFIRMED && 
+           (newStatus != OrderStatus.SHIPPING && newStatus != OrderStatus.CANCELLED)) {
+             throw new IllegalStateException("CONFIRMED chỉ có thể sang SHIPPING hoặc CANCELLED");
+        }
+        if (currentStatus == OrderStatus.SHIPPING && 
+           (newStatus != OrderStatus.DELIVERED && newStatus != OrderStatus.CANCELLED)) {
+             throw new IllegalStateException("SHIPPING chỉ có thể sang DELIVERED hoặc CANCELLED");
+        }
+    }
+
+    private OrderResponse mapOrderToOrderResponse(Order order) {
+        if (order == null) return null;
+
+        List<OrderItemResponse> itemResponses = (order.getItems() != null) 
+                ? order.getItems().stream()
                     .map(item -> new OrderItemResponse(
                             item.getId(),
                             item.getProductId(),
                             item.getProductName(),
                             item.getQuantity(),
                             item.getPrice()))
-                    .collect(Collectors.toList());
-        } else {
-            itemResponses = List.of(); // Trả về list rỗng nếu items là null
-        }
+                    .collect(Collectors.toList())
+                : List.of();
 
         return new OrderResponse(
                 order.getId(),
                 order.getUserId(),
-                order.getStatus() != null ? order.getStatus().name() : null, // Kiểm tra status null
+                order.getStatus() != null ? order.getStatus().name() : null,
                 order.getTotalAmount(),
                 itemResponses,
                 order.getCreatedAt(),
                 order.getUpdatedAt());
     }
 }
-

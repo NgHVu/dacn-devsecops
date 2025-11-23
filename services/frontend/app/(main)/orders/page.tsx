@@ -1,17 +1,26 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { orderService } from '@/services/orderService';
-import { type Order, type PageableResponse } from '@/types/order'; 
-import { OrderCard } from '@/components/orders/OrderCard';
-import { Loader2, AlertTriangle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { isAxiosError } from 'axios';
-import { toast } from 'sonner';
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { orderService } from "@/services/orderService";
+import { type Order } from "@/types/order";
+import { UserOrderStatusBadge } from "@/components/orders/UserOrderStatusBadge";
+import { formatPrice } from "@/lib/utils";
+import { Loader2, PackageOpen, ShoppingBag, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { isAxiosError } from "axios";
+import { toast } from "sonner";
 
-export default function OrdersPage() {
+export default function OrderHistoryPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,27 +32,19 @@ export default function OrdersPage() {
         setIsLoading(true);
         setError(null);
         
-        const myOrdersResponse = await orderService.getMyOrders();
-        
-        const ordersArray = myOrdersResponse.content;
-
-        const sortedOrders = ordersArray.sort((a, b) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-        
-        setOrders(sortedOrders); 
+        const data = await orderService.getMyOrders(0, 20);
+        setOrders(data.content);
 
       } catch (err) {
-        console.error("Lỗi khi tải Lịch sử Đơn hàng:", err);
+        console.error("Lỗi tải lịch sử:", err);
         
         if (isAxiosError(err) && err.response?.status === 401) {
-          toast.error("Vui lòng đăng nhập để xem đơn hàng.");
+          toast.error("Phiên đăng nhập hết hạn.");
           router.push("/login?redirect=/orders");
           return;
         }
         
-        setError("Không thể tải lịch sử đơn hàng. Vui lòng thử lại.");
-        
+        setError("Không thể tải lịch sử đơn hàng.");
       } finally {
         setIsLoading(false);
       }
@@ -52,49 +53,94 @@ export default function OrdersPage() {
     fetchOrders();
   }, [router]);
 
+  const formatDate = (dateString: string) => {
+    return new Intl.DateTimeFormat("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      timeZone: "Asia/Ho_Chi_Minh",
+    }).format(new Date(dateString));
+  };
+
   if (isLoading) {
     return (
-      <div className="container flex flex-1 items-center justify-center py-24">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <div className="container py-24 flex justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="container flex flex-col items-center justify-center py-24 text-center text-red-500">
-        <AlertTriangle className="h-12 w-12" />
-        <p className="mt-4 text-xl font-semibold">{error}</p>
-        <Button onClick={() => window.location.reload()} className="mt-4">
-          Thử lại
-        </Button>
-      </div>
-    );
-  }
-
-  if (!isLoading && !error && orders.length === 0) {
-    return (
-      <div className="container flex flex-col items-center justify-center py-24 text-center">
-        <h2 className="text-2xl font-bold">Bạn chưa có đơn hàng nào</h2>
-        <p className="mt-2 text-muted-foreground">
-          Tất cả đơn hàng của bạn sẽ xuất hiện tại đây.
-        </p>
-        <Button asChild className="mt-6">
-          <Link href="/">Bắt đầu mua sắm</Link>
-        </Button>
+      <div className="container py-24 flex flex-col items-center text-center text-red-500">
+        <AlertTriangle className="h-12 w-12 mb-4" />
+        <p className="text-lg font-medium">{error}</p>
+        <Button onClick={() => window.location.reload()} className="mt-4">Thử lại</Button>
       </div>
     );
   }
 
   return (
-    <div className="container py-8">
-      <h1 className="text-3xl font-bold mb-6">Lịch sử Đơn hàng</h1>
-      
-      <div className="space-y-6">
-        {orders.map((order) => (
-          <OrderCard key={order.id} order={order} />
-        ))}
+    <div className="container py-10 max-w-5xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <ShoppingBag className="h-8 w-8" />
+          Quản lý Đơn hàng
+        </h1>
+        <p className="text-muted-foreground mt-1">Theo dõi và xử lý trạng thái các đơn hàng trong hệ thống.</p>
       </div>
+
+      {orders.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-lg bg-muted/30">
+          <PackageOpen className="h-16 w-16 text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold text-muted-foreground">Bạn chưa có đơn hàng nào</h2>
+          <Button asChild className="mt-6">
+            <Link href="/">Bắt đầu mua sắm</Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
+          <Table>
+            <TableHeader className="bg-gray-50/50">
+              <TableRow>
+                <TableHead className="w-[80px] font-semibold">Mã đơn</TableHead>
+                <TableHead className="font-semibold">Khách hàng (ID)</TableHead>
+                <TableHead className="font-semibold">Ngày đặt</TableHead>
+                <TableHead className="font-semibold text-right">Tổng tiền</TableHead>
+                <TableHead className="font-semibold text-center">Trạng thái</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {orders.map((order) => (
+                <TableRow key={order.id} className="hover:bg-gray-50/50 h-16">
+                  <TableCell className="font-medium">#{order.id}</TableCell>
+                  
+                  <TableCell>
+                    <div className="flex flex-col">
+                       <span className="font-medium text-sm">User #{order.userId}</span>
+                       <span className="text-xs text-muted-foreground">{order.items.length} món</span>
+                    </div>
+                  </TableCell>
+
+                  <TableCell className="text-sm text-muted-foreground">
+                    {formatDate(order.createdAt)}
+                  </TableCell>
+
+                  <TableCell className="text-right font-bold text-green-600 text-base">
+                    {formatPrice(order.totalAmount)}
+                  </TableCell>
+
+                  <TableCell className="text-center">
+                    <UserOrderStatusBadge status={order.status} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }

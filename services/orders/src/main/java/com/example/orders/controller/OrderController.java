@@ -2,6 +2,7 @@ package com.example.orders.controller;
 
 import com.example.orders.dto.OrderCreateRequest;
 import com.example.orders.dto.OrderResponse;
+import com.example.orders.dto.OrderStatusUpdate;
 import com.example.orders.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,14 +16,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.data.domain.Sort;
 
-@Tag(name = "Order Controller", description = "APIs để quản lý đơn hàng")
+@Tag(name = "Order Controller", description = "APIs quản lý đơn hàng (User & Admin)")
 @RestController
 @RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
@@ -31,68 +33,61 @@ public class OrderController {
 
     private final OrderService orderService;
 
-    @Operation(
-            summary = "Tạo một đơn hàng mới",
-            description = "Tạo một đơn hàng mới từ giỏ hàng. Yêu cầu xác thực.",
-            security = @SecurityRequirement(name = "bearerAuth")
-    )
-    @ApiResponse(responseCode = "201", description = "Tạo đơn hàng thành công",
-            content = @Content(mediaType = "application/json", schema = @Schema(implementation = OrderResponse.class)))
-    @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ (ví dụ: số lượng < 1)", content = @Content)
-    @ApiResponse(responseCode = "401", description = "Chưa xác thực hoặc token không hợp lệ", content = @Content)
-    @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm hoặc người dùng", content = @Content)
+    @Operation(summary = "Tạo đơn hàng mới", security = @SecurityRequirement(name = "bearerAuth"))
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(
             @Valid @RequestBody OrderCreateRequest orderRequest,
-            @Parameter(hidden = true)
-            @RequestHeader("Authorization") String bearerToken) {
-
-        log.info("Nhận được yêu cầu tạo đơn hàng...");
-        OrderResponse createdOrder = orderService.createOrder(orderRequest, bearerToken);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdOrder);
+            @Parameter(hidden = true) @RequestHeader("Authorization") String bearerToken) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(orderService.createOrder(orderRequest, bearerToken));
     }
 
-    @Operation(
-            summary = "Lấy lịch sử đơn hàng của người dùng hiện tại",
-            description = "Trả về danh sách đơn hàng (có phân trang) của người dùng đã xác thực.",
-            security = @SecurityRequirement(name = "bearerAuth")
-    )
-    @ApiResponse(responseCode = "200", description = "Lấy danh sách thành công",
-            content = @Content(mediaType = "application/json", schema = @Schema(implementation = Page.class)))
-    @ApiResponse(responseCode = "401", description = "Chưa xác thực", content = @Content)
+    @Operation(summary = "Lịch sử đơn hàng của tôi", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/my")
     public ResponseEntity<Page<OrderResponse>> getMyOrders(
-            @Parameter(hidden = true)
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
             Authentication authentication,
             @Parameter(hidden = true) @RequestHeader("Authorization") String bearerToken) {
+        return ResponseEntity.ok(orderService.getOrders(authentication.getName(), bearerToken, pageable));
+    }
 
-        String userEmail = authentication.getName();
-        log.info("Lấy lịch sử đơn hàng cho user email: {}", userEmail);
-
-        Page<OrderResponse> ordersPage = orderService.getOrders(userEmail, bearerToken, pageable);
-        return ResponseEntity.ok(ordersPage);
+    @Operation(summary = "Chi tiết đơn hàng", security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/{orderId}")
+    public ResponseEntity<OrderResponse> getOrderById(
+            @PathVariable Long orderId,
+            Authentication authentication,
+            @Parameter(hidden = true) @RequestHeader("Authorization") String bearerToken) {
+        return ResponseEntity.ok(orderService.getOrderById(orderId, authentication.getName(), bearerToken));
     }
 
     @Operation(
-            summary = "Lấy chi tiết một đơn hàng cụ thể",
-            description = "Trả về chi tiết của một đơn hàng theo ID. Chỉ chủ sở hữu mới có quyền xem.",
+            summary = "[ADMIN] Lấy tất cả đơn hàng",
+            description = "Lấy danh sách toàn bộ đơn hàng trong hệ thống. Chỉ Admin mới được gọi.",
             security = @SecurityRequirement(name = "bearerAuth")
     )
-    @ApiResponse(responseCode = "200", description = "Tìm thấy đơn hàng",
-            content = @Content(mediaType = "application/json", schema = @Schema(implementation = OrderResponse.class)))
-    @ApiResponse(responseCode = "401", description = "Chưa xác thực", content = @Content)
-    @ApiResponse(responseCode = "404", description = "Không tìm thấy đơn hàng hoặc không có quyền xem", content = @Content)
-    @GetMapping("/{orderId}")
-    public ResponseEntity<OrderResponse> getOrderById(
-            @Parameter(description = "ID của đơn hàng cần xem") @PathVariable Long orderId,
-            Authentication authentication,
-            @Parameter(hidden = true) @RequestHeader("Authorization") String bearerToken) {
+    @ApiResponse(responseCode = "200", description = "Thành công")
+    @ApiResponse(responseCode = "403", description = "Không có quyền Admin")
+    @GetMapping
+    public ResponseEntity<Page<OrderResponse>> getAllOrders(
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        
+        log.info("Admin đang lấy danh sách toàn bộ đơn hàng...");
+        return ResponseEntity.ok(orderService.getAllOrders(pageable));
+    }
 
-        String userEmail = authentication.getName();
-        log.info("Lấy chi tiết đơn hàng ID: {} cho user email: {}", orderId, userEmail);
-
-        OrderResponse order = orderService.getOrderById(orderId, userEmail, bearerToken);
-        return ResponseEntity.ok(order);
+    @Operation(
+            summary = "[ADMIN] Cập nhật trạng thái đơn hàng",
+            description = "Chuyển trạng thái đơn hàng (VD: PENDING -> CONFIRMED). Có kiểm tra luồng hợp lệ.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponse(responseCode = "200", description = "Cập nhật thành công")
+    @ApiResponse(responseCode = "400", description = "Trạng thái không hợp lệ hoặc vi phạm luồng")
+    @PatchMapping("/{orderId}/status")
+    public ResponseEntity<OrderResponse> updateOrderStatus(
+            @PathVariable Long orderId,
+            @Valid @RequestBody OrderStatusUpdate statusUpdate) {
+        
+        log.info("Admin cập nhật đơn hàng ID: {} sang trạng thái: {}", orderId, statusUpdate.getStatus());
+        return ResponseEntity.ok(orderService.updateOrderStatus(orderId, statusUpdate));
     }
 }

@@ -104,6 +104,10 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
         <!-- Dành cho Test: Cung cấp một database H2 in-memory -->
         <dependency>
             <groupId>com.h2database</groupId>
@@ -114,7 +118,6 @@
 
     <build>
         <plugins>
-            <!-- Bắt buộc JDK >= 21 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
@@ -135,7 +138,7 @@
                 </executions>
             </plugin>
 
-            <!-- Khai báo tường minh cho Compiler -->
+            <!-- Compiler -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -145,7 +148,7 @@
                 </configuration>
             </plugin>
 
-            <!-- Khai báo tường minh cho Surefire (chạy unit test) -->
+            <!-- Surefire (chạy unit test) -->
              <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>

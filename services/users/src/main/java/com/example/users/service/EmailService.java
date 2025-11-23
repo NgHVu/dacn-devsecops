@@ -1,21 +1,22 @@
 package com.example.users.service;
 
+import com.example.users.dto.SendOrderEmailRequest; 
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import java.io.UnsupportedEncodingException;
-
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.context.Context;
+import org.thymeleaf.spring6.SpringTemplateEngine;
 
-import org.springframework.mail.MailException; 
-
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +24,7 @@ import jakarta.mail.internet.MimeMessage;
 public class EmailService {
 
     private final JavaMailSender mailSender;
+    private final SpringTemplateEngine templateEngine;
 
     @Value("${spring.mail.username}")
     private String senderEmail;
@@ -79,6 +81,48 @@ public class EmailService {
         
         } catch (MessagingException | UnsupportedEncodingException | MailException e) { 
             log.error("Lỗi khi gửi email reset mật khẩu đến {}: {}", userEmail, e.getMessage());
+        }
+    }
+
+    @Async
+    public void sendOrderNotification(String toEmail, String userName, SendOrderEmailRequest request) {
+        if ("CONFIRMED".equalsIgnoreCase(request.getStatus())) {
+            log.info("Bỏ qua gửi email cho trạng thái CONFIRMED đơn hàng #{}", request.getOrderId());
+            return;
+        }
+
+        try {
+            log.info("Đang chuẩn bị gửi email đơn hàng #{} tới {}", request.getOrderId(), toEmail);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED, StandardCharsets.UTF_8.name());
+
+            Context context = new Context();
+            context.setVariable("userName", userName);
+            context.setVariable("orderId", request.getOrderId());
+            context.setVariable("totalAmount", request.getTotalAmount());
+            context.setVariable("status", request.getStatus());
+            context.setVariable("items", request.getItems());
+
+            String html = "";
+            String subject = "Thông báo đơn hàng #" + request.getOrderId(); 
+
+            if ("PENDING".equalsIgnoreCase(request.getStatus())) {
+                html = templateEngine.process("order-confirmation", context);
+            } else {
+                html = templateEngine.process("order-status-update", context);
+            }
+
+            helper.setTo(toEmail);
+            helper.setFrom(senderEmail, "FoodApp Notifications");
+            helper.setSubject(subject);
+            helper.setText(html, true);
+
+            mailSender.send(message);
+            log.info("Đã gửi email HTML đơn hàng #{} thành công!", request.getOrderId());
+
+        } catch (MessagingException | UnsupportedEncodingException e) {
+            log.error("Lỗi khi gửi email HTML đơn hàng: {}", e.getMessage());
         }
     }
 }

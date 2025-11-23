@@ -1,3 +1,11 @@
+export enum OrderStatus {
+  PENDING = "PENDING",      
+  CONFIRMED = "CONFIRMED",   
+  SHIPPING = "SHIPPING",     
+  DELIVERED = "DELIVERED",  
+  CANCELLED = "CANCELLED",  
+}
+
 export type PageableResponse<T> = {
   content: T[];
   totalPages: number;
@@ -13,6 +21,7 @@ export type CreateOrderItemRequest = {
   productId: number;
   quantity: number;
 };
+
 export type CreateOrderRequest = {
   items: CreateOrderItemRequest[];
 };
@@ -27,9 +36,14 @@ export type OrderItem = {
 
 export type Order = {
   id: number; 
-  userId: string;
+  userId: number; 
   items: OrderItem[];
   totalAmount: number; 
-  status: string;
+  status: OrderStatus;
   createdAt: string;
+  updatedAt: string;
+};
+
+export type OrderStatusUpdate = {
+  status: OrderStatus;
 };

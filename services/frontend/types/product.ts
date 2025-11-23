@@ -18,6 +18,10 @@ export type PageableResponse<T> = {
   totalElements: number;
   size: number;
   number: number;
+
+  last?: boolean;  
+  first?: boolean;
+  empty?: boolean;
 };
 
 export const productSchema = z.object({

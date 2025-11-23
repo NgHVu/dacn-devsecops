@@ -9,9 +9,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
+
 import javax.crypto.SecretKey;
+import java.util.Collection;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 public class JwtTokenProvider {
@@ -51,21 +57,26 @@ public class JwtTokenProvider {
     }
 
     public String getUsernameFromToken(String token) {
-        Claims claims = Jwts.parser()
-                .verifyWith(this.key)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+        return parseClaims(token).getSubject();
+    }
 
-        return claims.getSubject();
+    @SuppressWarnings("unchecked")
+    public Collection<? extends GrantedAuthority> getAuthorities(String token) {
+        Claims claims = parseClaims(token);
+        List<String> roles = claims.get("roles", List.class);
+
+        if (roles == null) {
+            return List.of();
+        }
+
+        return roles.stream()
+                .map(SimpleGrantedAuthority::new)
+                .collect(Collectors.toList());
     }
 
     public boolean validateToken(String token) {
         try {
-            Jwts.parser()
-                    .verifyWith(this.key)
-                    .build()
-                    .parse(token);
+            parseClaims(token);
             return true;
         } catch (SecurityException | MalformedJwtException ex) {
             logger.error("Token JWT không hợp lệ: {}", ex.getMessage());
@@ -77,5 +88,13 @@ public class JwtTokenProvider {
             logger.error("Chuỗi JWT không hợp lệ hoặc rỗng: {}", ex.getMessage());
         }
         return false;
+    }
+
+    private Claims parseClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(this.key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 }

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Cập nhật trạng thái đơn hàng</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; }
+        .container { max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        
+        .header { background-color: #f8f9fa; padding: 20px; text-align: center; border-bottom: 1px solid #eee; }
+        .header h2 { margin: 0; color: #333; font-size: 20px; }
+        
+        .content { padding: 30px 20px; }
+        
+        .status-card { 
+            text-align: center; 
+            padding: 30px 20px; 
+            margin: 25px 0; 
+            border-radius: 8px; 
+            color: white; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .shipping { background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%); } 
+        .cancelled { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); }
+        .delivered { background: linear-gradient(135deg, #28a745 0%, #218838 100%); }
+
+        .status-card h1 { margin: 0 0 10px 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
+        .status-card p { margin: 0; font-size: 16px; opacity: 0.9; }
+        
+        .info-row { text-align: center; margin-top: 20px; font-size: 16px; }
+        .price { color: #d9534f; font-weight: bold; font-size: 18px; }
+        
+        .footer { background-color: #f8f9fa; padding: 15px; text-align: center; font-size: 12px; color: #888; border-top: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Cập Nhật Đơn Hàng #<span th:text="${orderId}"></span></h2>
+        </div>
+        
+        <div class="content">
+            <p>Xin chào <strong th:text="${userName}">Khách hàng</strong>,</p>
+            <p>Trạng thái đơn hàng của bạn vừa được cập nhật:</p>
+
+            <!-- Logic hiển thị màu sắc -->
+            <div th:class="'status-card ' + 
+                (${status} == 'SHIPPING' ? 'shipping' : 
+                (${status} == 'CANCELLED' ? 'cancelled' : 'delivered'))">
+                
+                <!-- 1. ĐANG GIAO -->
+                <div th:if="${status} == 'SHIPPING'">
+                    <h1>ĐANG GIAO HÀNG 🚚</h1>
+                    <p>Shipper đang trên đường đến chỗ bạn. Vui lòng chú ý điện thoại!</p>
+                </div>
+
+                <!-- 2. ĐÃ HỦY -->
+                <div th:if="${status} == 'CANCELLED'">
+                    <h1>ĐÃ BỊ HỦY ❌</h1>
+                    <p>Rất tiếc, đơn hàng đã bị hủy. Vui lòng liên hệ CSKH nếu có thắc mắc.</p>
+                </div>
+
+                <!-- 3. HOÀN THÀNH -->
+                <div th:if="${status} == 'DELIVERED'">
+                    <h1>GIAO HÀNG THÀNH CÔNG ✅</h1>
+                    <p>Cảm ơn bạn đã tin tưởng và mua sắm. Chúc bạn ngon miệng!</p>
+                </div>
+            </div>
+
+            <div class="info-row">
+                Tổng giá trị đơn hàng: <span class="price" th:text="${#numbers.formatDecimal(totalAmount, 0, 'COMMA', 0, 'POINT')} + ' đ'"></span>
+            </div>
+        </div>
+
+        <div class="footer">
+            &copy; 2025 FoodApp Microservices. Đây là email tự động, vui lòng không trả lời.
+        </div>
+    </div>
+</body>
+</html>
