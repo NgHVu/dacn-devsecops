@@ -35,6 +35,9 @@ export const productSchema = z.object({
     .int({ message: "Số lượng phải là số nguyên." })
     .min(0, { message: "Số lượng không thể âm." }),
     
+  categoryId: z.coerce.number()
+    .min(1, { message: "Vui lòng chọn danh mục." }),
+
   image: z.string().trim().url({ message: "Phải là một đường dẫn URL hợp lệ." })
             .or(z.literal("")).optional(), 
 });

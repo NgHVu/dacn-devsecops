@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { orderService } from "@/services/orderService";
 import { type Order } from "@/types/order";
 import { UserOrderStatusBadge } from "@/components/orders/UserOrderStatusBadge";
 import { formatPrice } from "@/lib/utils";
-import { Loader2, PackageOpen, ShoppingBag, AlertTriangle } from "lucide-react";
+import { PackageOpen, ShoppingBag, AlertTriangle } from "lucide-react"; // Bỏ Loader2
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/table";
 import { isAxiosError } from "axios";
 import { toast } from "sonner";
+import { PaginationControl } from "@/components/ui/PaginationControl";
+import { OrderTableSkeleton } from "@/components/skeletons/OrderTableSkeleton"; // Import Mới
 
 export default function OrderHistoryPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -26,32 +28,37 @@ export default function OrderHistoryPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        const data = await orderService.getMyOrders(0, 20);
-        setOrders(data.content);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const PAGE_SIZE = 10;
 
-      } catch (err) {
-        console.error("Lỗi tải lịch sử:", err);
-        
-        if (isAxiosError(err) && err.response?.status === 401) {
-          toast.error("Phiên đăng nhập hết hạn.");
-          router.push("/login?redirect=/orders");
-          return;
-        }
-        
-        setError("Không thể tải lịch sử đơn hàng.");
-      } finally {
-        setIsLoading(false);
+  const fetchOrders = useCallback(async (pageIndex: number) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const data = await orderService.getMyOrders(pageIndex, PAGE_SIZE);
+      
+      setOrders(data.content);
+      setTotalPages(data.totalPages);
+      setCurrentPage(data.number);
+
+    } catch (err) {
+      console.error("Lỗi tải lịch sử:", err);
+      if (isAxiosError(err) && err.response?.status === 401) {
+        toast.error("Phiên đăng nhập hết hạn.");
+        router.push("/login?redirect=/orders");
+        return;
       }
-    };
-
-    fetchOrders();
+      setError("Không thể tải lịch sử đơn hàng.");
+    } finally {
+      setIsLoading(false);
+    }
   }, [router]);
+
+  useEffect(() => {
+    fetchOrders(currentPage);
+  }, [fetchOrders, currentPage]);
 
   const formatDate = (dateString: string) => {
     return new Intl.DateTimeFormat("vi-VN", {
@@ -66,8 +73,14 @@ export default function OrderHistoryPage() {
 
   if (isLoading) {
     return (
-      <div className="container py-24 flex justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <div className="container py-10 max-w-5xl">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <ShoppingBag className="h-8 w-8" />
+            Quản lý Đơn hàng
+          </h1>
+        </div>
+        <OrderTableSkeleton />
       </div>
     );
   }
@@ -77,7 +90,7 @@ export default function OrderHistoryPage() {
       <div className="container py-24 flex flex-col items-center text-center text-red-500">
         <AlertTriangle className="h-12 w-12 mb-4" />
         <p className="text-lg font-medium">{error}</p>
-        <Button onClick={() => window.location.reload()} className="mt-4">Thử lại</Button>
+        <Button onClick={() => fetchOrders(0)} className="mt-4">Thử lại</Button>
       </div>
     );
   }
@@ -101,45 +114,53 @@ export default function OrderHistoryPage() {
           </Button>
         </div>
       ) : (
-        <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
-          <Table>
-            <TableHeader className="bg-gray-50/50">
-              <TableRow>
-                <TableHead className="w-[80px] font-semibold">Mã đơn</TableHead>
-                <TableHead className="font-semibold">Khách hàng (ID)</TableHead>
-                <TableHead className="font-semibold">Ngày đặt</TableHead>
-                <TableHead className="font-semibold text-right">Tổng tiền</TableHead>
-                <TableHead className="font-semibold text-center">Trạng thái</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.map((order) => (
-                <TableRow key={order.id} className="hover:bg-gray-50/50 h-16">
-                  <TableCell className="font-medium">#{order.id}</TableCell>
-                  
-                  <TableCell>
-                    <div className="flex flex-col">
-                       <span className="font-medium text-sm">User #{order.userId}</span>
-                       <span className="text-xs text-muted-foreground">{order.items.length} món</span>
-                    </div>
-                  </TableCell>
-
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(order.createdAt)}
-                  </TableCell>
-
-                  <TableCell className="text-right font-bold text-green-600 text-base">
-                    {formatPrice(order.totalAmount)}
-                  </TableCell>
-
-                  <TableCell className="text-center">
-                    <UserOrderStatusBadge status={order.status} />
-                  </TableCell>
+        <>
+          <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
+            <Table>
+              <TableHeader className="bg-gray-50/50">
+                <TableRow>
+                  <TableHead className="w-[80px] font-semibold">Mã đơn</TableHead>
+                  <TableHead className="font-semibold">Khách hàng (ID)</TableHead>
+                  <TableHead className="font-semibold">Ngày đặt</TableHead>
+                  <TableHead className="font-semibold text-right">Tổng tiền</TableHead>
+                  <TableHead className="font-semibold text-center">Trạng thái</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {orders.map((order) => (
+                  <TableRow key={order.id} className="hover:bg-gray-50/50 h-16">
+                    <TableCell className="font-medium">#{order.id}</TableCell>
+                    
+                    <TableCell>
+                      <div className="flex flex-col">
+                         <span className="font-medium text-sm">User #{order.userId}</span>
+                         <span className="text-xs text-muted-foreground">{order.items.length} món</span>
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDate(order.createdAt)}
+                    </TableCell>
+
+                    <TableCell className="text-right font-bold text-green-600 text-base">
+                      {formatPrice(order.totalAmount)}
+                    </TableCell>
+
+                    <TableCell className="text-center">
+                      <UserOrderStatusBadge status={order.status} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <PaginationControl 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => setCurrentPage(page)}
+          />
+        </>
       )}
     </div>
   );

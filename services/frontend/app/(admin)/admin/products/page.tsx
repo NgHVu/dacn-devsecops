@@ -19,21 +19,31 @@ import Image from "next/image";
 
 import { ProductActions } from "@/components/admin/ProductActions";
 import { ProductFormDialog } from "@/components/admin/ProductFormDialog";
+import { PaginationControl } from "@/components/ui/PaginationControl"; // Import mới
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const PAGE_SIZE = 10; 
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (pageIndex: number) => {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await productService.getProducts({ page: 0, size: 100 });
+      
+      const data = await productService.getProducts({ page: pageIndex, size: PAGE_SIZE });
+      
       setProducts(data.content);
+      setTotalPages(data.totalPages); 
+      setCurrentPage(data.number);    
+      
     } catch (err) {
       console.error("Lỗi khi tải sản phẩm:", err);
       setError("Không thể tải danh sách sản phẩm.");
@@ -44,8 +54,8 @@ export default function AdminProductsPage() {
   }, []);
 
   useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+    fetchProducts(currentPage);
+  }, [fetchProducts, currentPage]);
 
   const handleAddNew = () => {
     setCurrentProduct(null); 
@@ -62,7 +72,7 @@ export default function AdminProductsPage() {
   };
 
   const handleProductSaved = () => {
-    fetchProducts();
+    fetchProducts(currentPage); 
   };
 
   return (
@@ -75,39 +85,35 @@ export default function AdminProductsPage() {
         </Button>
       </div>
 
-      {isLoading && (
+      {isLoading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
-      )}
-
-      {!isLoading && error && (
+      ) : !isLoading && error ? (
         <div className="flex flex-col items-center py-12 text-center text-red-500">
           <AlertTriangle className="h-12 w-12" />
           <p className="mt-4 text-xl font-semibold">{error}</p>
-          <Button onClick={fetchProducts} className="mt-4">
+          <Button onClick={() => fetchProducts(0)} className="mt-4">
             Thử lại
           </Button>
         </div>
-      )}
-
-      {!isLoading && !error && (
+      ) : (
         <>
-          <div className="rounded-md border">
+          <div className="rounded-md border bg-white">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[80px]">Hình ảnh</TableHead>
                   <TableHead>Tên Sản phẩm</TableHead>
                   <TableHead className="text-right">Giá</TableHead>
-                  <TableHead className="text-right">Số lượng Kho</TableHead>
+                  <TableHead className="text-right">Kho</TableHead>
                   <TableHead className="w-[100px] text-center">Hành động</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {products.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center h-24">
+                    <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
                       Chưa có sản phẩm nào.
                     </TableCell>
                   </TableRow>
@@ -115,16 +121,23 @@ export default function AdminProductsPage() {
                   products.map((product) => (
                     <TableRow key={product.id}>
                       <TableCell>
-                        <Image
-                          src={getImageUrl(product.image)}
-                          alt={product.name}
-                          width={48}
-                          height={48}
-                          className="rounded-md object-cover"
-                        />
+                        <div className="relative h-12 w-12 rounded-md overflow-hidden border bg-gray-100">
+                            {product.image ? (
+                                <Image
+                                src={getImageUrl(product.image)}
+                                alt={product.name}
+                                fill
+                                className="object-cover"
+                                />
+                            ) : (
+                                <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">No img</div>
+                            )}
+                        </div>
                       </TableCell>
                       <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell className="text-right">{formatPrice(product.price)}</TableCell>
+                      <TableCell className="text-right text-green-600 font-bold">
+                        {formatPrice(product.price)}
+                      </TableCell>
                       <TableCell className="text-right">{product.stockQuantity}</TableCell>
                       <TableCell className="text-center">
                         <ProductActions 
@@ -139,6 +152,12 @@ export default function AdminProductsPage() {
               </TableBody>
             </Table>
           </div>
+
+          <PaginationControl 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => setCurrentPage(page)}
+          />
         </>
       )}
 

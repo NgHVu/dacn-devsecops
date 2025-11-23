@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation"; 
 import { useCart } from "@/context/CartContext";
@@ -18,25 +18,53 @@ import {
   CardFooter 
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingCart, Loader2 } from "lucide-react"; 
+import { ShoppingCart, Loader2, PackageOpen } from "lucide-react"; 
 import { CartItemRow } from "@/components/cart/CartItemRow";
 import { formatPrice } from "@/lib/utils";
+import { CartItemSkeleton } from "@/components/skeletons/CartItemSkeleton"; // Import Skeleton
 
 export default function CartPage() {
   const { items, totalItems, totalPrice, clearCart } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth(); // Lấy thêm isLoading của Auth
   const router = useRouter(); 
-  const [isLoading, setIsLoading] = useState(false); 
+  
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false); 
+  const [isPageLoading, setIsPageLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsPageLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isPageLoading || isAuthLoading) {
+    return (
+      <div className="container py-8">
+        <div className="h-8 w-48 bg-muted animate-pulse rounded mb-6" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 lg:gap-8">
+          <div className="lg:col-span-2 space-y-4">
+             <CartItemSkeleton />
+             <CartItemSkeleton />
+             <CartItemSkeleton />
+          </div>
+          <div className="lg:col-span-1">
+             <div className="h-64 bg-muted animate-pulse rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (totalItems === 0) {
     return (
-      <div className="container flex flex-col items-center justify-center py-24">
-        <ShoppingCart className="h-24 w-24 text-muted-foreground" />
-        <h1 className="mt-6 text-2xl font-bold">Giỏ hàng của bạn đang trống</h1>
-        <p className="mt-2 text-muted-foreground">
-          Hãy tìm sản phẩm và thêm vào giỏ nhé.
+      <div className="container flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-xl bg-muted/30 mt-8">
+        <div className="bg-white p-6 rounded-full shadow-sm mb-4">
+            <ShoppingCart className="h-12 w-12 text-muted-foreground" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900">Giỏ hàng của bạn đang trống</h2>
+        <p className="mt-2 text-muted-foreground text-center max-w-md">
+          Có vẻ như bạn chưa thêm món nào vào giỏ. Hãy dạo một vòng xem thực đơn nhé!
         </p>
-        <Button asChild className="mt-6">
+        <Button asChild className="mt-8" size="lg">
           <Link href="/">Tiếp tục mua sắm</Link>
         </Button>
       </div>
@@ -44,14 +72,12 @@ export default function CartPage() {
   }
 
   const handleCheckout = async () => {
-    setIsLoading(true);
+    setIsCheckoutLoading(true);
 
     if (!isAuthenticated) {
       toast.error("Vui lòng đăng nhập để thanh toán.");
-      
       router.push("/login?redirect=/cart"); 
-
-      setIsLoading(false);
+      setIsCheckoutLoading(false);
       return;
     }
 
@@ -65,7 +91,7 @@ export default function CartPage() {
     try {
       await orderService.createOrder(orderData);
       
-      toast.success("Đặt hàng thành công!");
+      toast.success("Đặt hàng thành công! Kiểm tra email của bạn nhé.");
       clearCart(); 
       router.push("/orders"); 
 
@@ -73,67 +99,82 @@ export default function CartPage() {
       console.error("Lỗi khi tạo đơn hàng:", err);
       if (isAxiosError(err)) {
         if (err.response?.status === 400) {
-          toast.error(err.response.data || "Một sản phẩm trong giỏ đã hết hàng.");
+          toast.error(err.response.data?.message || "Một sản phẩm trong giỏ không hợp lệ.");
         } else {
-          toast.error("Đã xảy ra lỗi không xác định. Vui lòng thử lại.");
+          toast.error("Lỗi kết nối. Vui lòng thử lại.");
         }
       } else {
-        toast.error("Đã xảy ra lỗi. Vui lòng thử lại.");
+        toast.error("Đã xảy ra lỗi không xác định.");
       }
     } finally {
-      setIsLoading(false);
+      setIsCheckoutLoading(false);
     }
   };
 
   return (
-    <div className="container py-8">
-      <h1 className="text-3xl font-bold mb-6">Giỏ hàng của bạn</h1>
+    <div className="container py-8 max-w-6xl">
+      <h1 className="text-3xl font-bold mb-8 flex items-center gap-2">
+        <ShoppingCart className="h-8 w-8" />
+        Giỏ hàng của bạn
+      </h1>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 lg:gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 lg:gap-12">
         
+        {/* DANH SÁCH SẢN PHẨM */}
         <div className="lg:col-span-2">
-          <div className="flex flex-col">
+          <div className="flex flex-col space-y-4">
             {items.map((item) => (
               <CartItemRow key={item.id} item={item} />
             ))}
           </div>
         </div>
 
+        {/* TỔNG KẾT & THANH TOÁN */}
         <div className="lg:col-span-1">
-          <Card className="sticky top-20">
-            <CardHeader>
+          <Card className="sticky top-24 shadow-lg border-muted">
+            <CardHeader className="bg-muted/50 border-b">
               <CardTitle>Tóm tắt đơn hàng</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between">
-                <span>Tạm tính ({totalItems} sản phẩm)</span>
-                <span>{formatPrice(totalPrice)}</span>
+            <CardContent className="space-y-4 pt-6">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Tạm tính ({totalItems} món)</span>
+                <span className="font-medium">{formatPrice(totalPrice)}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Phí vận chuyển</span>
-                <span className="text-green-600">Miễn phí</span>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Phí vận chuyển</span>
+                <span className="text-green-600 font-medium">Miễn phí</span>
               </div>
               <Separator />
-              <div className="flex justify-between text-xl font-bold">
-                <span>Tổng cộng</span>
-                <span>{formatPrice(totalPrice)}</span>
+              <div className="flex justify-between items-end">
+                <span className="text-lg font-bold">Tổng cộng</span>
+                <div className="text-right">
+                    <span className="text-2xl font-bold text-primary">{formatPrice(totalPrice)}</span>
+                    <p className="text-xs text-muted-foreground mt-1">(Đã bao gồm VAT)</p>
+                </div>
               </div>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="pb-6 pt-2">
               <Button 
                 size="lg" 
-                className="w-full"
+                className="w-full text-lg h-12 shadow-md hover:shadow-lg transition-all"
                 onClick={handleCheckout} 
-                disabled={isLoading}
+                disabled={isCheckoutLoading}
               >
-                {isLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {isCheckoutLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Đang xử lý...
+                  </>
                 ) : (
-                  "Tiếp tục Thanh toán"
+                  "Thanh toán ngay"
                 )}
               </Button>
             </CardFooter>
           </Card>
+          
+          <div className="mt-4 text-center text-xs text-muted-foreground">
+            <p>Thanh toán an toàn & bảo mật.</p>
+          </div>
         </div>
 
       </div>
