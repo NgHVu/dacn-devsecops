@@ -1,23 +1,23 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, ShieldCheck, ChevronLeft } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authService } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
@@ -32,7 +32,20 @@ function formatTime(seconds: number): string {
   return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
-export default function VerifyPage() {
+// Wrapper Suspense
+export default function VerifyPageWrapper() {
+  return (
+    <Suspense fallback={
+       <div className="w-full flex justify-center py-12">
+          <Loader2 className="h-10 w-10 animate-spin text-orange-600" />
+       </div>
+    }>
+       <VerifyPage />
+    </Suspense>
+  )
+}
+
+function VerifyPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
@@ -48,6 +61,7 @@ export default function VerifyPage() {
 
   const email = searchParams.get("email") || "";
 
+  // 1. Logic đếm ngược
   useEffect(() => {
     const calculateRemainingTime = () => {
       const pendingData = localStorage.getItem(PENDING_VERIFICATION_KEY);
@@ -78,10 +92,16 @@ export default function VerifyPage() {
     return () => clearInterval(interval);
   }, [isResending]); 
 
+  // Auto focus vào ô nhập đầu tiên khi tải trang
   useEffect(() => {
-    otpInputRef.current?.focus();
+    // Delay nhẹ để đảm bảo Slot đầu tiên đã mount
+    const timer = setTimeout(() => {
+        otpInputRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
   }, []);
 
+  // 2. Xử lý xác thực
   const handleVerify = async (finalOtp: string) => {
     if (isLoading) return; 
     
@@ -97,7 +117,9 @@ export default function VerifyPage() {
 
     if (!email || finalOtp.length < 6) {
       setError("Vui lòng nhập đủ 6 chữ số OTP.");
+      // QUAN TRỌNG: Phải set loading false trước khi focus
       setIsLoading(false);
+      setTimeout(() => otpInputRef.current?.focus(), 50);
       return;
     }
 
@@ -105,19 +127,29 @@ export default function VerifyPage() {
       const data = await authService.verifyAccount({ email, otp: finalOtp }); 
       localStorage.removeItem(PENDING_VERIFICATION_KEY); 
       await login(data.accessToken);
-      router.push("/");
+      router.push("/"); 
     } catch (err) {
       console.error("Lỗi khi xác thực OTP:", err);
       let errorMessage = "Đã xảy ra lỗi không xác định.";
       if (isAxiosError(err)) {
-        errorMessage = err.response?.data?.message || err.response?.data || "Mã OTP không hợp lệ hoặc đã hết hạn.";
+        errorMessage = err.response?.data?.message || err.response?.data || "Mã OTP không hợp lệ.";
       }
+      
+      // --- FIX LOGIC FOCUS ---
       setError(errorMessage);
-      setOtp(""); 
-      setIsLoading(false);
+      setOtp(""); // 1. Xóa mã cũ
+      
+      // 2. QUAN TRỌNG: Mở khóa input NGAY LẬP TỨC (để trình duyệt cho phép focus)
+      setIsLoading(false); 
+
+      // 3. Đợi React render lại UI (Input enabled) rồi mới focus
+      setTimeout(() => {
+        otpInputRef.current?.focus();
+      }, 50);
     }
   };
 
+  // 3. Xử lý gửi lại mã
   const handleResendOtp = async () => {
     if (isResending || countdown > 0) return;
 
@@ -125,6 +157,8 @@ export default function VerifyPage() {
     setError(null);
     setResendMessage(null);
     setOtp(""); 
+    
+    setTimeout(() => otpInputRef.current?.focus(), 50);
 
     if (!email) {
       setError("Không tìm thấy email để gửi lại mã.");
@@ -146,7 +180,7 @@ export default function VerifyPage() {
       console.error("Lỗi khi gửi lại OTP:", err);
       let errorMessage = "Không thể gửi lại mã OTP.";
       if (isAxiosError(err)) {
-        errorMessage = err.response?.data?.message || err.response?.data || "Không thể gửi lại mã vào lúc này.";
+        errorMessage = err.response?.data?.message || err.response?.data || "Lỗi gửi lại mã.";
       }
       setError(errorMessage);
     } finally {
@@ -156,9 +190,7 @@ export default function VerifyPage() {
 
   const handleOtpChange = (value: string) => {
     setOtp(value);
-    if (error) {
-      setError(null); 
-    }
+    if (error) setError(null); 
   }
 
   const handleChangeEmail = () => {
@@ -167,101 +199,116 @@ export default function VerifyPage() {
   };
   
   return (
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Xác thực Email</CardTitle>
-          <CardDescription>
-            Chúng tôi đã gửi mã OTP đến email:
-            <br />
-            <span className="font-medium text-primary">{email || "..."}</span>
-            <br />
-            Vui lòng nhập mã vào ô bên dưới.
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Xác thực thất bại</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          {resendMessage && (
-            <Alert>
-              <CheckCircle2 className="h-4 w-4" />
-              <AlertTitle>Thành công</AlertTitle>
-              <AlertDescription>{resendMessage}</AlertDescription>
-            </Alert>
-          )}
-          
-          <div className="flex flex-col items-center gap-4">
-            <InputOTP
-              ref={otpInputRef}
-              maxLength={6}
-              value={otp}
-              onChange={handleOtpChange}
-              onComplete={handleVerify}
-              disabled={isLoading || isResending}
-            >
-              <InputOTPGroup>
-                <InputOTPSlot index={0} />
-                <InputOTPSlot index={1} />
-                <InputOTPSlot index={2} />
-                <InputOTPSlot index={3} />
-                <InputOTPSlot index={4} />
-                <InputOTPSlot index={5} />
-              </InputOTPGroup>
-            </InputOTP>
-            
-            {countdown > 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Mã sẽ hết hạn sau: <span className="font-medium text-primary">{formatTime(countdown)}</span>
-              </p>
-            ) : (
-              <p className="text-sm font-medium text-destructive">
-                Mã OTP đã hết hạn.
-              </p>
-            )}
+    // Card "Vô hình" để khớp Layout
+    <Card className="w-full border-0 shadow-none bg-transparent transition-all">
+      <CardHeader className="text-center px-0 pb-2">
+        <div className="flex justify-center mb-4">
+          <div className="h-16 w-16 rounded-full bg-orange-100 flex items-center justify-center animate-pulse">
+            <ShieldCheck className="h-8 w-8 text-orange-600" />
           </div>
-        </CardContent>
+        </div>
+        <CardTitle className="text-2xl font-bold tracking-tight">Xác thực tài khoản</CardTitle>
+        <CardDescription className="text-base mt-2">
+          Nhập mã 6 số chúng tôi vừa gửi đến
+          <br />
+          <span className="font-semibold text-foreground bg-orange-100 px-2 py-0.5 rounded">{email || "email của bạn"}</span>
+        </CardDescription>
+      </CardHeader>
 
-        <CardFooter className="flex flex-col gap-4">
-          <Button 
-            className="w-full" 
-            onClick={() => handleVerify(otp)}
-            disabled={isLoading || isResending || otp.length < 6}
+      <CardContent className="space-y-6 pt-4 px-0">
+        
+        {error && (
+          <Alert variant="destructive" className="animate-in fade-in zoom-in-95 border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Lỗi xác thực</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        {resendMessage && (
+          <Alert className="border-green-200 bg-green-50 text-green-800 animate-in zoom-in-95">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <AlertTitle className="text-green-700 font-semibold">Đã gửi lại mã!</AlertTitle>
+            <AlertDescription>{resendMessage}</AlertDescription>
+          </Alert>
+        )}
+        
+        {/* INPUT OTP */}
+        <div className="flex flex-col items-center gap-6">
+          <InputOTP
+            ref={otpInputRef}
+            maxLength={6}
+            value={otp}
+            onChange={handleOtpChange}
+            onComplete={handleVerify}
+            disabled={isLoading || isResending}
+            className="gap-2"
           >
-            {isLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              "Xác thực"
-            )}
-          </Button>
+            <InputOTPGroup className="gap-2">
+              <InputOTPSlot index={0} className="h-12 w-10 sm:w-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 text-lg shadow-sm" />
+              <InputOTPSlot index={1} className="h-12 w-10 sm:w-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 text-lg shadow-sm" />
+              <InputOTPSlot index={2} className="h-12 w-10 sm:w-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 text-lg shadow-sm" />
+              <InputOTPSlot index={3} className="h-12 w-10 sm:w-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 text-lg shadow-sm" />
+              <InputOTPSlot index={4} className="h-12 w-10 sm:w-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 text-lg shadow-sm" />
+              <InputOTPSlot index={5} className="h-12 w-10 sm:w-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 text-lg shadow-sm" />
+            </InputOTPGroup>
+          </InputOTP>
           
-          <div className="text-center text-sm w-full">
-            <div className="flex justify-between items-center w-full">
-              <button
-                className="font-medium text-sm text-muted-foreground underline hover:text-primary"
-                onClick={handleChangeEmail}
-                disabled={isLoading || isResending}
-              >
-                Đổi email?
-              </button>
-
-              <div className="text-muted-foreground">
-                Chưa nhận được mã?{" "}
-                <button
-                  className="font-medium text-primary underline disabled:cursor-not-allowed disabled:text-muted-foreground"
-                  onClick={handleResendOtp}
-                  disabled={isLoading || isResending || countdown > 0} 
-                >
-                  {isResending ? "Đang gửi..." : "Gửi lại"}
-                </button>
-              </div>
-            </div>
+          <div className="min-h-[20px]">
+            {countdown > 0 ? (
+              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Hết hạn sau: <span className="font-bold text-orange-600 tabular-nums">{formatTime(countdown)}</span>
+              </p>
+            ) : (
+              <p className="text-sm font-medium text-destructive flex items-center gap-1.5">
+                <AlertCircle className="h-4 w-4" />
+                Mã OTP đã hết hạn
+              </p>
+            )}
           </div>
-        </CardFooter>
-      </Card>
+        </div>
+      </CardContent>
+
+      <CardFooter className="flex flex-col gap-4 px-0 pb-0">
+        <Button 
+          className="w-full h-11 text-base font-semibold bg-orange-600 hover:bg-orange-500" 
+          onClick={() => handleVerify(otp)}
+          disabled={isLoading || isResending || otp.length < 6}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Đang kiểm tra...
+            </>
+          ) : (
+            "Xác thực ngay"
+          )}
+        </Button>
+        
+        <div className="flex justify-between items-center w-full text-sm px-2">
+          <button
+            className="text-muted-foreground hover:text-orange-600 transition-colors flex items-center gap-1"
+            onClick={handleChangeEmail}
+            disabled={isLoading || isResending}
+          >
+            <ChevronLeft className="h-3 w-3" />
+            Đổi email
+          </button>
+
+          <button
+            className={`font-medium transition-colors ${
+              countdown > 0 || isLoading || isResending
+                ? "text-muted-foreground cursor-not-allowed opacity-50"
+                : "text-orange-600 hover:text-orange-500 hover:underline"
+            }`}
+            onClick={handleResendOtp}
+            disabled={isLoading || isResending || countdown > 0} 
+          >
+            {isResending ? "Đang gửi lại..." : "Gửi lại mã mới"}
+          </button>
+        </div>
+      </CardFooter>
+    </Card>
   );
 }

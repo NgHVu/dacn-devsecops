@@ -1,31 +1,31 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { productService } from "@/services/productService";
 import { Product } from "@/types/product";
 import { useCart } from "@/context/CartContext";
-import { formatPrice, getImageUrl } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Minus, Plus, ShoppingCart, ArrowLeft } from "lucide-react";
+import { cn, formatPrice, getImageUrl } from "@/lib/utils";
 import { SIZES, TOPPINGS, ProductOption } from "@/config/productOptions";
+import { ProductDetailSkeleton } from "@/components/skeletons/ProductDetailSkeleton";
+
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { Minus, Plus, ShoppingCart, ArrowLeft, Star, Clock, Check, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 import { FadeIn } from "@/components/animations/FadeIn";
-import Link from "next/link";
 
 export default function ProductDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id; 
-  
   const { addToCart } = useCart();
   
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState<ProductOption>(SIZES[0]);
   const [selectedToppings, setSelectedToppings] = useState<ProductOption[]>([]);
@@ -38,7 +38,7 @@ export default function ProductDetailPage() {
         const data = await productService.getProductById(Number(id));
         setProduct(data);
       } catch (error) {
-        console.error("Lỗi tải sản phẩm:", error);
+        toast.error("Không thể tải thông tin sản phẩm");
       } finally {
         setLoading(false);
       }
@@ -54,16 +54,21 @@ export default function ProductDetailPage() {
     return (base + sizePrice + toppingPrice) * quantity;
   };
 
-  const handleToppingChange = (topping: ProductOption, checked: boolean) => {
-    if (checked) {
-      setSelectedToppings([...selectedToppings, topping]);
-    } else {
+  const handleToppingChange = (topping: ProductOption) => {
+    const exists = selectedToppings.find(t => t.id === topping.id);
+    if (exists) {
       setSelectedToppings(selectedToppings.filter((t) => t.id !== topping.id));
+    } else {
+      setSelectedToppings([...selectedToppings, topping]);
     }
   };
 
   const handleAddToCart = () => {
     if (!product) return;
+    
+    // Gọi hàm thêm vào giỏ
+    // [CẬP NHẬT] Đã xóa toast thủ công ở đây. 
+    // CartContext sẽ tự động hiển thị toast đẹp (có hình + nút xem giỏ).
     addToCart(product, quantity, {
       size: selectedSize,
       toppings: selectedToppings,
@@ -71,110 +76,176 @@ export default function ProductDetailPage() {
     });
   };
 
-  if (loading) return <div className="flex justify-center py-20 h-screen items-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div>;
+  if (loading) return <ProductDetailSkeleton />;
+
   if (!product) return (
-    <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <h2 className="text-xl font-semibold">Không tìm thấy sản phẩm</h2>
-        <Button asChild variant="outline"><Link href="/">Quay lại trang chủ</Link></Button>
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center">
+       <div className="bg-muted/50 p-8 rounded-full">
+          <ShoppingCart className="h-16 w-16 text-muted-foreground/50" />
+       </div>
+       <div>
+          <h2 className="text-2xl font-bold">Không tìm thấy món này</h2>
+          <p className="text-muted-foreground mt-2">Món ăn có thể đã bị xóa hoặc tạm ngưng phục vụ.</p>
+       </div>
+       <Button onClick={() => router.push("/")} className="rounded-full px-8">Về trang chủ</Button>
     </div>
   );
 
   return (
-    <div className="container py-8 max-w-6xl">
-      <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-6 transition-colors">
-        <ArrowLeft className="mr-2 h-4 w-4" /> Quay lại thực đơn
-      </Link>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+    <div className="min-h-screen bg-background pb-32 animate-in fade-in duration-500">
+      <div className="container px-4 py-6 max-w-6xl mx-auto">
         
-        <FadeIn className="relative h-[400px] md:h-[500px] w-full rounded-2xl overflow-hidden shadow-lg border bg-white">
-          {product.image ? (
-            <Image src={getImageUrl(product.image)} alt={product.name} fill className="object-cover" priority />
-          ) : (
-            <div className="flex items-center justify-center h-full bg-gray-100 text-gray-400">No Image</div>
-          )}
-        </FadeIn>
+        {/* Breadcrumb / Back Button */}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
+            <Link href="/" className="hover:text-orange-600 transition-colors">Trang chủ</Link>
+            <ChevronRight className="h-4 w-4" />
+            <Link href="/menu" className="hover:text-orange-600 transition-colors">Thực đơn</Link>
+            <ChevronRight className="h-4 w-4" />
+            <span className="text-foreground font-medium truncate max-w-[200px]">{product.name}</span>
+        </div>
 
-        <div className="space-y-8 pb-20 md:pb-0"> 
-          <FadeIn delay={0.1}>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900">{product.name}</h1>
-            <p className="text-2xl font-bold text-primary mt-2">{formatPrice(product.price)}</p>
-            <p className="text-gray-600 mt-4 leading-relaxed text-lg">
-                {product.description || "Món ăn ngon tuyệt vời, được chế biến từ nguyên liệu tươi sạch, đảm bảo vệ sinh an toàn thực phẩm."}
-            </p>
-          </FadeIn>
-
-          <div className="h-px bg-gray-200 my-6" />
-
-          <FadeIn delay={0.2} className="space-y-4">
-            <h3 className="font-semibold text-lg flex items-center gap-2">Chọn kích cỡ <span className="text-red-500">*</span></h3>
-            <RadioGroup 
-                value={selectedSize.id} 
-                onValueChange={(val) => setSelectedSize(SIZES.find(s => s.id === val) || SIZES[0])}
-                className="flex flex-wrap gap-3"
-            >
-              {SIZES.map((size) => (
-                <div key={size.id} className="relative">
-                  <RadioGroupItem value={size.id} id={`size-${size.id}`} className="peer sr-only" />
-                  <Label 
-                    htmlFor={`size-${size.id}`} 
-                    className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all w-24"
-                  >
-                    <span className="text-lg font-bold">{size.id}</span>
-                    <span className="text-xs text-muted-foreground">+{formatPrice(size.price)}</span>
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </FadeIn>
-
-          <FadeIn delay={0.3} className="space-y-4">
-            <h3 className="font-semibold text-lg">Thêm Topping (Tùy chọn)</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {TOPPINGS.map((topping) => (
-                <div key={topping.id} className="flex items-center space-x-3 border rounded-lg p-3 hover:bg-gray-50 transition-colors">
-                  <Checkbox 
-                    id={`topping-${topping.id}`} 
-                    onCheckedChange={(checked) => handleToppingChange(topping, checked === true)}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+          {/* --- LEFT: IMAGE (Sticky) --- */}
+          <div className="lg:col-span-5">
+             <div className="lg:sticky lg:top-24 space-y-6">
+                <div className="relative aspect-square w-full rounded-[2rem] overflow-hidden shadow-xl border border-border/50 bg-white dark:bg-zinc-900 group">
+                  <Image 
+                    src={getImageUrl(product.image)} alt={product.name} fill 
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    priority 
                   />
-                  <Label htmlFor={`topping-${topping.id}`} className="flex-1 cursor-pointer flex justify-between font-normal">
-                    <span>{topping.name}</span>
-                    <span className="text-primary font-medium">+{formatPrice(topping.price)}</span>
-                  </Label>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none" />
                 </div>
-              ))}
-            </div>
-          </FadeIn>
+             </div>
+          </div>
 
-          <FadeIn delay={0.4} className="space-y-4">
-            <h3 className="font-semibold text-lg">Ghi chú cho quán</h3>
-            <Textarea 
-                placeholder="Ví dụ: Ít đường, không đá, xin thêm ớt..." 
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                className="resize-none"
-            />
-          </FadeIn>
+          {/* --- RIGHT: INFO --- */}
+          <div className="lg:col-span-7"> 
+             <FadeIn delay={0.1} className="space-y-8">
+                 {/* Header Info */}
+                 <div className="space-y-4">
+                     <div className="flex justify-between items-start gap-4">
+                        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground leading-tight">{product.name}</h1>
+                        <div className="text-2xl md:text-3xl font-bold text-orange-600 whitespace-nowrap">
+                            {formatPrice(product.price)}
+                        </div>
+                     </div>
+                     
+                     <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-1 rounded-md font-semibold">
+                            <Star className="h-4 w-4 fill-current" /> 4.8 (120+)
+                        </div>
+                        <Separator orientation="vertical" className="h-4" />
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                            <Clock className="h-4 w-4" /> 15-20 phút
+                        </div>
+                     </div>
 
-          <FadeIn delay={0.5} className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t shadow-2xl md:static md:p-0 md:border-none md:shadow-none z-50">
-            <div className="container md:px-0 flex items-center gap-4 max-w-6xl mx-auto">
-              <div className="flex items-center border rounded-md h-12">
-                <Button variant="ghost" size="icon" className="h-full w-12" onClick={() => setQuantity(Math.max(1, quantity - 1))} disabled={quantity <= 1}>
-                  <Minus className="h-4 w-4" />
+                     <p className="text-muted-foreground leading-relaxed text-base">
+                         {product.description || "Món ngon đặc biệt được chế biến từ nguyên liệu tươi sạch, mang đến hương vị đậm đà khó quên."}
+                     </p>
+                 </div>
+
+                 <Separator />
+
+                 {/* Options Section */}
+                 <div className="space-y-8">
+                    {/* Size Selection */}
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end">
+                            <label className="font-bold text-base">Chọn kích cỡ (Size)</label>
+                            <span className="text-xs font-medium bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded text-muted-foreground">Bắt buộc</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            {SIZES.map((size) => {
+                                const isSelected = selectedSize.id === size.id;
+                                return (
+                                    <div key={size.id} onClick={() => setSelectedSize(size)}
+                                        className={cn(
+                                            "relative flex flex-col items-center justify-center p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 select-none hover:scale-[1.02]",
+                                            isSelected ? "border-orange-600 bg-orange-50 dark:bg-orange-900/20" : "border-border bg-card hover:border-orange-200"
+                                        )}
+                                    >
+                                        <span className={cn("font-bold", isSelected ? "text-orange-700 dark:text-orange-400" : "text-foreground")}>{size.name}</span>
+                                        <span className="text-xs text-muted-foreground mt-1">+{formatPrice(size.price)}</span>
+                                        {isSelected && <div className="absolute top-2 right-2 text-orange-600"><Check className="h-4 w-4" /></div>}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Toppings */}
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end">
+                            <label className="font-bold text-base">Thêm Topping</label>
+                            <span className="text-xs font-medium bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded text-muted-foreground">Tùy chọn</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {TOPPINGS.map((topping) => {
+                                const isSelected = selectedToppings.some(t => t.id === topping.id);
+                                return (
+                                    <div key={topping.id} onClick={() => handleToppingChange(topping)}
+                                        className={cn(
+                                            "flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all duration-200 select-none",
+                                            isSelected ? "border-orange-600 bg-orange-50 ring-1 ring-orange-600 dark:bg-orange-900/20" : "border-border bg-card hover:bg-muted/50"
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={cn("h-5 w-5 rounded border flex items-center justify-center transition-colors", isSelected ? "bg-orange-600 border-orange-600" : "border-muted-foreground")}>
+                                                {isSelected && <Check className="h-3.5 w-3.5 text-white" />}
+                                            </div>
+                                            <span className="font-medium text-sm">{topping.name}</span>
+                                        </div>
+                                        <span className="text-sm font-bold text-orange-600">+{formatPrice(topping.price)}</span>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Note */}
+                    <div className="space-y-3">
+                        <label className="font-bold text-base">Ghi chú cho quán</label>
+                        <Textarea 
+                            placeholder="Ví dụ: Không hành, nhiều đá, để riêng nước chấm..." 
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            className="bg-card border-border min-h-[100px] rounded-xl focus:ring-orange-500/20 focus:border-orange-500 resize-none"
+                        />
+                    </div>
+                 </div>
+             </FadeIn>
+          </div>
+        </div>
+      </div>
+
+      {/* --- STICKY FOOTER ACTION --- */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-lg border-t border-border/60 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.1)] p-4 safe-area-bottom">
+        <div className="container max-w-6xl mx-auto flex items-center gap-6">
+             {/* Quantity Control */}
+             <div className="flex items-center bg-muted/50 rounded-full p-1 border border-border shadow-inner">
+                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-white hover:shadow-sm transition-all" onClick={() => setQuantity(q => Math.max(1, q-1))}>
+                    <Minus className="h-4 w-4" />
                 </Button>
-                <span className="w-12 text-center font-bold text-lg">{quantity}</span>
-                <Button variant="ghost" size="icon" className="h-full w-12" onClick={() => setQuantity(quantity + 1)}>
-                  <Plus className="h-4 w-4" />
+                <span className="w-12 text-center font-bold text-lg tabular-nums">{quantity}</span>
+                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-white hover:shadow-sm transition-all" onClick={() => setQuantity(q => q + 1)}>
+                    <Plus className="h-4 w-4" />
                 </Button>
-              </div>
+             </div>
 
-              <Button size="lg" className="flex-1 h-12 text-lg font-bold shadow-lg" onClick={handleAddToCart}>
-                <ShoppingCart className="mr-2 h-5 w-5" />
-                Thêm • {formatPrice(calculateTotalPrice())}
-              </Button>
-            </div>
-          </FadeIn>
-
+             {/* Add Button */}
+             <Button 
+                onClick={handleAddToCart}
+                className="flex-1 h-12 rounded-full bg-orange-600 hover:bg-orange-700 text-white text-base font-bold shadow-lg shadow-orange-600/30 hover:scale-[1.02] transition-all active:scale-[0.98]"
+             >
+                <div className="flex items-center justify-between w-full px-4">
+                    <span>Thêm vào giỏ</span> 
+                    <span className="bg-white/20 px-2 py-0.5 rounded text-sm font-bold backdrop-blur-sm">
+                        {formatPrice(calculateTotalPrice())}
+                    </span>
+                </div>
+             </Button>
         </div>
       </div>
     </div>

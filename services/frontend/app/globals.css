@@ -1,6 +1,15 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@layer base {
+  html {
+    /* Dành sẵn không gian cho thanh cuộn, giúp web không bị giật sang phải khi mở Modal */
+    scrollbar-gutter: stable;
+    /* Cuộn mượt mà */
+    scroll-behavior: smooth;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

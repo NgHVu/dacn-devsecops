@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { isAxiosError } from "axios";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +16,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 import {
   Form,
@@ -26,10 +29,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { PasswordStrength } from "@/components/ui/password-strength"; 
-import { AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authService } from "@/services/authService";
-import { isAxiosError } from "axios";
 
 const formSchema = z
   .object({
@@ -56,7 +57,6 @@ const PENDING_VERIFICATION_KEY = "pendingVerification";
 
 export default function RegisterPage() {
   const router = useRouter();
-
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null); 
 
@@ -76,15 +76,13 @@ export default function RegisterPage() {
     setError(null);
     
     try {
-      const message = await authService.register({
+      await authService.register({
         name: values.name,
         email: values.email,
         password: values.password,
       });
 
-      console.log("Đăng ký (bước 1) thành công:", message);
-
-      // eslint-disable-next-line react-hooks/purity
+      // Lưu thông tin OTP
       const newExpiry = Date.now() + OTP_LIFESPAN_SECONDS * 1000;
       const verificationData = {
         email: values.email,
@@ -95,138 +93,152 @@ export default function RegisterPage() {
       router.push(`/verify?email=${encodeURIComponent(values.email)}`);
 
     } catch (err) {
-      console.error("Lỗi khi đăng ký (register):", err);
-      let errorMessage = "Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.";
+      console.error("Lỗi đăng ký:", err);
+      let errorMessage = "Đã xảy ra lỗi không xác định.";
       if (isAxiosError(err)) {
         if (err.response?.status === 409) {
-          errorMessage = "Email này đã được đăng ký. Vui lòng sử dụng email khác.";
+          errorMessage = "Email này đã được sử dụng.";
           form.setError("email", { message: errorMessage });
         } else if (err.response?.data) {
-          errorMessage = err.response.data.message || err.response.data || "Đăng ký thất bại.";
+          errorMessage = err.response.data.message || "Đăng ký thất bại.";
         }
       }
       setError(errorMessage);
-      setIsLoading(false);
+    } finally {
+        setIsLoading(false);
     }
   };
 
+  const handleFormChange = () => {
+    if (error) setError(null);
+  };
+
   return (
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Tạo tài khoản</CardTitle>
-        </CardHeader>
+    // Sử dụng Card không viền để khớp với Layout
+    <Card className="w-full border-0 shadow-none bg-transparent">
+      <CardHeader className="space-y-2 text-center px-0">
+        <CardTitle className="text-3xl font-bold tracking-tight">
+          Tạo tài khoản
+        </CardTitle>
+        <CardDescription className="text-base">
+          Tham gia cộng đồng FoodHub ngay hôm nay
+        </CardDescription>
+      </CardHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
-            <CardContent className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Đăng ký thất bại</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+      <CardContent className="space-y-6 px-0">
+          
+          {error && (
+              <Alert variant="destructive" className="animate-in fade-in slide-in-from-top-2">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Đăng ký thất bại</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+          )}
 
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Họ và Tên</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Nguyễn Văn A"
-                        {...field}
-                        disabled={isLoading}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="example@gmail.com"
-                        {...field}
-                        disabled={isLoading}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mật khẩu</FormLabel>
-                    <FormControl>
-                      <PasswordInput
-                        placeholder="Mật khẩu của bạn"
-                        {...field}
-                        disabled={isLoading}
-                      />
-                    </FormControl>
-                    <PasswordStrength password={field.value} />
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Xác nhận mật khẩu</FormLabel>
-                    <FormControl>
-                      <PasswordInput
-                        placeholder="Nhập lại mật khẩu"
-                        {...field}
-                        disabled={isLoading}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-
-            <CardFooter className="flex flex-col gap-4 pt-6">
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  "Tiếp tục"
-                )}
-              </Button>
-              
-              <div className="text-center text-sm w-full">
-                Đã có tài khoản?{" "}
-                <Link
-                  href="/login"
-                  className="font-medium text-primary underline"
-                >
-                  Đăng nhập ngay
-                </Link>
-              </div>
-            </CardFooter>
+          <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} onChange={handleFormChange} className="space-y-4">
             
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Họ và Tên</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Ví dụ: Nguyễn Văn A"
+                      {...field}
+                      disabled={isLoading}
+                      className="h-11 bg-background"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="name@example.com"
+                      {...field}
+                      disabled={isLoading}
+                      className="h-11 bg-background"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mật khẩu</FormLabel>
+                  <FormControl>
+                    <PasswordInput
+                      placeholder="Tạo mật khẩu"
+                      {...field}
+                      disabled={isLoading}
+                      className="h-11 bg-background"
+                    />
+                  </FormControl>
+                  <div className="pt-1">
+                      <PasswordStrength password={field.value} />
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Xác nhận mật khẩu</FormLabel>
+                  <FormControl>
+                    <PasswordInput
+                      placeholder="Nhập lại mật khẩu"
+                      {...field}
+                      disabled={isLoading}
+                      className="h-11 bg-background"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+              <Button type="submit" className="w-full h-11 text-base font-semibold bg-orange-600 hover:bg-orange-500 mt-2" disabled={isLoading}>
+                  {isLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                  "Tiếp tục"
+                  )}
+              </Button>
           </form>
         </Form>
-      </Card>
+      </CardContent>
+
+      <CardFooter className="justify-center px-0 pb-0">
+          <div className="text-sm text-muted-foreground">
+              Đã có tài khoản?{" "}
+              <Link
+                  href="/login"
+                  className="font-semibold text-orange-600 hover:text-orange-500 hover:underline"
+              >
+                  Đăng nhập ngay
+              </Link>
+          </div>
+      </CardFooter>
+    </Card>
   );
 }

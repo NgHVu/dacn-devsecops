@@ -6,6 +6,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { isAxiosError } from "axios";
+import { 
+  AlertCircle, 
+  CheckCircle2, 
+  Loader2, 
+  ChevronLeft, 
+  KeyRound, 
+  XCircle 
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,11 +35,10 @@ import {
 } from "@/components/ui/form"; 
 import { PasswordInput } from "@/components/ui/password-input";
 import { PasswordStrength } from "@/components/ui/password-strength"; 
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authService } from "@/services/authService";
-import { isAxiosError } from "axios";
 
+// --- VALIDATION SCHEMA ---
 const formSchema = z
   .object({
     newPassword: z.string().min(8, {
@@ -45,26 +53,30 @@ const formSchema = z
     path: ["confirmPassword"], 
   });
 
+// --- WRAPPER FOR SUSPENSE ---
 export default function ResetPasswordPageWrapper() {
   return (
-    <Suspense fallback={<div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-12 w-12 animate-spin" /></div>}>
+    <Suspense fallback={
+      <div className="w-full flex items-center justify-center h-[300px]">
+        <Loader2 className="h-10 w-10 animate-spin text-orange-600" />
+      </div>
+    }>
       <ResetPasswordPage />
     </Suspense>
   );
 }
 
-type TokenStatus = 'loading' | 'valid' | 'invalid';
+type TokenStatus = 'loading' | 'valid' | 'invalid' | 'success';
 
 function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // State
   const [token, setToken] = useState<string | null>(null);
-  
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null); 
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [tokenStatus, setTokenStatus] = useState<TokenStatus>('loading');
+  const [error, setError] = useState<string | null>(null); 
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -75,11 +87,12 @@ function ResetPasswordPage() {
     mode: "onChange", 
   });
 
+  // 1. Validate Token on Mount
   useEffect(() => {
     const tokenFromUrl = searchParams.get("token");
 
     if (!tokenFromUrl) {
-      setError("Token không hợp lệ hoặc bị thiếu.");
+      setError("Đường dẫn không hợp lệ hoặc bị thiếu.");
       setTokenStatus('invalid');
       return;
     }
@@ -89,10 +102,12 @@ function ResetPasswordPage() {
     const validateToken = async () => {
       try {
         await authService.validateResetToken(tokenFromUrl);
+        // Giả lập delay nhỏ để UX đỡ bị giật cục
+        await new Promise(r => setTimeout(r, 500));
         setTokenStatus('valid');
       } catch (err) {
         console.error("Lỗi khi xác thực token:", err);
-        let errorMessage = "Link không hợp lệ.";
+        let errorMessage = "Đường dẫn đặt lại mật khẩu đã hết hạn hoặc không hợp lệ.";
         if (isAxiosError(err) && err.response?.data) {
           errorMessage = err.response.data.message || err.response.data;
         }
@@ -102,157 +117,194 @@ function ResetPasswordPage() {
     };
 
     validateToken();
-    
   }, [searchParams]);
 
+  // 2. Handle Submit
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!token || tokenStatus !== 'valid') return; 
 
-    setIsLoading(true);
+    setIsSubmitting(true);
     setError(null);
     
     try {
-      const message = await authService.resetPassword({
+      await authService.resetPassword({
         token: token,
         newPassword: values.newPassword,
       });
-      setSuccessMessage(message);
-      setTokenStatus('invalid'); 
+      setTokenStatus('success');
+      
+      // Redirect sau 3s
       setTimeout(() => {
         router.push("/login");
       }, 3000);
 
     } catch (err) {
       console.error("Lỗi khi reset mật khẩu:", err);
-      let errorMessage = "Đã xảy ra lỗi không xác định.";
+      let errorMessage = "Đã xảy ra lỗi khi cập nhật mật khẩu.";
       if (isAxiosError(err) && err.response?.data) {
         errorMessage = err.response.data.message || err.response.data;
       }
       setError(errorMessage);
-      setTokenStatus('invalid');
+      // Không set invalid ngay, cho phép user thử lại nếu lỗi mạng
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  // --- RENDER HELPERS ---
+  const renderHeaderIcon = () => {
+    switch (tokenStatus) {
+      case 'loading': return <Loader2 className="h-6 w-6 text-orange-600 animate-spin" />;
+      case 'success': return <CheckCircle2 className="h-6 w-6 text-green-600 animate-bounce" />;
+      case 'invalid': return <XCircle className="h-6 w-6 text-red-500" />;
+      default: return <KeyRound className="h-6 w-6 text-orange-600" />;
+    }
+  };
+
+  const renderTitle = () => {
+    switch (tokenStatus) {
+      case 'loading': return "Đang xác thực...";
+      case 'invalid': return "Link không hợp lệ";
+      case 'success': return "Đổi mật khẩu thành công";
+      default: return "Đặt lại mật khẩu";
+    }
+  };
+
+  const renderDescription = () => {
+    switch (tokenStatus) {
+      case 'loading': return "Vui lòng đợi trong giây lát.";
+      case 'invalid': return "Đường dẫn này có thể đã hết hạn hoặc sai lệch.";
+      case 'success': return "Mật khẩu của bạn đã được cập nhật. Đang chuyển hướng...";
+      default: return "Nhập mật khẩu mới để bảo vệ tài khoản.";
     }
   };
 
   return (
-      <Card className="w-full max-w-md">
-        
-        {tokenStatus === 'loading' && (
-          <CardHeader className="text-center p-8">
-            <div className="flex flex-col items-center gap-4">
-              <Loader2 className="h-12 w-12 animate-spin" />
-              <p className="text-muted-foreground">Đang xác thực link...</p>
-            </div>
-          </CardHeader>
-        )}
+    // Card "Vô hình" để khớp Layout
+    <Card className="w-full border-0 shadow-none bg-transparent transition-all duration-300">
+      
+      {/* HEADER DYNAMIC */}
+      <CardHeader className="text-center px-0 pb-6">
+        <div className="flex justify-center mb-4">
+          <div className={`h-12 w-12 rounded-full flex items-center justify-center ${tokenStatus === 'invalid' ? 'bg-red-100' : 'bg-orange-100'}`}>
+            {renderHeaderIcon()}
+          </div>
+        </div>
+        <CardTitle className="text-3xl font-bold tracking-tight">{renderTitle()}</CardTitle>
+        <CardDescription className="text-base mt-2">{renderDescription()}</CardDescription>
+      </CardHeader>
 
+      <CardContent className="space-y-4 px-0">
+        
+        {/* TRƯỜNG HỢP 1: TOKEN HỢP LỆ -> HIỆN FORM */}
         {tokenStatus === 'valid' && (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} noValidate> 
-              <CardHeader className="text-center">
-                <CardTitle className="text-2xl font-bold">Đặt lại mật khẩu</CardTitle>
-                <CardDescription>
-                  Nhập mật khẩu mới cho tài khoản của bạn.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Đặt lại thất bại</AlertTitle>
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-                
-                <FormField
-                  control={form.control}
-                  name="newPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Mật khẩu mới</FormLabel>
-                      <FormControl>
-                        <PasswordInput
-                          placeholder="Mật khẩu mới của bạn"
-                          {...field}
-                          disabled={isLoading}
-                        />
-                      </FormControl>
-                      <PasswordStrength password={field.value} />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Xác nhận mật khẩu</FormLabel>
-                      <FormControl>
-                        <PasswordInput
-                          placeholder="Nhập lại mật khẩu mới"
-                          {...field}
-                          disabled={isLoading}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               
-              <CardFooter className="pt-6">
-                <Button
-                  type="submit" 
-                  className="w-full"
-                  disabled={isLoading || !token}
-                >
-                  {isLoading ? (
+              {error && (
+                <Alert variant="destructive" className="animate-in fade-in zoom-in-95">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Lỗi</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <FormField
+                control={form.control}
+                name="newPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mật khẩu mới</FormLabel>
+                    <FormControl>
+                      <PasswordInput
+                        placeholder="Nhập mật khẩu mới"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="h-11 bg-background"
+                      />
+                    </FormControl>
+                    <div className="pt-1">
+                      <PasswordStrength password={field.value} />
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Xác nhận mật khẩu</FormLabel>
+                    <FormControl>
+                      <PasswordInput
+                        placeholder="Nhập lại để xác nhận"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="h-11 bg-background"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button 
+                type="submit" 
+                className="w-full h-11 text-base font-semibold bg-orange-600 hover:bg-orange-500 mt-2" 
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    "Cập nhật mật khẩu"
-                  )}
-                </Button>
-              </CardFooter>
+                    Đang cập nhật...
+                  </>
+                ) : (
+                  "Xác nhận thay đổi"
+                )}
+              </Button>
             </form>
           </Form>
         )}
 
-        {tokenStatus === 'invalid' && (
-          <>
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold">Link không hợp lệ</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {successMessage ? (
-                <Alert className="border-green-500/50 text-green-700 dark:text-green-400 [&>svg]:text-green-700 dark:[&>svg]:text-green-400">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <AlertTitle>Thành công!</AlertTitle>
-                  <AlertDescription>
-                    {successMessage} Bạn sẽ được chuyển hướng đến trang Đăng nhập
-                    trong 3 giây...
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Đặt lại thất bại</AlertTitle>
-                  <AlertDescription>
-                    {error || "Link reset này không còn hợp lệ."}
-                  </AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-            <CardFooter>
-              <Button asChild className="w-full">
-                <Link href="/login">Quay lại trang Đăng nhập</Link>
-              </Button>
-            </CardFooter>
-          </>
+        {/* TRƯỜNG HỢP 2: THÀNH CÔNG -> HIỆN ALERT XANH */}
+        {tokenStatus === 'success' && (
+           <Alert className="border-green-200 bg-green-50 text-green-800 animate-in zoom-in-95 duration-300">
+             <CheckCircle2 className="h-4 w-4 text-green-600" />
+             <AlertTitle className="text-green-700 font-semibold">Thành công!</AlertTitle>
+             <AlertDescription>
+               Bạn sẽ được chuyển hướng đến trang Đăng nhập trong 3 giây...
+             </AlertDescription>
+           </Alert>
         )}
-        
-      </Card>
+
+        {/* TRƯỜNG HỢP 3: INVALID -> HIỆN ALERT ĐỎ */}
+        {tokenStatus === 'invalid' && (
+           <Alert variant="destructive" className="animate-in zoom-in-95 duration-300">
+             <AlertCircle className="h-4 w-4" />
+             <AlertTitle>Yêu cầu không hợp lệ</AlertTitle>
+             <AlertDescription>{error || "Link reset này đã hết hạn hoặc không tồn tại."}</AlertDescription>
+           </Alert>
+        )}
+
+      </CardContent>
+
+      <CardFooter className="justify-center px-0 pb-0">
+        {/* Nút quay lại chỉ hiện khi không phải đang loading */}
+        {tokenStatus !== 'loading' && (
+          <div className="text-center text-sm">
+            <Link
+              href="/login"
+              className="font-semibold text-orange-600 hover:text-orange-500 hover:underline flex items-center justify-center gap-1"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Quay lại đăng nhập
+            </Link>
+          </div>
+        )}
+      </CardFooter>
+
+    </Card>
   );
 }

@@ -1,9 +1,12 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import Image from "next/image"; 
+import { useRouter } from "next/navigation"; // Thêm router để nút Xem giỏ hoạt động
 import { Product } from "@/types/product";
 import { toast } from "sonner";
 import { ProductSize, ProductTopping } from "@/config/productOptions";
+import { getImageUrl } from "@/lib/utils"; 
 
 export type CartItem = {
   id: number; 
@@ -32,6 +35,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const router = useRouter(); // Hook để chuyển trang
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -55,6 +59,40 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [items, isLoaded]);
 
+  // --- HÀM HELPER HIỂN THỊ TOAST (Đã cập nhật giao diện mới) ---
+  const showCartToast = (message: string, product: Product, uniqueId: string, quantity: number, sizeName: string) => {
+    toast.success(
+      <div className="flex items-center gap-3 w-full">
+        {/* Hình ảnh món ăn */}
+        <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-md border border-border/50">
+          <Image 
+            src={getImageUrl(product.image)} 
+            alt={product.name}
+            fill
+            className="object-cover"
+          />
+        </div>
+        {/* Nội dung text */}
+        <div className="flex flex-col gap-0.5">
+          <span className="font-bold text-sm">{message}</span>
+          <span className="text-xs text-muted-foreground line-clamp-1">
+             {quantity}x {product.name} ({sizeName})
+          </span>
+        </div>
+      </div>,
+      {
+        id: `cart-action-${uniqueId}`, // ID giúp chống spam
+        duration: 3000,
+        position: "bottom-right",
+        action: { 
+            label: "Xem giỏ", 
+            onClick: () => router.push("/cart") 
+        },
+        className: "group"
+      }
+    );
+  };
+
   const addToCart = (
     product: Product, 
     quantity: number,
@@ -76,9 +114,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     setItems((prev) => {
       const existingItem = prev.find((item) => item.uniqueKey === uniqueKey);
+      const sizeName = options.size.name; // Lấy tên size để hiện lên toast
 
       if (existingItem) {
-        toast.success("Đã cập nhật số lượng!");
+        showCartToast("Đã cập nhật số lượng!", product, uniqueKey, quantity, sizeName);
         return prev.map((item) =>
           item.uniqueKey === uniqueKey
             ? { ...item, quantity: item.quantity + quantity }
@@ -86,7 +125,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         );
       }
 
-      toast.success("Đã thêm vào giỏ hàng!");
+      showCartToast("Đã thêm vào giỏ!", product, uniqueKey, quantity, sizeName);
+
       return [
         ...prev,
         {

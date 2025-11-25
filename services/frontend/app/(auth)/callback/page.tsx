@@ -2,15 +2,14 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { authService } from "@/services/authService";
-import { Loader2 } from "lucide-react";
 import { isAxiosError } from "axios";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import { Loader2, AlertCircle, ChevronLeft } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
@@ -25,14 +24,12 @@ export default function GoogleCallbackPage() {
   const { login } = useAuth(); 
 
   const [error, setError] = useState<string | null>(null);
-  
   const hasProcessed = useRef(false);
 
   useEffect(() => {
     const handleGoogleCallback = async () => {
       const code = searchParams.get("code");
       const errorParam = searchParams.get("error");
-      
       const state = searchParams.get("state"); 
 
       if (errorParam) {
@@ -41,7 +38,7 @@ export default function GoogleCallbackPage() {
       }
 
       if (!code) {
-        setError("Không tìm thấy authorization code. Vui lòng thử lại.");
+        setError("Không tìm thấy mã xác thực. Vui lòng thử lại.");
         return;
       }
 
@@ -53,19 +50,16 @@ export default function GoogleCallbackPage() {
             redirectUrl = decodedState.redirect;
           }
         } catch (e) {
-          console.error("Không thể giải mã 'state' của Google:", e);
+          console.error("Lỗi giải mã state:", e);
         }
       }
 
       try {
         const data = await authService.loginWithGoogle({ code });
-
         await login(data.accessToken); 
-
         router.push(redirectUrl); 
-
       } catch (err) {
-        console.error("Lỗi khi xác thực Google Callback:", err);
+        console.error("Lỗi xác thực Google:", err);
         let errorMessage = "Đã xảy ra lỗi không xác định.";
         if (isAxiosError(err)) {
           errorMessage = err.response?.data?.message || err.response?.data || "Xác thực Google thất bại.";
@@ -78,39 +72,57 @@ export default function GoogleCallbackPage() {
       hasProcessed.current = true;
       handleGoogleCallback();
     }
-
   }, [searchParams, router, login]); 
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center p-4">
+    // Card "Vô hình" để khớp Layout
+    <Card className="w-full border-0 shadow-none bg-transparent transition-all">
+      
       {error ? (
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-destructive">
+        // TRẠNG THÁI LỖI
+        <>
+          <CardHeader className="text-center px-0">
+            <div className="flex justify-center mb-4">
+              <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-red-600" />
+              </div>
+            </div>
+            <CardTitle className="text-xl font-bold text-destructive">
               Đăng nhập thất bại
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <Alert variant="destructive">
+          <CardContent className="px-0">
+            <Alert variant="destructive" className="border-red-200 bg-red-50">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Đã xảy ra lỗi</AlertTitle>
+              <AlertTitle>Lỗi xác thực</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           </CardContent>
-          <CardFooter>
-            <Button asChild className="w-full">
-              <Link href="/login">Quay lại trang Đăng nhập</Link>
+          <CardFooter className="px-0">
+            <Button asChild className="w-full h-11 bg-orange-600 hover:bg-orange-500">
+              <Link href="/login" className="flex items-center gap-2">
+                <ChevronLeft className="h-4 w-4" />
+                Quay lại đăng nhập
+              </Link>
             </Button>
           </CardFooter>
-        </Card>
+        </>
       ) : (
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin" />
-          <p className="text-muted-foreground">
-            Đang xác thực, vui lòng chờ...
-          </p>
+        // TRẠNG THÁI LOADING (ĐANG XỬ LÝ)
+        <div className="py-12 flex flex-col items-center justify-center gap-6">
+          <div className="relative">
+            {/* Hiệu ứng 2 vòng tròn xoay nhìn cho "nguy hiểm" hơn */}
+            <div className="absolute inset-0 rounded-full border-4 border-orange-200 opacity-20 animate-ping"></div>
+            <Loader2 className="h-12 w-12 animate-spin text-orange-600 relative z-10" />
+          </div>
+          <div className="text-center space-y-2">
+            <h3 className="text-lg font-semibold text-gray-900">Đang kết nối với Google...</h3>
+            <p className="text-sm text-muted-foreground">
+              Vui lòng không tắt trình duyệt
+            </p>
+          </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
