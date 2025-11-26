@@ -12,6 +12,7 @@ import {
   productSchema,
   type CreateProductRequest
 } from "@/types/product";
+import { getImageUrl } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -28,10 +30,12 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from "lucide-react";
+import { Loader2, Image as ImageIcon } from "lucide-react";
+import Image from "next/image";
 
 interface ProductFormDialogProps {
   isOpen: boolean;
@@ -48,8 +52,7 @@ export function ProductFormDialog({
 }: ProductFormDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const mode = initialData ? "Cập nhật" : "Tạo mới";
-  const title = `${mode} Sản phẩm`;
-
+  
   const form = useForm({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -61,6 +64,7 @@ export function ProductFormDialog({
     },
   });
 
+  // Reset form khi mở/đóng
   useEffect(() => {
     if (isOpen) {
       form.reset({
@@ -82,18 +86,17 @@ export function ProductFormDialog({
       price: data.price,
       stockQuantity: data.stockQuantity,
       image: data.image || null,
-      categoryId: 1, 
+      categoryId: 1, // Mặc định categoryId=1 (Cần update khi có API category)
     };
 
     try {
       if (initialData) {
         await productService.updateProduct(initialData.id, requestData);
-        toast.success(`Đã cập nhật sản phẩm: ${data.name}`);
+        toast.success(`Đã cập nhật: ${data.name}`);
       } else {
         await productService.createProduct(requestData);
-        toast.success(`Đã tạo sản phẩm: ${data.name}`);
+        toast.success(`Đã tạo mới: ${data.name}`);
       }
-      
       onProductSaved(); 
       onClose(); 
     } catch (err) {
@@ -108,103 +111,141 @@ export function ProductFormDialog({
     }
   };
 
+  // Watch image field to show preview
+  const imageUrl = form.watch("image");
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-xl">
+    <Dialog open={isOpen} onOpenChange={(open) => !isSubmitting && onClose()}>
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle className="text-xl text-orange-600">{mode} Sản phẩm</DialogTitle>
+          <DialogDescription>
+            Điền thông tin chi tiết về món ăn. Nhấn lưu để hoàn tất.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tên Sản phẩm</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ví dụ: Bún Bò Huế" {...field} value={field.value as string} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* LEFT COLUMN: BASIC INFO */}
+                <div className="space-y-4">
+                    <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Tên món ăn <span className="text-red-500">*</span></FormLabel>
+                            <FormControl>
+                                <Input placeholder="Ví dụ: Phở Bò Đặc Biệt" {...field} value={field.value as string} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Mô tả (Tùy chọn)</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="..." {...field} value={field.value as string} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="price"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Giá bán (VNĐ) <span className="text-red-500">*</span></FormLabel>
+                                <FormControl>
+                                <Input type="number" step="1000" {...field} value={field.value as number} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        
+                        <FormField
+                            control={form.control}
+                            name="stockQuantity"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Số lượng kho</FormLabel>
+                                <FormControl>
+                                <Input type="number" {...field} value={field.value as number} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                    </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Giá (VND)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        step="1000" 
-                        {...field} 
-                        value={field.value as number}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="stockQuantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Số lượng Kho</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        {...field} 
-                        value={field.value as number}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    <FormField
+                        control={form.control}
+                        name="description"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Mô tả</FormLabel>
+                            <FormControl>
+                                <Textarea 
+                                    placeholder="Mô tả ngắn gọn về món ăn..." 
+                                    className="resize-none min-h-[100px]" 
+                                    {...field} 
+                                    value={field.value as string} 
+                                />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+
+                {/* RIGHT COLUMN: IMAGE */}
+                <div className="space-y-4">
+                    <FormField
+                        control={form.control}
+                        name="image"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Link Hình ảnh</FormLabel>
+                            <FormControl>
+                                <Input placeholder="https://example.com/image.jpg" {...field} value={field.value as string} />
+                            </FormControl>
+                            <FormDescription className="text-xs">
+                                Dán đường dẫn ảnh trực tiếp vào đây.
+                            </FormDescription>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    {/* Image Preview Area */}
+                    <div className="mt-2 border-2 border-dashed border-zinc-200 rounded-xl w-full aspect-square flex flex-col items-center justify-center bg-zinc-50 overflow-hidden relative">
+                        {imageUrl ? (
+                            <Image 
+                                src={getImageUrl(imageUrl as string)} 
+                                alt="Preview" 
+                                fill 
+                                className="object-cover"
+                                onError={() => toast.error("Link ảnh không hợp lệ")}
+                            />
+                        ) : (
+                            <div className="text-center text-zinc-400 p-4">
+                                <ImageIcon className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                                <p className="text-sm">Xem trước ảnh</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
 
-            <FormField
-              control={form.control}
-              name="image"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Link Hình ảnh (Tùy chọn)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://..." {...field} value={field.value as string} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <DialogFooter>
+            {/* [FIX] Thay đổi gap-2 sm:gap-0 thành gap-2 sm:space-x-2 */}
+            <DialogFooter className="gap-2 sm:space-x-2">
               <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-                Hủy
+                Hủy bỏ
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Lưu"}
+              <Button type="submit" disabled={isSubmitting} className="bg-orange-600 hover:bg-orange-500 text-white">
+                {isSubmitting ? (
+                    <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang lưu...
+                    </>
+                ) : (
+                    "Lưu sản phẩm"
+                )}
               </Button>
             </DialogFooter>
           </form>

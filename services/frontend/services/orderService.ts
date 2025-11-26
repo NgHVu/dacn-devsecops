@@ -31,6 +31,7 @@ const getOrderById = async (id: number): Promise<Order> => {
   return response.data;
 };
 
+// API cho Admin
 const getAllOrders = async (
   page = 0, 
   size = 20

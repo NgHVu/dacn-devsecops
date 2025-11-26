@@ -6,11 +6,15 @@ import {
   type UpdateProductRequest
 } from '@/types/product';
 
+// Cập nhật thêm các tham số lọc chuẩn E-commerce
 export type GetProductsParams = {
   page?: number;
   size?: number;
   sort?: string; 
   name?: string;
+  categoryId?: number | string; // Thêm lọc theo danh mục
+  minPrice?: number;            // Thêm lọc giá thấp nhất
+  maxPrice?: number;            // Thêm lọc giá cao nhất
 };
 
 const getProducts = async (
@@ -22,7 +26,12 @@ const getProducts = async (
   if (params.page !== undefined) queryParams.append('page', String(params.page));
   if (params.size !== undefined) queryParams.append('size', String(params.size));
   if (params.sort) queryParams.append('sort', params.sort);
+  
+  // Các bộ lọc (Backend chưa xử lý thì sẽ bỏ qua, không gây lỗi)
   if (params.name) queryParams.append('name', params.name);
+  if (params.categoryId) queryParams.append('categoryId', String(params.categoryId));
+  if (params.minPrice) queryParams.append('minPrice', String(params.minPrice));
+  if (params.maxPrice) queryParams.append('maxPrice', String(params.maxPrice));
 
   const url = `/api/products?${queryParams.toString()}`;
 

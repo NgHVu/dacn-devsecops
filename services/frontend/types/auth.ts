@@ -23,6 +23,10 @@ export interface UserResponse {
   name: string;
   email: string;
   role: string;
+  // Thêm các trường mở rộng (có thể backend chưa trả về, ta để optional để UI không lỗi)
+  phoneNumber?: string;
+  avatar?: string;
+  address?: string;
 }
 
 export interface GoogleAuthRequest {
@@ -37,3 +41,18 @@ export type ResetPasswordRequest = {
   token: string;
   newPassword: string;
 };
+
+// [NEW] Request cập nhật thông tin
+export interface UpdateProfileRequest {
+  name: string;
+  phoneNumber?: string;
+  address?: string;
+  avatar?: string;
+}
+
+// [NEW] Request đổi mật khẩu
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+  confirmationPassword: string;
+}

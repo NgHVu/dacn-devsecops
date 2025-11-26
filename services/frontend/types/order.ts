@@ -20,6 +20,7 @@ export type PageableResponse<T> = {
 export type CreateOrderItemRequest = {
   productId: number;
   quantity: number;
+  note?: string; // Thêm note nếu cần
 };
 
 export type CreateOrderRequest = {
@@ -32,6 +33,7 @@ export type OrderItem = {
   quantity: number;
   price: number;
   productName: string;
+  productImage?: string; // Optional nếu backend chưa trả về
 };
 
 export type Order = {
