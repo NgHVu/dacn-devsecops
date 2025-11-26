@@ -10,7 +10,9 @@ import com.example.orders.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,6 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -177,6 +182,60 @@ public class OrderServiceImpl implements OrderService {
         triggerEmailNotification(savedOrder, "");
 
         return mapOrderToOrderResponse(savedOrder);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DashboardStats getDashboardStats() {
+        BigDecimal totalRevenue = orderRepository.sumTotalRevenue();
+        if (totalRevenue == null) totalRevenue = BigDecimal.ZERO;
+
+        long totalOrders = orderRepository.count();
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime startOfMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
+        long newCustomers = orderRepository.countDistinctUsersInPeriod(startOfMonth, now);
+
+        double revenueGrowth = calculateRevenueGrowth(now);
+
+        List<MonthlyRevenue> rawMonthlyStats = orderRepository.getMonthlyRevenue();
+        List<DashboardStats.MonthlyStats> chartData = rawMonthlyStats.stream()
+                .map(m -> new DashboardStats.MonthlyStats("Tháng " + m.month(), m.total()))
+                .collect(Collectors.toList());
+
+        Pageable top5 = PageRequest.of(0, 5, Sort.by("createdAt").descending());
+        List<OrderResponse> recentSales = orderRepository.findAll(top5).stream()
+                .map(this::mapOrderToOrderResponse)
+                .collect(Collectors.toList());
+
+        return new DashboardStats(
+                totalRevenue,
+                revenueGrowth,
+                totalOrders,
+                newCustomers,
+                chartData,
+                recentSales
+        );
+    }
+    
+    private double calculateRevenueGrowth(OffsetDateTime now) {
+        OffsetDateTime startOfThisMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
+        OffsetDateTime startOfLastMonth = startOfThisMonth.minusMonths(1);
+        
+        BigDecimal thisMonthRev = orderRepository.sumRevenueInPeriod(startOfThisMonth, now);
+        if (thisMonthRev == null) thisMonthRev = BigDecimal.ZERO;
+        
+        BigDecimal lastMonthRev = orderRepository.sumRevenueInPeriod(startOfLastMonth, startOfThisMonth.minusSeconds(1));
+        if (lastMonthRev == null) lastMonthRev = BigDecimal.ZERO;
+
+        if (lastMonthRev.compareTo(BigDecimal.ZERO) == 0) {
+            return thisMonthRev.compareTo(BigDecimal.ZERO) > 0 ? 100.0 : 0.0;
+        }
+
+        return thisMonthRev.subtract(lastMonthRev)
+                .divide(lastMonthRev, 4, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100))
+                .doubleValue();
     }
 
     private void validateStatusTransition(OrderStatus currentStatus, OrderStatus newStatus) {

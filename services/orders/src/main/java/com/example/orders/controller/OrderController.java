@@ -1,8 +1,10 @@
 package com.example.orders.controller;
 
+import com.example.orders.dto.DashboardStats;
 import com.example.orders.dto.OrderCreateRequest;
 import com.example.orders.dto.OrderResponse;
 import com.example.orders.dto.OrderStatusUpdate;
+import com.example.orders.dto.DashboardStats; 
 import com.example.orders.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -89,5 +91,17 @@ public class OrderController {
         
         log.info("Admin cập nhật đơn hàng ID: {} sang trạng thái: {}", orderId, statusUpdate.getStatus());
         return ResponseEntity.ok(orderService.updateOrderStatus(orderId, statusUpdate));
+    }
+
+    @Operation(
+            summary = "[ADMIN] Lấy thống kê Dashboard",
+            description = "Trả về tổng doanh thu, tăng trưởng, biểu đồ tháng và đơn hàng mới nhất.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @PreAuthorize("hasRole('ADMIN')") 
+    @GetMapping("/admin/dashboard")
+    public ResponseEntity<DashboardStats> getDashboardStats() {
+        log.info("Admin đang lấy dữ liệu thống kê Dashboard...");
+        return ResponseEntity.ok(orderService.getDashboardStats());
     }
 }

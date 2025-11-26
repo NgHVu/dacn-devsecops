@@ -2,6 +2,7 @@ package com.example.products;
 
 import com.example.products.controller.ProductController;
 import com.example.products.dto.ProductCreateRequest;
+import com.example.products.dto.ProductCriteria; 
 import com.example.products.dto.ProductUpdateRequest;
 import com.example.products.entity.Product;
 import com.example.products.service.ProductService;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -31,16 +33,20 @@ class ProductControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @SuppressWarnings("removal")
     @MockBean
     private ProductService productService;
 
     @Test
     void testList_ShouldReturn200OK() throws Exception {
         Page<Product> emptyPage = Page.empty();
-        given(productService.list(any(), any(), any(), any())).willReturn(emptyPage);
+        
+        given(productService.getAllProducts(any(ProductCriteria.class), any(Pageable.class)))
+                .willReturn(emptyPage);
 
-        mockMvc.perform(get("/api/products"))
+        mockMvc.perform(get("/api/products")
+                        .param("search", "phone")       
+                        .param("minPrice", "100")
+                        .param("sort", "price_asc"))
                 .andExpect(status().isOk());
     }
     
@@ -56,7 +62,7 @@ class ProductControllerTest {
     
     @Test
     void testCreate_ShouldReturn201Created() throws Exception {
-        ProductCreateRequest request = new ProductCreateRequest("Phở Bò", new BigDecimal("50000"), 100, "pho.jpg");
+        ProductCreateRequest request = new ProductCreateRequest("Phở Bò", new BigDecimal("50000"), 100, "pho.jpg", 1L); // Thêm categoryId
         
         Product savedProduct = Product.builder().id(1L).name("Phở Bò").build();
         given(productService.create(any(ProductCreateRequest.class))).willReturn(savedProduct);
@@ -70,7 +76,7 @@ class ProductControllerTest {
     
     @Test
     void testUpdatePartial_ShouldReturn200OK() throws Exception {
-        ProductUpdateRequest request = new ProductUpdateRequest("Tên Mới", null, null, null);
+        ProductUpdateRequest request = new ProductUpdateRequest("Tên Mới", null, null, null, null);
         
         Product updatedProduct = Product.builder().id(1L).name("Tên Mới").build();
         given(productService.updatePartial(eq(1L), any(ProductUpdateRequest.class))).willReturn(updatedProduct);

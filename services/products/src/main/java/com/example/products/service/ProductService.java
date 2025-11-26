@@ -2,9 +2,9 @@ package com.example.products.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest; 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;     
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification; 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -13,11 +13,13 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.products.dto.ProductCreateRequest;
-import com.example.products.dto.ProductCriteria;    
+import com.example.products.dto.ProductCriteria;
 import com.example.products.dto.ProductUpdateRequest;
+import com.example.products.entity.Category;
 import com.example.products.entity.Product;
+import com.example.products.repository.CategoryRepository;
 import com.example.products.repository.ProductRepository;
-import com.example.products.repository.ProductSpecification; 
+import com.example.products.repository.ProductSpecification;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -29,7 +31,9 @@ import java.util.List;
 public class ProductService {
 
     private final ProductRepository repo;
+    private final CategoryRepository categoryRepository; 
 
+    // --- LOGIC CHO READ ---
     @Transactional(readOnly = true)
     public Page<Product> getAllProducts(ProductCriteria criteria, Pageable pageable) {
         Specification<Product> spec = ProductSpecification.filterBy(criteria);
@@ -51,7 +55,6 @@ public class ProductService {
         }
 
         Pageable sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
-
         return repo.findAll(spec, sortedPageable);
     }
 
@@ -76,6 +79,9 @@ public class ProductService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Tên sản phẩm đã tồn tại: " + req.name());
         }
 
+        Category category = categoryRepository.findById(req.categoryId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy danh mục với ID: " + req.categoryId()));
+
         BigDecimal normalizedPrice = req.price().setScale(2, RoundingMode.HALF_UP);
 
         Product entity = Product.builder()
@@ -83,6 +89,7 @@ public class ProductService {
                 .price(normalizedPrice)
                 .stockQuantity(req.stockQuantity())
                 .image(req.image())
+                .category(category) 
                 .build();
         
         return repo.save(entity);
@@ -116,6 +123,12 @@ public class ProductService {
 
         if (req.image() != null) {
             existing.setImage(req.image());
+        }
+
+        if (req.categoryId() != null) {
+            Category newCategory = categoryRepository.findById(req.categoryId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy danh mục mới với ID: " + req.categoryId()));
+            existing.setCategory(newCategory);
         }
 
         return repo.save(existing);

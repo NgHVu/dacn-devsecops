@@ -7,13 +7,15 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
-@Data // (Lombok) Tự động tạo Getters, Setters, toString, equals, hashCode
-@NoArgsConstructor // (Lombok) Constructor rỗng cho JPA
-@AllArgsConstructor // (Lombok) Constructor cho tất cả các trường
-@Builder // (Lombok) Hỗ trợ Builder pattern
+@Data 
+@NoArgsConstructor 
+@AllArgsConstructor 
+@Builder 
 @Entity
 @Table(name = "products",
        indexes = {
@@ -41,12 +43,12 @@ public class Product {
     private BigDecimal price;
 
     @Column(name = "stock_quantity", nullable = false)
-    @Builder.Default // Đặt giá trị mặc định là 0
+    @Builder.Default 
     private Integer stockQuantity = 0;
 
     @Size(max = 255)
     @Schema(description = "Tên file ảnh hoặc URL", example = "com-tam.jpg")
-    private String image; // (Giữ nguyên tên `image` cho nhất quán)
+    private String image; 
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -55,4 +57,9 @@ public class Product {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    @ManyToOne(fetch = FetchType.EAGER) 
+    @JoinColumn(name = "category_id", nullable = false) 
+    @JsonIgnoreProperties("products") 
+    private Category category;
 }

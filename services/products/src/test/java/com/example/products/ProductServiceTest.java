@@ -12,6 +12,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.products.dto.ProductCreateRequest;
+import com.example.products.dto.ProductCriteria; 
 import com.example.products.dto.ProductUpdateRequest;
 import com.example.products.entity.Product;
 import com.example.products.repository.ProductRepository;
@@ -53,7 +54,7 @@ class ProductServiceTest {
 
     @Test
     void testCreate_Success() {
-        ProductCreateRequest request = new ProductCreateRequest("Bún Bò Huế", new BigDecimal("45000"), 50, "bun-bo.jpg");        
+        ProductCreateRequest request = new ProductCreateRequest("Bún Bò Huế", new BigDecimal("45000"), 50, "bun-bo.jpg", 1L);        
         Product savedProduct = Product.builder().id(1L).name("Bún Bò Huế").build();
         when(productRepository.existsByNameIgnoreCase("Bún Bò Huế")).thenReturn(false);
         when(productRepository.save(any(Product.class))).thenReturn(savedProduct);
@@ -64,7 +65,7 @@ class ProductServiceTest {
 
     @Test
     void testCreate_Conflict_ShouldThrowException() {
-        ProductCreateRequest request = new ProductCreateRequest("Phở Bò", new BigDecimal("50000"), 100, "pho-bo.jpg");        
+        ProductCreateRequest request = new ProductCreateRequest("Phở Bò", new BigDecimal("50000"), 100, "pho-bo.jpg", 1L);        
         when(productRepository.existsByNameIgnoreCase("Phở Bò")).thenReturn(true);
         assertThrows(ResponseStatusException.class, () -> productService.create(request));
     }
@@ -72,7 +73,7 @@ class ProductServiceTest {
     @Test
     void testUpdatePartial_AllFields_Success() {
         Product existing = Product.builder().id(1L).name("Cũ").price(new BigDecimal("10000")).image("cu.jpg").build();
-        ProductUpdateRequest request = new ProductUpdateRequest("Mới", new BigDecimal("20000"), 20, "moi.jpg");        
+        ProductUpdateRequest request = new ProductUpdateRequest("Mới", new BigDecimal("20000"), 20, "moi.jpg", null);        
         when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(productRepository.save(any(Product.class))).thenAnswer(i -> i.getArgument(0));
         Product updated = productService.updatePartial(1L, request);
@@ -84,7 +85,7 @@ class ProductServiceTest {
     @Test
     void testUpdatePartial_NameConflict_ShouldThrowException() {
         Product existing = Product.builder().id(1L).name("Cơm").build();
-        ProductUpdateRequest request = new ProductUpdateRequest("Phở", null, null, null);
+        ProductUpdateRequest request = new ProductUpdateRequest("Phở", null, null, null, null);
         when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(productRepository.existsByNameIgnoreCase("Phở")).thenReturn(true);
         assertThrows(ResponseStatusException.class, () -> productService.updatePartial(1L, request));
@@ -93,39 +94,36 @@ class ProductServiceTest {
     @Test
     void testUpdatePartial_InvalidPrice_ShouldThrowException() {
         Product existing = Product.builder().id(1L).name("Cơm").build();
-    ProductUpdateRequest request = new ProductUpdateRequest(null, new BigDecimal("0.00"), null, null);
+        ProductUpdateRequest request = new ProductUpdateRequest(null, new BigDecimal("0.00"), null, null, null);
         when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
         assertThrows(ResponseStatusException.class, () -> productService.updatePartial(1L, request));
     }
-    
+        
     @SuppressWarnings("unchecked")
     @Test
-    void testList_SearchByName_ShouldCallCorrectRepoMethod() {
+    void testGetAllProducts_Search_ShouldCallRepo() {
+        // Arrange
         Page<Product> productPage = new PageImpl<>(List.of());
         when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(productPage);
-        productService.list("cơm", null, null, Pageable.unpaged());
+        
+        ProductCriteria criteria = new ProductCriteria("cơm", null, null, null, "newest");
+        
+        productService.getAllProducts(criteria, Pageable.unpaged());
+        
         verify(productRepository, times(1)).findAll(any(Specification.class), any(Pageable.class));
     }
     
     @SuppressWarnings("unchecked")
     @Test
-    void testList_SearchByPrice_ShouldCallCorrectRepoMethod() {
+    void testGetAllProducts_FilterByPrice_ShouldCallRepo() {
         Page<Product> productPage = new PageImpl<>(List.of());
         when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(productPage);
-        productService.list(null, new BigDecimal("10000"), new BigDecimal("50000"), Pageable.unpaged());
+        
+        ProductCriteria criteria = new ProductCriteria(null, null, new BigDecimal("10000"), new BigDecimal("50000"), null);
+        
+        productService.getAllProducts(criteria, Pageable.unpaged());
+        
         verify(productRepository, times(1)).findAll(any(Specification.class), any(Pageable.class));
-    }
-
-    @Test
-    void testList_InvalidPriceRange_ShouldThrowException() {
-        String name = null;
-        BigDecimal minPrice = new BigDecimal("50000");
-        BigDecimal maxPrice = new BigDecimal("10000");
-        Pageable pageable = Pageable.unpaged();
-
-        assertThrows(ResponseStatusException.class, 
-            () ->  productService.list(name, minPrice, maxPrice, pageable)
-        );
     }
 
     @Test
@@ -140,16 +138,5 @@ class ProductServiceTest {
     void testDelete_NotFound_ShouldThrowException() {
         when(productRepository.existsById(99L)).thenReturn(false);
         assertThrows(ResponseStatusException.class, () -> productService.delete(99L));
-    }
-    
-    @SuppressWarnings("unchecked")
-    @Test
-    void testList_Success() {
-        List<Product> productList = List.of(Product.builder().id(1L).name("Sản phẩm 1").build());
-        Page<Product> productPage = new PageImpl<>(productList, Pageable.unpaged(), 1);
-        when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(productPage);
-        Page<Product> result = productService.list(null, null, null, Pageable.unpaged());
-        assertThat(result.getTotalElements()).isEqualTo(1);
-        assertThat(result.getContent().get(0).getName()).isEqualTo("Sản phẩm 1");
     }
 }

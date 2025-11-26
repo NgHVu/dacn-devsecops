@@ -1,10 +1,16 @@
 import * as z from 'zod';
 
+export type Category = {
+  id: number;
+  name: string;
+  description?: string;
+};
+
 export type GetProductsParams = {
   page?: number;
   size?: number;
   sort?: string; 
-  search?: string; 
+  search?: string;
   categoryId?: number | string;
   minPrice?: number;
   maxPrice?: number;
@@ -17,7 +23,12 @@ export type Product = {
   price: number;
   image: string;
   stockQuantity: number;
-  categoryId?: number; 
+  
+  category?: Category; 
+  
+  // Giữ field nếu backend trả về cả 2, thường là object
+  // categoryId?: number; 
+
   createdAt: string;
   updatedAt: string;
 };
@@ -35,13 +46,18 @@ export type PageableResponse<T> = {
 
 export const productSchema = z.object({
   name: z.string().min(3, { message: "Tên phải có ít nhất 3 ký tự." }),
+  
   description: z.string().optional(),
+  
   price: z.coerce.number().min(0, { message: "Giá không thể âm." }),
+    
   stockQuantity: z.coerce.number()
     .int({ message: "Số lượng phải là số nguyên." })
     .min(0, { message: "Số lượng không thể âm." }),
+    
   categoryId: z.coerce.number()
     .min(1, { message: "Vui lòng chọn danh mục." }),
+
   image: z.string().trim().url({ message: "Phải là một đường dẫn URL hợp lệ." })
             .or(z.literal("")).optional(), 
 });
@@ -57,4 +73,4 @@ export type CreateProductRequest = {
   categoryId: number; 
 };
 
-export type UpdateProductRequest = CreateProductRequest;
+export type UpdateProductRequest = Partial<CreateProductRequest>;

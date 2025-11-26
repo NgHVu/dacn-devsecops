@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 
-// Đổi tên thành số ít để đồng bộ với Entity "Product"
 @Schema(description = "Payload để tạo mới một sản phẩm")
 public record ProductCreateRequest(
 
@@ -24,11 +23,12 @@ public record ProductCreateRequest(
         @Schema(description = "Số lượng tồn kho ban đầu", example = "100")
         Integer stockQuantity,
 
-        // Nếu ảnh là bắt buộc, thêm @NotBlank
-        @NotBlank(message = "Ảnh không được để trống") 
+        //@NotBlank(message = "Ảnh không được để trống") 
         @Size(max = 255, message = "Độ dài URL ảnh tối đa 255 ký tự")
         @Schema(description = "Tên file ảnh hoặc URL", example = "com-tam.jpg")
-        String image
+        String image,
 
-
+        @NotNull(message = "Danh mục không được để trống")
+        @Schema(description = "ID của danh mục sản phẩm", example = "1")
+        Long categoryId
 ) {}
