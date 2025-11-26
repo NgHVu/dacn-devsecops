@@ -2,7 +2,9 @@ package com.example.products.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest; // <-- Mới
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;        // <-- Mới
 import org.springframework.data.jpa.domain.Specification; 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -11,49 +13,54 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.products.dto.ProductCreateRequest;
+import com.example.products.dto.ProductCriteria;     // <-- Mới
 import com.example.products.dto.ProductUpdateRequest;
 import com.example.products.entity.Product;
 import com.example.products.repository.ProductRepository;
+import com.example.products.repository.ProductSpecification; // <-- Mới
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
-@Service // Đánh dấu đây là một Service Bean
-@RequiredArgsConstructor // (Lombok) Tự động tạo constructor để tiêm Repository
-@Transactional // Mặc định các phương thức sẽ là transaction
+@Service
+@RequiredArgsConstructor
+@Transactional
 public class ProductService {
 
-    // Tiêm Repository vào Service
     private final ProductRepository repo;
 
-    // --- LOGIC CHO READ ---
+    // --- LOGIC CHO READ (Đã nâng cấp Advanced Filter) ---
     @Transactional(readOnly = true)
-    public Page<Product> list(String q, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
-        
-        // 1. Tạo một Specification rỗng (luôn đúng) để bắt đầu
-        Specification<Product> spec = Specification.allOf();
+    public Page<Product> getAllProducts(ProductCriteria criteria, Pageable pageable) {
+        // 1. Tạo Specification từ Criteria (Logic lọc nằm ở file ProductSpecification)
+        Specification<Product> spec = ProductSpecification.filterBy(criteria);
 
-        // 2. Nếu có từ khóa tên, thêm điều kiện "AND name LIKE ..."
-        if (StringUtils.hasText(q)) {
-            spec = spec.and((root, query, cb) -> 
-                cb.like(cb.lower(root.get("name")), "%" + q.trim().toLowerCase() + "%")
-            );
-        }
+        // 2. Xử lý Logic Sắp xếp
+        // Mặc định sắp xếp theo ngày cập nhật giảm dần (mới nhất lên đầu)
+        Sort sort = Sort.by("updatedAt").descending();
 
-        // 3. Nếu có khoảng giá, thêm điều kiện "AND price BETWEEN ..."
-        if (minPrice != null && maxPrice != null) {
-            if (minPrice.compareTo(maxPrice) > 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "minPrice không được lớn hơn maxPrice");
+        if (StringUtils.hasText(criteria.sort())) {
+            switch (criteria.sort()) {
+                case "price_asc" -> sort = Sort.by("price").ascending();
+                case "price_desc" -> sort = Sort.by("price").descending();
+                case "name_asc" -> sort = Sort.by("name").ascending();
+                case "newest" -> sort = Sort.by("updatedAt").descending();
+                default -> {
+                    // Nếu chuỗi sort không khớp case nào, kiểm tra xem pageable gốc có sort không
+                    if (pageable.getSort().isSorted()) {
+                        sort = pageable.getSort();
+                    }
+                }
             }
-            spec = spec.and((root, query, cb) -> 
-                cb.between(root.get("price"), minPrice, maxPrice)
-            );
         }
 
-        // 4. Thực thi truy vấn với tất cả các điều kiện đã được xây dựng
-        return repo.findAll(spec, pageable);
-    }   
+        // 3. Tạo Pageable mới kết hợp trang hiện tại và sort đã chốt
+        Pageable sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
+
+        // 4. Gọi Repository (đã extends JpaSpecificationExecutor)
+        return repo.findAll(spec, sortedPageable);
+    }
 
     @Transactional(readOnly = true)
     public Product getById(Long id) {
@@ -91,11 +98,12 @@ public class ProductService {
 
     // --- LOGIC CHO UPDATE ---
     public Product updatePartial(Long id, ProductUpdateRequest req) {
-        Product existing = getById(id); // Tái sử dụng logic getById (đã bao gồm check Not Found)
+        Product existing = getById(id);
 
         // Cập nhật tên
         if (req.name() != null && StringUtils.hasText(req.name())) {
             String newName = req.name().trim();
+            // Nếu tên thay đổi và trùng với tên sản phẩm KHÁC -> Lỗi
             if (!newName.equalsIgnoreCase(existing.getName()) && repo.existsByNameIgnoreCase(newName)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Tên sản phẩm đã tồn tại: " + newName);
             }
@@ -111,6 +119,7 @@ public class ProductService {
             existing.setPrice(normalized);
         }
 
+        // Cập nhật tồn kho
         if (req.stockQuantity() != null) {
             if (req.stockQuantity() < 0) {
                  throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số lượng tồn kho không thể âm");

@@ -1,5 +1,19 @@
 import * as z from 'zod';
 
+// ... (Các phần code khác giữ nguyên)
+
+// Cập nhật lại Type Params
+export type GetProductsParams = {
+  page?: number;
+  size?: number;
+  sort?: string; 
+  search?: string; // <-- ĐỔI TỪ name THÀNH search
+  categoryId?: number | string;
+  minPrice?: number;
+  maxPrice?: number;
+};
+
+// ... (Các phần code Product, PageableResponse, Zod Schema giữ nguyên vì không ảnh hưởng)
 export type Product = {
   id: number;
   name: string;
@@ -18,7 +32,6 @@ export type PageableResponse<T> = {
   totalElements: number;
   size: number;
   number: number;
-
   last?: boolean;  
   first?: boolean;
   empty?: boolean;
@@ -26,18 +39,13 @@ export type PageableResponse<T> = {
 
 export const productSchema = z.object({
   name: z.string().min(3, { message: "Tên phải có ít nhất 3 ký tự." }),
-  
   description: z.string().optional(),
-  
   price: z.coerce.number().min(0, { message: "Giá không thể âm." }),
-    
   stockQuantity: z.coerce.number()
     .int({ message: "Số lượng phải là số nguyên." })
     .min(0, { message: "Số lượng không thể âm." }),
-    
   categoryId: z.coerce.number()
     .min(1, { message: "Vui lòng chọn danh mục." }),
-
   image: z.string().trim().url({ message: "Phải là một đường dẫn URL hợp lệ." })
             .or(z.literal("")).optional(), 
 });

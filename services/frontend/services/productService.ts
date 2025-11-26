@@ -3,19 +3,9 @@ import {
   type Product, 
   type PageableResponse,
   type CreateProductRequest,
-  type UpdateProductRequest
+  type UpdateProductRequest,
+  type GetProductsParams // Import type này
 } from '@/types/product';
-
-// Cập nhật thêm các tham số lọc chuẩn E-commerce
-export type GetProductsParams = {
-  page?: number;
-  size?: number;
-  sort?: string; 
-  name?: string;
-  categoryId?: number | string; // Thêm lọc theo danh mục
-  minPrice?: number;            // Thêm lọc giá thấp nhất
-  maxPrice?: number;            // Thêm lọc giá cao nhất
-};
 
 const getProducts = async (
   params: GetProductsParams = {}
@@ -27,8 +17,9 @@ const getProducts = async (
   if (params.size !== undefined) queryParams.append('size', String(params.size));
   if (params.sort) queryParams.append('sort', params.sort);
   
-  // Các bộ lọc (Backend chưa xử lý thì sẽ bỏ qua, không gây lỗi)
-  if (params.name) queryParams.append('name', params.name);
+  // --- SỬA ĐỔI TẠI ĐÂY: Đổi 'name' thành 'search' để khớp với Backend ---
+  if (params.search) queryParams.append('search', params.search);
+  
   if (params.categoryId) queryParams.append('categoryId', String(params.categoryId));
   if (params.minPrice) queryParams.append('minPrice', String(params.minPrice));
   if (params.maxPrice) queryParams.append('maxPrice', String(params.maxPrice));
