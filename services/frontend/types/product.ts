@@ -1,19 +1,15 @@
 import * as z from 'zod';
 
-// ... (Các phần code khác giữ nguyên)
-
-// Cập nhật lại Type Params
 export type GetProductsParams = {
   page?: number;
   size?: number;
   sort?: string; 
-  search?: string; // <-- ĐỔI TỪ name THÀNH search
+  search?: string; 
   categoryId?: number | string;
   minPrice?: number;
   maxPrice?: number;
 };
 
-// ... (Các phần code Product, PageableResponse, Zod Schema giữ nguyên vì không ảnh hưởng)
 export type Product = {
   id: number;
   name: string;

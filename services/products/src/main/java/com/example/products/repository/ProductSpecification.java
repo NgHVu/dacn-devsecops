@@ -11,25 +11,21 @@ import java.util.List;
 
 public class ProductSpecification {
 
-    // Private constructor để tránh khởi tạo
     private ProductSpecification() {}
 
     public static Specification<Product> filterBy(ProductCriteria criteria) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            // 1. Tìm kiếm theo tên (ILIKE %search%)
             if (StringUtils.hasText(criteria.search())) {
                 String pattern = "%" + criteria.search().toLowerCase().trim() + "%";
                 predicates.add(cb.like(cb.lower(root.get("name")), pattern));
             }
 
-            // 2. Lọc theo Category ID (Giả sử quan hệ trong Entity tên là "category")
             if (criteria.categoryId() != null) {
                 predicates.add(cb.equal(root.get("category").get("id"), criteria.categoryId()));
             }
 
-            // 3. Lọc theo khoảng giá (min <= price <= max)
             if (criteria.minPrice() != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("price"), criteria.minPrice()));
             }
@@ -37,7 +33,6 @@ public class ProductSpecification {
                 predicates.add(cb.lessThanOrEqualTo(root.get("price"), criteria.maxPrice()));
             }
 
-            // Kết hợp tất cả điều kiện bằng AND
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }

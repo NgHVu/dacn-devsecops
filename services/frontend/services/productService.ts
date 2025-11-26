@@ -4,7 +4,7 @@ import {
   type PageableResponse,
   type CreateProductRequest,
   type UpdateProductRequest,
-  type GetProductsParams // Import type này
+  type GetProductsParams 
 } from '@/types/product';
 
 const getProducts = async (
@@ -17,7 +17,6 @@ const getProducts = async (
   if (params.size !== undefined) queryParams.append('size', String(params.size));
   if (params.sort) queryParams.append('sort', params.sort);
   
-  // --- SỬA ĐỔI TẠI ĐÂY: Đổi 'name' thành 'search' để khớp với Backend ---
   if (params.search) queryParams.append('search', params.search);
   
   if (params.categoryId) queryParams.append('categoryId', String(params.categoryId));

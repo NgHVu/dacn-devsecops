@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.example.products.dto.ProductCreateRequest;
-import com.example.products.dto.ProductCriteria; // <-- IMPORT MỚI
+import com.example.products.dto.ProductCriteria; 
 import com.example.products.dto.ProductUpdateRequest;
 import com.example.products.entity.Product;
 import com.example.products.service.ProductService;
@@ -43,7 +43,7 @@ public class ProductController {
             @RequestParam(required = false) String search,
 
             @Parameter(description = "ID danh mục sản phẩm")
-            @RequestParam(required = false) Long categoryId, // <-- THÊM
+            @RequestParam(required = false) Long categoryId, 
 
             @Parameter(description = "Giá tối thiểu")
             @RequestParam(required = false) @DecimalMin("0.00") BigDecimal minPrice,
@@ -52,12 +52,11 @@ public class ProductController {
             @RequestParam(required = false) @DecimalMin("0.00") BigDecimal maxPrice,
 
             @Parameter(description = "Sắp xếp: 'price_asc', 'price_desc', 'newest' (mặc định)")
-            @RequestParam(required = false, defaultValue = "newest") String sort, // <-- THÊM
+            @RequestParam(required = false, defaultValue = "newest") String sort, 
 
             @Parameter(hidden = true)
             @PageableDefault(size = 10) Pageable pageable
     ) {
-        // Gom nhóm tham số vào Record để truyền xuống Service cho gọn
         ProductCriteria criteria = new ProductCriteria(search, categoryId, minPrice, maxPrice, sort);
         
         return ResponseEntity.ok(service.getAllProducts(criteria, pageable));
