@@ -3,7 +3,7 @@ package com.example.users.service;
 import com.example.users.exception.ResourceNotFoundException;
 import com.example.users.dto.*;
 import com.example.users.entity.User;
-import com.example.users.entity.Role; // === 1. IMPORT ENUM MỚI ===
+import com.example.users.entity.Role;
 import com.example.users.exception.EmailAlreadyExistsException;
 import com.example.users.repository.UserRepository;
 import com.example.users.security.JwtTokenProvider;
@@ -11,6 +11,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.Page;         
+import org.springframework.data.domain.Pageable;     
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -20,7 +22,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UsernameNotFoundException; // Vẫn giữ import này
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -28,8 +30,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.util.StringUtils;         
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.io.IOException;                      
+import java.nio.file.Files;                   
+import java.nio.file.Path;                            
+import java.nio.file.Paths;                           
+import java.nio.file.StandardCopyOption;             
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -206,7 +215,7 @@ public class UserServiceImpl implements UserService {
         }
 
         User user = userRepository.findByEmail(userInfo.email())
-                .orElseGet(() -> createNewGoogleUser(userInfo)); // <-- Sẽ gọi hàm đã cập nhật
+                .orElseGet(() -> createNewGoogleUser(userInfo)); 
 
         log.info("Đăng nhập/Đăng ký Google thành công cho: {}", user.getEmail());
         
@@ -365,5 +374,99 @@ public class UserServiceImpl implements UserService {
         }
 
         log.info("Token hợp lệ cho user: {}", user.getEmail());
+    }
+
+    @Override
+    @Transactional
+    public UserResponse updateProfile(UpdateProfileRequest request) {
+        User user = getAuthenticatedUser();
+        
+        if (StringUtils.hasText(request.name())) {
+            user.setName(request.name().trim());
+        }
+        if (StringUtils.hasText(request.phoneNumber())) {
+            user.setPhoneNumber(request.phoneNumber().trim());
+        }
+        if (StringUtils.hasText(request.address())) {
+            user.setAddress(request.address().trim());
+        }
+        
+        return UserResponse.fromEntity(userRepository.save(user));
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(ChangePasswordRequest request) {
+        User user = getAuthenticatedUser();
+
+        if (!passwordEncoder.matches(request.oldPassword(), user.getPassword())) {
+            throw new BadCredentialsException("Mật khẩu cũ không chính xác");
+        }
+
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new BadCredentialsException("Mật khẩu xác nhận không khớp");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+        log.info("Người dùng ID {} đã đổi mật khẩu thành công", user.getId());
+    }
+
+    @Override
+    @Transactional
+    public String uploadAvatar(MultipartFile file) {
+        User user = getAuthenticatedUser();
+
+        if (file.isEmpty()) {
+            throw new RuntimeException("File ảnh không được để trống");
+        }
+
+        try {
+            String fileName = System.currentTimeMillis() + "_" + StringUtils.cleanPath(file.getOriginalFilename());
+            Path uploadPath = Paths.get("uploads/avatars");
+            
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+            
+            Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+            
+            String fileUrl = "/uploads/avatars/" + fileName; 
+            
+            user.setAvatar(fileUrl);
+            userRepository.save(user);
+            
+            return fileUrl;
+        } catch (IOException e) {
+            log.error("Lỗi khi upload avatar", e);
+            throw new RuntimeException("Không thể upload ảnh, vui lòng thử lại sau.");
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<UserResponse> getAllUsers(Pageable pageable) {
+        return userRepository.findAll(pageable)
+                .map(UserResponse::fromEntity);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserResponse getUserById(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
+        return UserResponse.fromEntity(user);
+    }
+
+    @Override
+    @Transactional
+    public void lockUser(Long id, boolean lock) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
+        
+        user.setAccountNonLocked(!lock);
+        userRepository.save(user);
+        
+        log.info("Admin đã {} tài khoản user ID: {}", lock ? "KHÓA" : "MỞ KHÓA", id);
     }
 }

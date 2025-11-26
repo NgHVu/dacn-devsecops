@@ -7,12 +7,12 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import java.util.List;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.time.OffsetDateTime;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Collection;
+import java.util.List;
 
 @Getter
 @Setter
@@ -36,6 +36,19 @@ public class User implements UserDetails {
 
     @Column(nullable = false)
     private String name; 
+
+    @Column(name = "phone_number")
+    private String phoneNumber;
+
+    @Column(name = "address")
+    private String address;
+
+    @Column(name = "avatar")
+    private String avatar;
+
+    @Column(name = "account_non_locked")
+    @Builder.Default
+    private boolean accountNonLocked = true; 
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -83,7 +96,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return this.accountNonLocked;
     }
 
     @Override
@@ -94,21 +107,5 @@ public class User implements UserDetails {
     @Override
     public boolean isEnabled() {
         return this.isVerified;
-    }
-
-    public String getResetPasswordToken() {
-        return resetPasswordToken;
-    }
-
-    public void setResetPasswordToken(String resetPasswordToken) {
-    this.resetPasswordToken = resetPasswordToken;
-    }
-
-    public LocalDateTime getResetTokenExpiry() {
-        return resetTokenExpiry;
-    }
-
-    public void setResetTokenExpiry(LocalDateTime resetTokenExpiry) {
-        this.resetTokenExpiry = resetTokenExpiry;
     }
 }

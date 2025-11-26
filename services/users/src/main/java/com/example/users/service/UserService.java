@@ -1,11 +1,10 @@
 package com.example.users.service;
 
-import com.example.users.dto.AuthResponse;
-import com.example.users.dto.LoginRequest;
-import com.example.users.dto.RegisterRequest;
-import com.example.users.dto.UserResponse;
-import com.example.users.dto.VerifyRequest;
+import com.example.users.dto.*;
+import org.springframework.data.domain.Page;     
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.web.multipart.MultipartFile; 
 
 public interface UserService extends UserDetailsService {
 
@@ -28,4 +27,16 @@ public interface UserService extends UserDetailsService {
     void resetPassword(String token, String newPassword);
 
     void validateResetToken(String token);
+
+    UserResponse updateProfile(UpdateProfileRequest request);
+
+    void changePassword(ChangePasswordRequest request);
+
+    String uploadAvatar(MultipartFile file);
+
+    Page<UserResponse> getAllUsers(Pageable pageable);
+
+    UserResponse getUserById(Long id); 
+
+    void lockUser(Long id, boolean lock); 
 }
