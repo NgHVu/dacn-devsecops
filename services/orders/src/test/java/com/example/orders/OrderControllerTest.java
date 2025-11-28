@@ -24,7 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime; 
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -51,6 +51,7 @@ class OrderControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+    
     @MockBean
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
@@ -68,11 +69,16 @@ class OrderControllerTest {
         OrderCreateRequest createRequest = new OrderCreateRequest(List.of(itemRequest));
 
         OrderResponse responseDto = new OrderResponse(
-                1L, 1L, "PENDING", new BigDecimal("100.00"),
+                1L, 
+                1L, 
+                "PENDING", 
+                new BigDecimal("100.00"),
                 List.of(new OrderItemResponse(1L, 101L, "Sản phẩm 1", 2, new BigDecimal("50.00"))),
-                LocalDateTime.now(), LocalDateTime.now()
+                OffsetDateTime.now(), 
+                OffsetDateTime.now()  
         );
 
+        // Mock hành vi của Service
         when(orderService.createOrder(any(OrderCreateRequest.class), eq(MOCK_TOKEN)))
                 .thenReturn(responseDto);
 
@@ -82,14 +88,16 @@ class OrderControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(1L));
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.totalAmount").value(100.00));
     }
 
     @Test
     @DisplayName("POST /orders: Thất bại (400 Bad Request) khi DTO không hợp lệ")
     @WithMockUser
     void testCreateOrder_InvalidInput_ShouldReturnBadRequest() throws Exception {
-        OrderCreateRequest badRequest = new OrderCreateRequest(List.of());
+        OrderCreateRequest badRequest = new OrderCreateRequest(List.of()); // List rỗng
 
         mockMvc.perform(post("/api/v1/orders")
                         .header("Authorization", MOCK_TOKEN)

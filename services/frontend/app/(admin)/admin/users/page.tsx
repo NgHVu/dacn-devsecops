@@ -5,7 +5,6 @@ import { userService } from "@/services/userService";
 import { UserResponse } from "@/types/auth";
 import { toast } from "sonner";
 
-// UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,7 +28,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PaginationControl } from "@/components/ui/PaginationControl";
 import { UserRoleBadge } from "@/components/admin/UserRoleBadge";
 
-// Icons
 import { 
   Users, 
   Search, 
@@ -39,7 +37,10 @@ import {
   MapPin,
   MoreHorizontal,
   Shield,
-  Ban
+  Ban,
+  Unlock,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -53,17 +54,14 @@ export default function AdminUsersPage() {
   const [allUsers, setAllUsers] = useState<UserResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Pagination
   const [currentPage, setCurrentPage] = useState(0);
   const ROWS_PER_PAGE = 10;
 
-  // Search
   const [searchQuery, setSearchQuery] = useState("");
 
   const fetchUsers = useCallback(async () => {
     try {
       setIsLoading(true);
-      // Lấy 1000 user để xử lý client-side
       const data = await userService.getAllUsers(0, 1000);
       setAllUsers(data.content);
       setCurrentPage(0);
@@ -79,7 +77,34 @@ export default function AdminUsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  // Filtering
+  const handleToggleLock = async (user: UserResponse) => {
+    if (user.role === "ROLE_ADMIN") {
+        toast.warning("Không thể khóa tài khoản Quản trị viên.");
+        return;
+    }
+
+    const action = user.accountNonLocked ? "khóa" : "mở khóa";
+    const confirmMsg = `Bạn có chắc muốn ${action} tài khoản ${user.name}?`;
+    
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+        const shouldLock = user.accountNonLocked ?? true; 
+        
+        await userService.lockUser(user.id, shouldLock);
+        
+        toast.success(`Đã ${action} tài khoản thành công!`);
+        
+        setAllUsers(prev => prev.map(u => 
+            u.id === user.id ? { ...u, accountNonLocked: !shouldLock } : u
+        ));
+
+    } catch (error) {
+        console.error(error);
+        toast.error(`Thao tác thất bại.`);
+    }
+  };
+
   const filteredUsers = useMemo(() => {
     if (!searchQuery) return allUsers;
     const q = searchQuery.toLowerCase();
@@ -91,7 +116,6 @@ export default function AdminUsersPage() {
     );
   }, [allUsers, searchQuery]);
 
-  // Pagination
   const totalPages = Math.ceil(filteredUsers.length / ROWS_PER_PAGE);
   const paginatedUsers = filteredUsers.slice(
       currentPage * ROWS_PER_PAGE,
@@ -105,7 +129,6 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Người dùng</h1>
@@ -118,7 +141,6 @@ export default function AdminUsersPage() {
         </Button>
       </div>
 
-      {/* MAIN CARD */}
       <Card className="shadow-sm border-zinc-200">
         <CardHeader className="p-4 sm:p-6 border-b border-zinc-100 bg-white">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -130,7 +152,6 @@ export default function AdminUsersPage() {
               </Badge>
             </CardTitle>
             
-            {/* Search */}
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
               <Input
@@ -152,7 +173,7 @@ export default function AdminUsersPage() {
               <TableRow className="bg-zinc-50/50 hover:bg-zinc-50/50 border-zinc-100">
                 <TableHead className="w-[250px] pl-6">Người dùng</TableHead>
                 <TableHead>Thông tin liên hệ</TableHead>
-                <TableHead>Địa chỉ</TableHead>
+                <TableHead>Trạng thái</TableHead> 
                 <TableHead className="text-center">Vai trò</TableHead>
                 <TableHead className="text-right pr-6">Thao tác</TableHead>
               </TableRow>
@@ -172,7 +193,7 @@ export default function AdminUsersPage() {
                         </div>
                     </TableCell>
                     <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                     <TableCell className="text-center"><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                   </TableRow>
@@ -184,8 +205,12 @@ export default function AdminUsersPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedUsers.map((user) => (
-                  <TableRow key={user.id} className="group hover:bg-blue-50/30 transition-colors border-zinc-100">
+                paginatedUsers.map((user) => {
+                  const isLocked = user.accountNonLocked === false; 
+                  const isAdmin = user.role === "ROLE_ADMIN";
+
+                  return (
+                  <TableRow key={user.id} className={`group hover:bg-blue-50/30 transition-colors border-zinc-100 ${isLocked ? "bg-red-50/50" : ""}`}>
                     <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
                             <Avatar className="h-10 w-10 border border-zinc-200">
@@ -193,7 +218,7 @@ export default function AdminUsersPage() {
                                 <AvatarFallback>U</AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col">
-                                <span className="font-semibold text-zinc-900">{user.name}</span>
+                                <span className={`font-semibold ${isLocked ? "text-red-700" : "text-zinc-900"}`}>{user.name}</span>
                                 <span className="text-xs text-zinc-500">ID: #{user.id}</span>
                             </div>
                         </div>
@@ -209,14 +234,25 @@ export default function AdminUsersPage() {
                                     <Phone className="h-3.5 w-3.5 text-zinc-400" /> {user.phoneNumber}
                                 </div>
                             )}
+                            {user.address && (
+                                <div className="flex items-center gap-2 text-zinc-700 max-w-[200px]">
+                                    <MapPin className="h-3.5 w-3.5 text-zinc-400 shrink-0" /> 
+                                    <span className="truncate">{user.address}</span>
+                                </div>
+                            )}
                         </div>
                     </TableCell>
 
                     <TableCell>
-                        <div className="flex items-start gap-2 text-sm text-zinc-600 max-w-[250px]">
-                            <MapPin className="h-3.5 w-3.5 text-zinc-400 mt-0.5 shrink-0" /> 
-                            <span className="truncate">{user.address || "Chưa cập nhật"}</span>
-                        </div>
+                        {isLocked ? (
+                            <Badge variant="destructive" className="gap-1 pl-1 pr-2">
+                                <XCircle className="h-3 w-3" /> Đã khóa
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline" className="gap-1 pl-1 pr-2 text-green-700 border-green-200 bg-green-50">
+                                <CheckCircle2 className="h-3 w-3" /> Hoạt động
+                            </Badge>
+                        )}
                     </TableCell>
 
                     <TableCell className="text-center">
@@ -235,20 +271,39 @@ export default function AdminUsersPage() {
                                 <DropdownMenuItem onClick={() => toast.info("Tính năng xem chi tiết đang phát triển")}>
                                     Xem chi tiết
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50">
-                                    <Ban className="mr-2 h-4 w-4" /> Khóa tài khoản
-                                </DropdownMenuItem>
+                                
+                                {isAdmin ? (
+                                    <DropdownMenuItem disabled className="text-zinc-400 cursor-not-allowed">
+                                        <Shield className="mr-2 h-4 w-4" /> Không thể khóa
+                                    </DropdownMenuItem>
+                                ) : (
+                                    isLocked ? (
+                                        <DropdownMenuItem 
+                                            className="text-green-600 focus:text-green-600 focus:bg-green-50"
+                                            onClick={() => handleToggleLock(user)}
+                                        >
+                                            <Unlock className="mr-2 h-4 w-4" /> Mở khóa tài khoản
+                                        </DropdownMenuItem>
+                                    ) : (
+                                        <DropdownMenuItem 
+                                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                            onClick={() => handleToggleLock(user)}
+                                        >
+                                            <Ban className="mr-2 h-4 w-4" /> Khóa tài khoản
+                                        </DropdownMenuItem>
+                                    )
+                                )}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>
         </CardContent>
 
-        {/* FOOTER PAGINATION */}
         {!isLoading && paginatedUsers.length > 0 && (
             <CardFooter className="border-t border-zinc-100 bg-zinc-50/30 py-4 flex justify-center">
                  <PaginationControl 

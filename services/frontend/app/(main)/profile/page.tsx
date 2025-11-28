@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
-import { isAxiosError } from "axios"; // [FIX] Import helper kiểm tra lỗi của Axios
+import { isAxiosError } from "axios"; 
 import { 
   User, 
   Lock, 
@@ -49,15 +49,13 @@ import { useAuth } from "@/context/AuthContext";
 import { userService } from "@/services/userService";
 import { FadeIn } from "@/components/animations/FadeIn";
 
-// --- SCHEMA: UPDATE PROFILE ---
 const profileSchema = z.object({
   name: z.string().min(2, "Tên phải có ít nhất 2 ký tự"),
-  email: z.string().email().readonly(), // Email thường không cho sửa
+  email: z.string().email().readonly(), 
   phoneNumber: z.string().regex(/^[0-9]{10,11}$/, "Số điện thoại không hợp lệ").optional().or(z.literal("")),
   address: z.string().optional(),
 });
 
-// --- SCHEMA: CHANGE PASSWORD ---
 const passwordSchema = z.object({
   currentPassword: z.string().min(1, "Vui lòng nhập mật khẩu hiện tại"),
   newPassword: z.string().min(8, "Mật khẩu mới phải có ít nhất 8 ký tự"),
@@ -71,7 +69,6 @@ export default function ProfilePage() {
   const { user, refreshProfile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  // --- FORM PROFILE ---
   const profileForm = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -82,7 +79,6 @@ export default function ProfilePage() {
     },
   });
 
-  // --- FORM PASSWORD ---
   const passwordForm = useForm<z.infer<typeof passwordSchema>>({
     resolver: zodResolver(passwordSchema),
     defaultValues: {
@@ -92,7 +88,6 @@ export default function ProfilePage() {
     },
   });
 
-  // --- HANDLER: UPDATE INFO ---
   const onUpdateProfile = async (values: z.infer<typeof profileSchema>) => {
     setIsLoading(true);
     try {
@@ -101,7 +96,7 @@ export default function ProfilePage() {
         phoneNumber: values.phoneNumber,
         address: values.address,
       });
-      await refreshProfile(); // Cập nhật lại context để Navbar hiển thị tên mới
+      await refreshProfile(); 
       toast.success("Cập nhật hồ sơ thành công!");
     } catch (error) {
       console.error(error);
@@ -111,23 +106,20 @@ export default function ProfilePage() {
     }
   };
 
-  // --- HANDLER: CHANGE PASSWORD ---
   const onChangePassword = async (values: z.infer<typeof passwordSchema>) => {
     setIsLoading(true);
     try {
       await userService.changePassword({
-        currentPassword: values.currentPassword,
+        oldPassword: values.currentPassword,      
         newPassword: values.newPassword,
-        confirmationPassword: values.confirmPassword
+        confirmPassword: values.confirmPassword   
       });
       toast.success("Đổi mật khẩu thành công!");
       passwordForm.reset();
-    } catch (error) { // [FIX] Xóa :any
+    } catch (error) { 
       console.error(error);
-      // Xử lý lỗi cụ thể từ backend nếu có (ví dụ: sai mật khẩu cũ)
       let msg = "Đổi mật khẩu thất bại.";
       
-      // [FIX] Sử dụng Type Guard của axios để lấy message lỗi an toàn
       if (isAxiosError(error) && error.response?.data?.message) {
         msg = error.response.data.message;
       }
@@ -138,15 +130,34 @@ export default function ProfilePage() {
     }
   };
 
-  // --- HANDLER: UPLOAD AVATAR (Mock UI only for now) ---
   const handleAvatarClick = () => {
-    toast.info("Tính năng upload avatar đang được phát triển!");
-    // Logic: Mở file input -> gọi userService.uploadAvatar -> refreshProfile
+    const fileInput = document.getElementById('avatar-upload') as HTMLInputElement;
+    if (fileInput) fileInput.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+        toast.error("File ảnh quá lớn (tối đa 5MB)");
+        return;
+    }
+
+    try {
+        const toastId = toast.loading("Đang tải ảnh lên...");
+        await userService.uploadAvatar(file);
+        await refreshProfile();
+        toast.dismiss(toastId);
+        toast.success("Cập nhật ảnh đại diện thành công!");
+    } catch (error) {
+        console.error(error);
+        toast.error("Lỗi khi upload ảnh.");
+    }
   };
 
   return (
     <div className="min-h-screen bg-background pb-20 animate-in fade-in duration-500">
-      {/* Header Background */}
       <div className="h-48 bg-gradient-to-r from-orange-500 to-red-600 w-full relative">
          <div className="absolute inset-0 bg-black/10" />
       </div>
@@ -155,7 +166,6 @@ export default function ProfilePage() {
         <FadeIn>
             <div className="flex flex-col md:flex-row gap-8 items-start">
                 
-                {/* --- LEFT: USER CARD --- */}
                 <div className="w-full md:w-1/3 space-y-6">
                     <Card className="border-border/60 shadow-lg overflow-hidden">
                         <CardContent className="pt-8 pb-8 flex flex-col items-center text-center">
@@ -169,6 +179,13 @@ export default function ProfilePage() {
                                 <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Camera className="text-white h-8 w-8" />
                                 </div>
+                                <input 
+                                    type="file" 
+                                    id="avatar-upload" 
+                                    className="hidden" 
+                                    accept="image/*" 
+                                    onChange={handleFileChange}
+                                />
                             </div>
                             
                             <h2 className="text-2xl font-bold text-foreground">{user?.name}</h2>
@@ -181,14 +198,8 @@ export default function ProfilePage() {
                             </div>
                         </CardContent>
                     </Card>
-
-                    {/* Menu Sidebar (Optional - for future features) */}
-                    <div className="hidden md:block space-y-1">
-                        {/* Các link khác nếu cần */}
-                    </div>
                 </div>
 
-                {/* --- RIGHT: TABS --- */}
                 <div className="w-full md:w-2/3">
                     <Tabs defaultValue="general" className="w-full">
                         <TabsList className="w-full grid grid-cols-2 mb-6 bg-muted/50 p-1 rounded-xl">
@@ -200,7 +211,6 @@ export default function ProfilePage() {
                             </TabsTrigger>
                         </TabsList>
 
-                        {/* TAB 1: GENERAL INFO */}
                         <TabsContent value="general">
                             <Card className="border-border/60 shadow-md">
                                 <CardHeader>
@@ -291,7 +301,6 @@ export default function ProfilePage() {
                             </Card>
                         </TabsContent>
 
-                        {/* TAB 2: SECURITY */}
                         <TabsContent value="security">
                             <Card className="border-border/60 shadow-md">
                                 <CardHeader>

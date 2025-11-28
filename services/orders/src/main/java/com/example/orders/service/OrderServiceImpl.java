@@ -187,7 +187,9 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     public DashboardStats getDashboardStats() {
-        BigDecimal totalRevenue = orderRepository.sumTotalRevenue();
+        OrderStatus cancelledStatus = OrderStatus.CANCELLED;
+
+        BigDecimal totalRevenue = orderRepository.sumTotalRevenue(cancelledStatus);
         if (totalRevenue == null) totalRevenue = BigDecimal.ZERO;
 
         long totalOrders = orderRepository.count();
@@ -196,9 +198,10 @@ public class OrderServiceImpl implements OrderService {
         OffsetDateTime startOfMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
         long newCustomers = orderRepository.countDistinctUsersInPeriod(startOfMonth, now);
 
-        double revenueGrowth = calculateRevenueGrowth(now);
+        double revenueGrowth = calculateRevenueGrowth(now, cancelledStatus);
 
-        List<MonthlyRevenue> rawMonthlyStats = orderRepository.getMonthlyRevenue();
+        List<MonthlyRevenue> rawMonthlyStats = orderRepository.getMonthlyRevenue(cancelledStatus);
+        
         List<DashboardStats.MonthlyStats> chartData = rawMonthlyStats.stream()
                 .map(m -> new DashboardStats.MonthlyStats("Tháng " + m.month(), m.total()))
                 .collect(Collectors.toList());
@@ -218,14 +221,14 @@ public class OrderServiceImpl implements OrderService {
         );
     }
     
-    private double calculateRevenueGrowth(OffsetDateTime now) {
+    private double calculateRevenueGrowth(OffsetDateTime now, OrderStatus cancelledStatus) {
         OffsetDateTime startOfThisMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
         OffsetDateTime startOfLastMonth = startOfThisMonth.minusMonths(1);
         
-        BigDecimal thisMonthRev = orderRepository.sumRevenueInPeriod(startOfThisMonth, now);
+        BigDecimal thisMonthRev = orderRepository.sumRevenueInPeriod(startOfThisMonth, now, cancelledStatus);
         if (thisMonthRev == null) thisMonthRev = BigDecimal.ZERO;
         
-        BigDecimal lastMonthRev = orderRepository.sumRevenueInPeriod(startOfLastMonth, startOfThisMonth.minusSeconds(1));
+        BigDecimal lastMonthRev = orderRepository.sumRevenueInPeriod(startOfLastMonth, startOfThisMonth.minusSeconds(1), cancelledStatus);
         if (lastMonthRev == null) lastMonthRev = BigDecimal.ZERO;
 
         if (lastMonthRev.compareTo(BigDecimal.ZERO) == 0) {

@@ -15,7 +15,8 @@ import {
   UtensilsCrossed,
   ShieldCheck,
   ChevronRight,
-  Home
+  Home,
+  Layers 
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,7 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area"; // [FIX] Đã có component này
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function AdminLayout({
   children,
@@ -42,7 +43,6 @@ export default function AdminLayout({
   const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
 
-  // --- 1. CONFIG MENU ITEMS ---
   const menuItems = [
     {
       href: "/admin/dashboard",
@@ -53,6 +53,11 @@ export default function AdminLayout({
       href: "/admin/products",
       label: "Quản lý Món ăn",
       icon: Package,
+    },
+    {
+      href: "/admin/categories", 
+      label: "Quản lý Danh mục",
+      icon: Layers,
     },
     {
       href: "/admin/orders",
@@ -66,13 +71,11 @@ export default function AdminLayout({
     },
   ];
 
-  // Fix Hydration Error
   useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    setIsMounted(true); 
+    setIsMounted(true);
   }, []);
 
-  // --- 2. SECURITY LOGIC ---
   useEffect(() => {
     if (!isMounted || isLoading) return;
 
@@ -90,7 +93,6 @@ export default function AdminLayout({
     }
   }, [isMounted, isLoading, isAuthenticated, user, router, pathname]);
 
-  // --- 3. LOADING STATE ---
   if (!isMounted || isLoading || !user || user.role !== "ROLE_ADMIN") {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-zinc-50 gap-4">
@@ -105,11 +107,9 @@ export default function AdminLayout({
     );
   }
 
-  // --- 4. MAIN ADMIN UI ---
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]">
       
-      {/* --- SIDEBAR (DESKTOP) --- */}
       <div className="hidden border-r bg-zinc-900 text-zinc-100 md:block relative">
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex h-16 items-center border-b border-white/10 px-6">
@@ -143,7 +143,6 @@ export default function AdminLayout({
             </nav>
           </ScrollArea>
           
-          {/* Footer Sidebar */}
           <div className="mt-auto p-4 border-t border-white/10">
              <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-sm">
                 <div className="flex items-center gap-3 mb-2">
@@ -156,20 +155,17 @@ export default function AdminLayout({
                     </div>
                 </div>
                 <p className="text-[10px] text-zinc-500 mt-1">
-                    IP: 192.168.1.x detected
+                    IP: 192.168.61.x detected
                 </p>
              </div>
           </div>
         </div>
       </div>
 
-      {/* --- MAIN CONTENT AREA --- */}
       <div className="flex flex-col bg-zinc-50/50 min-h-screen">
         
-        {/* HEADER (Mobile Menu + User Profile) */}
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-white/80 backdrop-blur-md px-6 shadow-sm">
           
-          {/* Mobile Trigger */}
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="shrink-0 md:hidden">
@@ -199,7 +195,6 @@ export default function AdminLayout({
             </SheetContent>
           </Sheet>
 
-          {/* Breadcrumb (Simple) */}
           <div className="hidden md:flex items-center text-sm text-zinc-500">
              <Link href="/admin/dashboard" className="hover:text-orange-600 transition-colors"><Home className="h-4 w-4" /></Link>
              <ChevronRight className="h-4 w-4 mx-2" />
@@ -209,7 +204,6 @@ export default function AdminLayout({
           </div>
 
           <div className="ml-auto flex items-center gap-4">
-             {/* User Dropdown */}
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full hover:bg-orange-50 border border-transparent hover:border-orange-100">
@@ -235,11 +229,10 @@ export default function AdminLayout({
                     <LogOut className="mr-2 h-4 w-4" /> Đăng xuất
                 </DropdownMenuItem>
                 </DropdownMenuContent>
-             </DropdownMenu>
+            </DropdownMenu>
           </div>
         </header>
 
-        {/* PAGE CONTENT */}
         <main className="flex-1 p-4 lg:p-8 max-w-[1600px] mx-auto w-full animate-in fade-in duration-500">
           {children}
         </main>

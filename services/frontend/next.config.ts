@@ -18,24 +18,27 @@ const nextConfig: NextConfig = {
 
   async rewrites() {
     return [
-      // Điều hướng /api/auth/** -> users-service (Port 8082)
+      // Users Service
       {
         source: '/api/auth/:path*',
         destination: 'http://localhost:8082/api/auth/:path*',
       },
-      // Điều hướng /api/users/** -> users-service (Port 8082)
       {
         source: '/api/users/:path*',
         destination: 'http://localhost:8082/api/users/:path*',
       },
 
-      // Điều hướng /api/products/** -> products-service (Port 8081)
+      // Products Service
       {
         source: '/api/products/:path*',
         destination: 'http://localhost:8081/api/products/:path*',
       },
+      {
+        source: '/api/categories/:path*',
+        destination: 'http://localhost:8081/api/categories/:path*',
+      },
 
-      // Điều hướng /api/orders/** -> orders-service (Port 8083)
+      // Orders Service 
       {
         source: '/api/orders/:path*',
         destination: 'http://localhost:8083/api/v1/orders/:path*',

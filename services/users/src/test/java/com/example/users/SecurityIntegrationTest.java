@@ -1,7 +1,6 @@
 package com.example.users;
 
 import com.example.users.dto.UserResponse;
-import com.example.users.entity.User;
 import com.example.users.security.JwtTokenProvider;
 import com.example.users.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +38,6 @@ class SecurityIntegrationTest {
     @Autowired
     private JwtTokenProvider tokenProvider;
 
-    @SuppressWarnings("removal")
     @MockBean
     private UserService userService;
 
@@ -54,7 +52,16 @@ class SecurityIntegrationTest {
     void setUp() {
         mockSpringUserDetails = new org.springframework.security.core.userdetails.User("test@example.com", "password", new ArrayList<>());
 
-        mockUserResponse = new UserResponse(1L, "Test User", "test@example.com", "ROLE_USER");
+        mockUserResponse = new UserResponse(
+            1L, 
+            "Test User", 
+            "test@example.com", 
+            "ROLE_USER",
+            null, 
+            null,
+            null,
+            true  
+        );
     }
 
     private String generateTestToken(String email, String role) {

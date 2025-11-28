@@ -6,11 +6,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { isAxiosError } from "axios";
 import { toast } from "sonner";
 import { productService } from "@/services/productService";
+import { categoryService } from "@/services/categoryService"; 
 import { 
   type Product, 
   type ProductFormData, 
   productSchema,
-  type CreateProductRequest
+  type CreateProductRequest,
+  type Category 
 } from "@/types/product";
 import { getImageUrl } from "@/lib/utils";
 
@@ -32,6 +34,13 @@ import {
   FormMessage,
   FormDescription,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"; 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Image as ImageIcon } from "lucide-react";
@@ -51,6 +60,10 @@ export function ProductFormDialog({
   initialData,
 }: ProductFormDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+
   const mode = initialData ? "Cập nhật" : "Tạo mới";
   
   const form = useForm({
@@ -61,10 +74,32 @@ export function ProductFormDialog({
       price: 0,
       stockQuantity: 0,
       image: "",
+      categoryId: 0, 
     },
   });
 
-  // Reset form khi mở/đóng
+  useEffect(() => {
+    if (isOpen) {
+      const loadCategories = async () => {
+        setIsLoadingCategories(true);
+        try {
+          const data = await categoryService.getAllCategories();
+          setCategories(data);
+          
+          if (!initialData && data.length > 0) {
+             form.setValue('categoryId', data[0].id);
+          }
+        } catch (error) {
+          console.error("Failed to load categories", error);
+          toast.error("Không thể tải danh sách danh mục");
+        } finally {
+          setIsLoadingCategories(false);
+        }
+      };
+      loadCategories();
+    }
+  }, [isOpen, initialData, form]);
+
   useEffect(() => {
     if (isOpen) {
       form.reset({
@@ -73,6 +108,7 @@ export function ProductFormDialog({
         price: initialData?.price || 0,
         stockQuantity: initialData?.stockQuantity || 0,
         image: initialData?.image || "",
+        categoryId: initialData?.category?.id || 0, 
       });
     }
   }, [initialData, isOpen, form]);
@@ -86,7 +122,7 @@ export function ProductFormDialog({
       price: data.price,
       stockQuantity: data.stockQuantity,
       image: data.image || null,
-      categoryId: 1, // Mặc định categoryId=1 (Cần update khi có API category)
+      categoryId: data.categoryId, 
     };
 
     try {
@@ -111,12 +147,11 @@ export function ProductFormDialog({
     }
   };
 
-  // Watch image field to show preview
   const imageUrl = form.watch("image");
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isSubmitting && onClose()}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl text-orange-600">{mode} Sản phẩm</DialogTitle>
           <DialogDescription>
@@ -128,7 +163,6 @@ export function ProductFormDialog({
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* LEFT COLUMN: BASIC INFO */}
                 <div className="space-y-4">
                     <FormField
                         control={form.control}
@@ -139,6 +173,35 @@ export function ProductFormDialog({
                             <FormControl>
                                 <Input placeholder="Ví dụ: Phở Bò Đặc Biệt" {...field} value={field.value as string} />
                             </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="categoryId"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Danh mục món <span className="text-red-500">*</span></FormLabel>
+                            <Select 
+                                disabled={isLoadingCategories} 
+                                onValueChange={(val: string) => field.onChange(Number(val))} 
+                                value={field.value ? String(field.value) : undefined}
+                            >
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={isLoadingCategories ? "Đang tải..." : "Chọn danh mục"} />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    {categories.map((cat) => (
+                                        <SelectItem key={cat.id} value={String(cat.id)}>
+                                            {cat.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             <FormMessage />
                             </FormItem>
                         )}
@@ -194,7 +257,6 @@ export function ProductFormDialog({
                     />
                 </div>
 
-                {/* RIGHT COLUMN: IMAGE */}
                 <div className="space-y-4">
                     <FormField
                         control={form.control}
@@ -213,7 +275,6 @@ export function ProductFormDialog({
                         )}
                     />
 
-                    {/* Image Preview Area */}
                     <div className="mt-2 border-2 border-dashed border-zinc-200 rounded-xl w-full aspect-square flex flex-col items-center justify-center bg-zinc-50 overflow-hidden relative">
                         {imageUrl ? (
                             <Image 
@@ -233,7 +294,6 @@ export function ProductFormDialog({
                 </div>
             </div>
 
-            {/* [FIX] Thay đổi gap-2 sm:gap-0 thành gap-2 sm:space-x-2 */}
             <DialogFooter className="gap-2 sm:space-x-2">
               <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
                 Hủy bỏ

@@ -2,9 +2,9 @@ package com.example.orders.repository;
 
 import com.example.orders.dto.MonthlyRevenue;
 import com.example.orders.entity.Order;
-import com.example.orders.entity.OrderStatus; 
-import org.springframework.data.domain.Page; 
-import org.springframework.data.domain.Pageable; 
+import com.example.orders.entity.OrderStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,9 +13,9 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional; 
+import java.util.Optional;
 
-@Repository 
+@Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByUserId(Long userId);
@@ -26,8 +26,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Optional<Order> findByIdAndUserId(Long id, Long userId);
 
-    @Query("SELECT SUM(o.totalAmount) FROM Order o WHERE o.status <> 'CANCELLED'")
-    BigDecimal sumTotalRevenue();
+    @Query("SELECT SUM(o.totalAmount) FROM Order o WHERE o.status <> :cancelledStatus")
+    BigDecimal sumTotalRevenue(@Param("cancelledStatus") OrderStatus cancelledStatus);
 
     @Query("SELECT COUNT(o) FROM Order o WHERE o.createdAt >= :startDate AND o.createdAt <= :endDate")
     long countOrdersInPeriod(@Param("startDate") OffsetDateTime startDate, @Param("endDate") OffsetDateTime endDate);
@@ -36,18 +36,20 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     long countDistinctUsersInPeriod(@Param("startDate") OffsetDateTime startDate, @Param("endDate") OffsetDateTime endDate);
 
     @Query("""
-       SELECT new com.example.orders.dto.MonthlyRevenue(
-           YEAR(o.createdAt), 
-           MONTH(o.createdAt), 
-           SUM(o.totalAmount)
-       ) 
-       FROM Order o 
-       WHERE o.status <> 'CANCELLED'
-       GROUP BY YEAR(o.createdAt), MONTH(o.createdAt)
-       ORDER BY YEAR(o.createdAt), MONTH(o.createdAt)
-       """)
-    List<MonthlyRevenue> getMonthlyRevenue();
-    
-    @Query("SELECT SUM(o.totalAmount) FROM Order o WHERE o.createdAt >= :startDate AND o.createdAt <= :endDate AND o.status <> 'CANCELLED'")
-    BigDecimal sumRevenueInPeriod(@Param("startDate") OffsetDateTime startDate, @Param("endDate") OffsetDateTime endDate);
+        SELECT new com.example.orders.dto.MonthlyRevenue(
+            CAST(EXTRACT(YEAR FROM o.createdAt) AS int), 
+            CAST(EXTRACT(MONTH FROM o.createdAt) AS int), 
+            SUM(o.totalAmount)
+        ) 
+        FROM Order o 
+        WHERE o.status <> :cancelledStatus
+        GROUP BY CAST(EXTRACT(YEAR FROM o.createdAt) AS int), CAST(EXTRACT(MONTH FROM o.createdAt) AS int)
+        ORDER BY CAST(EXTRACT(YEAR FROM o.createdAt) AS int), CAST(EXTRACT(MONTH FROM o.createdAt) AS int)
+        """)
+    List<MonthlyRevenue> getMonthlyRevenue(@Param("cancelledStatus") OrderStatus cancelledStatus);
+
+    @Query("SELECT SUM(o.totalAmount) FROM Order o WHERE o.createdAt >= :startDate AND o.createdAt <= :endDate AND o.status <> :cancelledStatus")
+    BigDecimal sumRevenueInPeriod(@Param("startDate") OffsetDateTime startDate, 
+                                  @Param("endDate") OffsetDateTime endDate, 
+                                  @Param("cancelledStatus") OrderStatus cancelledStatus);
 }

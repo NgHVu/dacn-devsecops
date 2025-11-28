@@ -56,6 +56,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() 
                         
+                        .requestMatchers("/error").permitAll()
+
+                        .requestMatchers("/uploads/**").permitAll()
+
                         .requestMatchers(HttpMethod.POST, 
                             "/api/auth/register",
                             "/api/auth/login",

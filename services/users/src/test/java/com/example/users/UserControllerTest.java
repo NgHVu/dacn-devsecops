@@ -27,15 +27,12 @@ class UserControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @SuppressWarnings("removal")
     @MockBean
     private UserService userService;
 
-    @SuppressWarnings("removal")
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
 
-    @SuppressWarnings("removal")
     @MockBean
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
@@ -46,7 +43,16 @@ class UserControllerTest {
     @DisplayName("GET /me: Thành công (200 OK) khi người dùng đã xác thực")
     @WithMockUser 
     void testGetCurrentUser_Success() throws Exception {
-        UserResponse response = new UserResponse(1L, "Test User", "test@example.com", "ROLE_USER");
+        UserResponse response = new UserResponse(
+            1L, 
+            "Test User", 
+            "test@example.com", 
+            "ROLE_USER",
+            null,
+            null,
+            null,
+            true
+        );
         when(userService.getCurrentUser()).thenReturn(response);
 
         mockMvc.perform(get("/api/users/me")

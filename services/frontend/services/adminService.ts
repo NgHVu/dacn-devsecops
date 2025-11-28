@@ -2,7 +2,7 @@ import apiClient from "@/lib/apiClient";
 import { DashboardStats } from "@/types/dashboard";
 
 const getDashboardStats = async (): Promise<DashboardStats> => {
-  const response = await apiClient.get<DashboardStats>("/api/v1/orders/admin/dashboard");
+  const response = await apiClient.get<DashboardStats>("/api/orders/admin/dashboard");
   return response.data;
 };
 
