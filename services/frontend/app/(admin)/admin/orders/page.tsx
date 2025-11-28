@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo,  } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { orderService } from "@/services/orderService";
 import { Order, OrderStatus } from "@/types/order";
 import { formatPrice } from "@/lib/utils";
 import { toast } from "sonner";
 
-// UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,7 +27,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-// Icons
 import { 
   PackageSearch, 
   AlertCircle, 
@@ -41,12 +39,10 @@ import {
   ArrowUpDown 
 } from "lucide-react";
 
-// Custom Components
 import { OrderStatusBadge } from "@/components/admin/OrderStatusBadge";
 import { OrderActions } from "@/components/admin/OrderActions";
 import { PaginationControl } from "@/components/ui/PaginationControl";
 
-// Helper: Format Date (VN Time)
 const formatDate = (dateString: string) => {
   if (!dateString) return "N/A";
   const date = new Date(dateString);
@@ -60,25 +56,20 @@ export default function AdminOrdersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Pagination Settings
   const [currentPage, setCurrentPage] = useState(0);
   const ROWS_PER_PAGE = 10; 
   const FETCH_SIZE = 1000;  
 
-  // Filter State
   type FilterType = OrderStatus | "ALL";
   const [filter, setFilter] = useState<FilterType>("ALL");
 
-  // Search State
   const [searchQuery, setSearchQuery] = useState("");
 
-  // [NEW] Sort State
   const [sortConfig, setSortConfig] = useState<{ key: keyof Order | string; direction: 'asc' | 'desc' }>({
-    key: 'createdAt', // Mặc định sắp xếp theo ngày đặt
-    direction: 'desc' // Mới nhất lên đầu
+    key: 'createdAt',
+    direction: 'desc'
   });
 
-  // Fetch dữ liệu
   const fetchOrders = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -104,7 +95,6 @@ export default function AdminOrdersPage() {
     toast.info("Đang cập nhật trạng thái đơn hàng...");
   };
 
-  // [NEW] Handle Sort Click
   const handleSort = (key: keyof Order | string) => {
     setSortConfig((current) => ({
       key,
@@ -112,7 +102,6 @@ export default function AdminOrdersPage() {
     }));
   };
 
-  // 1. LỌC DỮ LIỆU
   const filteredOrders = useMemo(() => {
     return allOrders.filter(order => {
       if (filter !== "ALL" && order.status !== filter) return false;
@@ -126,16 +115,13 @@ export default function AdminOrdersPage() {
     });
   }, [allOrders, filter, searchQuery]);
 
-  // 2. SẮP XẾP DỮ LIỆU (Logic gom nhóm nằm ở đây)
   const sortedOrders = useMemo(() => {
     const sorted = [...filteredOrders];
     return sorted.sort((a, b) => {
       const { key, direction } = sortConfig;
-      // [FIX] Thay 'any' bằng 'string | number' để đảm bảo kiểu dữ liệu an toàn khi so sánh
       let aValue = a[key as keyof Order] as string | number;
       let bValue = b[key as keyof Order] as string | number;
 
-      // Xử lý đặc biệt cho các trường không phải string/number thuần túy
       if (key === 'totalAmount') {
          aValue = Number(a.totalAmount);
          bValue = Number(b.totalAmount);
@@ -147,7 +133,6 @@ export default function AdminOrdersPage() {
     });
   }, [filteredOrders, sortConfig]);
 
-  // 3. PHÂN TRANG
   const totalPages = Math.ceil(sortedOrders.length / ROWS_PER_PAGE);
   const paginatedOrders = sortedOrders.slice(
       currentPage * ROWS_PER_PAGE,
@@ -157,23 +142,21 @@ export default function AdminOrdersPage() {
   return (
     <div className="space-y-6">
       
-      {/* --- HEADER --- */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Đơn hàng</h1>
-          <p className="text-zinc-500">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Đơn hàng</h1>
+          <p className="text-muted-foreground">
             Theo dõi, xử lý và cập nhật trạng thái giao hàng.
           </p>
         </div>
         <div className="flex items-center gap-2">
-           <Button variant="outline" size="sm" onClick={handleRefresh} className="hover:bg-zinc-100">
+           <Button variant="outline" size="sm" onClick={handleRefresh} className="hover:bg-accent">
             <RotateCcw className="mr-2 h-4 w-4" />
             Cập nhật
           </Button>
         </div>
       </div>
 
-      {/* --- FILTER TABS --- */}
       <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar">
         {[
             { key: "ALL", label: "Tất cả" },
@@ -198,11 +181,11 @@ export default function AdminOrdersPage() {
                         whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all border
                         ${filter === tab.key 
                             ? "bg-orange-600 text-white border-orange-600 shadow-md shadow-orange-600/20" 
-                            : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300"}
+                            : "bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground"}
                     `}
                 >
                     {tab.label} 
-                    <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[10px] ${filter === tab.key ? "bg-white/20" : "bg-zinc-100 text-zinc-600"}`}>
+                    <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[10px] ${filter === tab.key ? "bg-white/20" : "bg-muted text-muted-foreground"}`}>
                         {count}
                     </span>
                 </button>
@@ -210,25 +193,23 @@ export default function AdminOrdersPage() {
         })}
       </div>
 
-      {/* --- MAIN CARD --- */}
-      <Card className="shadow-sm border-zinc-200">
-        <CardHeader className="p-4 sm:p-6 border-b border-zinc-100 bg-white">
+      <Card className="shadow-sm border-border bg-card">
+        <CardHeader className="p-4 sm:p-6 border-b border-border">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2 text-card-foreground">
               <ShoppingBag className="h-5 w-5 text-orange-600" />
               Danh sách đơn
-              <Badge variant="secondary" className="text-xs font-normal bg-zinc-100 text-zinc-600">
+              <Badge variant="secondary" className="text-xs font-normal">
                  Hiển thị {paginatedOrders.length} / {filteredOrders.length} đơn
               </Badge>
             </CardTitle>
             
-            {/* Search Bar */}
             <div className="relative w-full sm:w-72">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
                 placeholder="Tìm mã đơn, món ăn..."
-                className="pl-9 bg-zinc-50 border-zinc-200 focus-visible:ring-orange-500"
+                className="pl-9 bg-background border-input focus-visible:ring-orange-500"
                 value={searchQuery}
                 onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -242,35 +223,34 @@ export default function AdminOrdersPage() {
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-zinc-50/50 hover:bg-zinc-50/50 border-zinc-100">
+              <TableRow className="bg-muted/50 hover:bg-muted/50 border-border">
                 <TableHead className="w-[100px] pl-6">
                     <Button 
                         variant="ghost" 
                         onClick={() => handleSort('id')}
-                        className="-ml-4 h-8 text-xs font-bold hover:text-orange-600"
+                        className="-ml-4 h-8 text-xs font-bold hover:text-orange-600 text-muted-foreground"
                     >
                         Mã đơn <ArrowUpDown className="ml-2 h-3 w-3" />
                     </Button>
                 </TableHead>
                 
                 <TableHead>
-                    {/* [NEW] NÚT SẮP XẾP KHÁCH HÀNG - Gom đơn cùng khách lại gần nhau */}
                     <Button 
                         variant="ghost" 
                         onClick={() => handleSort('userId')}
-                        className="-ml-4 h-8 text-xs font-bold hover:text-orange-600"
+                        className="-ml-4 h-8 text-xs font-bold hover:text-orange-600 text-muted-foreground"
                     >
                         Khách hàng <ArrowUpDown className="ml-2 h-3 w-3" />
                     </Button>
                 </TableHead>
                 
-                <TableHead>Chi tiết đơn</TableHead>
+                <TableHead className="text-muted-foreground">Chi tiết đơn</TableHead>
                 
                 <TableHead>
                     <Button 
                         variant="ghost" 
                         onClick={() => handleSort('createdAt')}
-                        className="-ml-4 h-8 text-xs font-bold hover:text-orange-600"
+                        className="-ml-4 h-8 text-xs font-bold hover:text-orange-600 text-muted-foreground"
                     >
                         Thời gian đặt <ArrowUpDown className="ml-2 h-3 w-3" />
                     </Button>
@@ -280,22 +260,21 @@ export default function AdminOrdersPage() {
                     <Button 
                         variant="ghost" 
                         onClick={() => handleSort('totalAmount')}
-                        className="ml-auto h-8 text-xs font-bold hover:text-orange-600"
+                        className="ml-auto h-8 text-xs font-bold hover:text-orange-600 text-muted-foreground"
                     >
                         Tổng tiền <ArrowUpDown className="ml-2 h-3 w-3" />
                     </Button>
                 </TableHead>
                 
-                <TableHead className="text-center">Trạng thái</TableHead>
-                <TableHead className="text-right pr-6">Hành động</TableHead>
+                <TableHead className="text-center text-muted-foreground">Trạng thái</TableHead>
+                <TableHead className="text-right pr-6 text-muted-foreground">Hành động</TableHead>
               </TableRow>
             </TableHeader>
             
             <TableBody>
               {isLoading ? (
-                // --- SKELETON LOADING ---
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
+                Array.from({ length: 10 }).map((_, i) => (
+                  <TableRow key={i} className="border-border">
                     <TableCell className="pl-6"><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell>
                         <div className="flex items-center gap-3">
@@ -314,10 +293,9 @@ export default function AdminOrdersPage() {
                   </TableRow>
                 ))
               ) : error ? (
-                // --- ERROR STATE ---
                 <TableRow>
-                   <TableCell colSpan={7} className="h-60 text-center">
-                      <div className="flex flex-col items-center justify-center text-red-500 gap-2">
+                   <TableCell colSpan={7} className="h-60 text-center border-border">
+                      <div className="flex flex-col items-center justify-center text-destructive gap-2">
                         <AlertCircle className="h-8 w-8" />
                         <p>{error}</p>
                         <Button variant="outline" size="sm" onClick={() => fetchOrders()}>Thử lại</Button>
@@ -325,41 +303,39 @@ export default function AdminOrdersPage() {
                    </TableCell>
                 </TableRow>
               ) : paginatedOrders.length === 0 ? (
-                // --- EMPTY STATE ---
                 <TableRow>
-                  <TableCell colSpan={7} className="h-60 text-center">
-                    <div className="flex flex-col items-center justify-center text-zinc-400 gap-2">
-                      <PackageSearch className="h-10 w-10 opacity-20" />
+                  <TableCell colSpan={7} className="h-60 text-center border-border">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
+                      <PackageSearch className="h-10 w-10 opacity-50" />
                       <p>Không tìm thấy đơn hàng nào phù hợp.</p>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : (
-                // --- DATA ROWS ---
                 paginatedOrders.map((order) => (
-                  <TableRow key={order.id} className="group hover:bg-orange-50/30 transition-colors border-zinc-100">
+                  <TableRow key={order.id} className="group hover:bg-muted/50 transition-colors border-border">
                     
-                    <TableCell className="pl-6 font-medium text-zinc-900">
+                    <TableCell className="pl-6 font-medium text-foreground">
                         #{order.id}
                     </TableCell>
                     
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8 border border-zinc-200">
+                        <Avatar className="h-8 w-8 border border-border">
                             <AvatarImage src={`https://ui-avatars.com/api/?name=User+${order.userId}&background=random`} />
                             <AvatarFallback>U{order.userId}</AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col">
-                            <span className="text-sm font-medium text-zinc-700">User #{order.userId}</span>
+                            <span className="text-sm font-medium text-foreground">User #{order.userId}</span>
                         </div>
                       </div>
                     </TableCell>
 
                     <TableCell>
                         <div className="flex flex-col max-w-[200px]">
-                            <span className="text-sm text-zinc-900 truncate font-medium">{order.items[0]?.productName}</span>
+                            <span className="text-sm text-foreground truncate font-medium">{order.items[0]?.productName}</span>
                             {order.items.length > 1 && (
-                                <span className="text-xs text-zinc-500">
+                                <span className="text-xs text-muted-foreground">
                                     + {order.items.length - 1} món khác
                                 </span>
                             )}
@@ -367,7 +343,7 @@ export default function AdminOrdersPage() {
                     </TableCell>
                     
                     <TableCell>
-                        <div className="flex items-center gap-2 text-sm text-zinc-500">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <CalendarClock className="h-3.5 w-3.5" />
                             {formatDate(order.createdAt)}
                         </div>
@@ -394,9 +370,8 @@ export default function AdminOrdersPage() {
           </Table>
         </CardContent>
 
-        {/* --- FOOTER PAGINATION --- */}
         {!isLoading && !error && filteredOrders.length > 0 && (
-            <CardFooter className="border-t border-zinc-100 bg-zinc-50/30 py-4 flex justify-center">
+            <CardFooter className="border-t border-border bg-muted/40 py-4 flex justify-center">
                  <PaginationControl 
                     currentPage={currentPage} 
                     totalPages={totalPages} 

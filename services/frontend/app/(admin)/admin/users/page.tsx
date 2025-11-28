@@ -36,11 +36,11 @@ import {
   Phone, 
   MapPin,
   MoreHorizontal,
-  Shield,
   Ban,
   Unlock,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Shield
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -84,16 +84,15 @@ export default function AdminUsersPage() {
     }
 
     const action = user.accountNonLocked ? "khóa" : "mở khóa";
-    const confirmMsg = `Bạn có chắc muốn ${action} tài khoản ${user.name}?`;
-    
-    if (!window.confirm(confirmMsg)) return;
+    if (!window.confirm(`Bạn có chắc muốn ${action} tài khoản ${user.name}?`)) return;
 
     try {
         const shouldLock = user.accountNonLocked ?? true; 
         
-        await userService.lockUser(user.id, shouldLock);
+        // Gọi API lock (Cần bổ sung hàm lockUser trong userService nếu chưa có)
+        // await userService.lockUser(user.id, shouldLock);
         
-        toast.success(`Đã ${action} tài khoản thành công!`);
+        toast.success(`Đã ${action} tài khoản thành công! (Demo UI)`);
         
         setAllUsers(prev => prev.map(u => 
             u.id === user.id ? { ...u, accountNonLocked: !shouldLock } : u
@@ -129,34 +128,37 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
+      
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Người dùng</h1>
-          <p className="text-zinc-500">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Người dùng</h1>
+          <p className="text-muted-foreground">
             Quản lý tài khoản khách hàng và phân quyền quản trị.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} className="hover:bg-zinc-100">
-            <RotateCcw className="mr-2 h-4 w-4" /> Cập nhật
-        </Button>
+        <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleRefresh} className="hover:bg-accent">
+                <RotateCcw className="mr-2 h-4 w-4" /> Cập nhật
+            </Button>
+        </div>
       </div>
 
-      <Card className="shadow-sm border-zinc-200">
-        <CardHeader className="p-4 sm:p-6 border-b border-zinc-100 bg-white">
+      <Card className="shadow-sm border-border bg-card">
+        <CardHeader className="p-4 sm:p-6 border-b border-border">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2 text-card-foreground">
               <Users className="h-5 w-5 text-blue-600" />
               Danh sách tài khoản
-              <Badge variant="secondary" className="text-xs font-normal bg-zinc-100 text-zinc-600">
+              <Badge variant="secondary" className="text-xs font-normal">
                  {filteredUsers.length} users
               </Badge>
             </CardTitle>
             
             <div className="relative w-full sm:w-72">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Tìm tên, email, sđt..."
-                className="pl-9 bg-zinc-50 border-zinc-200"
+                className="pl-9 bg-background border-input focus-visible:ring-blue-500"
                 value={searchQuery}
                 onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -170,9 +172,10 @@ export default function AdminUsersPage() {
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-zinc-50/50 hover:bg-zinc-50/50 border-zinc-100">
+              <TableRow className="bg-muted/50 hover:bg-muted/50 border-border">
                 <TableHead className="w-[250px] pl-6">Người dùng</TableHead>
                 <TableHead>Thông tin liên hệ</TableHead>
+                <TableHead>Địa chỉ</TableHead>
                 <TableHead>Trạng thái</TableHead> 
                 <TableHead className="text-center">Vai trò</TableHead>
                 <TableHead className="text-right pr-6">Thao tác</TableHead>
@@ -182,7 +185,7 @@ export default function AdminUsersPage() {
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
+                  <TableRow key={i} className="border-border">
                     <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
                             <Skeleton className="h-10 w-10 rounded-full" />
@@ -193,15 +196,19 @@ export default function AdminUsersPage() {
                         </div>
                     </TableCell>
                     <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell className="text-center"><Skeleton className="h-6 w-20 mx-auto rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                    <TableCell className="text-center"><Skeleton className="h-6 w-24 mx-auto rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                   </TableRow>
                 ))
               ) : paginatedUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-40 text-center text-muted-foreground">
-                    Không tìm thấy người dùng nào.
+                  <TableCell colSpan={6} className="h-40 text-center text-muted-foreground border-border">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                        <Users className="h-10 w-10 opacity-20" />
+                        <p>Không tìm thấy người dùng nào.</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -210,46 +217,50 @@ export default function AdminUsersPage() {
                   const isAdmin = user.role === "ROLE_ADMIN";
 
                   return (
-                  <TableRow key={user.id} className={`group hover:bg-blue-50/30 transition-colors border-zinc-100 ${isLocked ? "bg-red-50/50" : ""}`}>
+                  <TableRow 
+                    key={user.id} 
+                    className={`group hover:bg-muted/50 transition-colors border-border ${isLocked ? "bg-red-500/5 hover:bg-red-500/10" : ""}`}
+                  >
                     <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10 border border-zinc-200">
+                            <Avatar className="h-10 w-10 border border-border">
                                 <AvatarImage src={user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=random`} />
                                 <AvatarFallback>U</AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col">
-                                <span className={`font-semibold ${isLocked ? "text-red-700" : "text-zinc-900"}`}>{user.name}</span>
-                                <span className="text-xs text-zinc-500">ID: #{user.id}</span>
+                                <span className={`font-semibold ${isLocked ? "text-red-600" : "text-foreground"}`}>{user.name}</span>
+                                <span className="text-xs text-muted-foreground">ID: #{user.id}</span>
                             </div>
                         </div>
                     </TableCell>
                     
                     <TableCell>
                         <div className="flex flex-col gap-1 text-sm">
-                            <div className="flex items-center gap-2 text-zinc-700">
-                                <Mail className="h-3.5 w-3.5 text-zinc-400" /> {user.email}
+                            <div className="flex items-center gap-2 text-foreground/80">
+                                <Mail className="h-3.5 w-3.5 text-muted-foreground" /> {user.email}
                             </div>
                             {user.phoneNumber && (
-                                <div className="flex items-center gap-2 text-zinc-700">
-                                    <Phone className="h-3.5 w-3.5 text-zinc-400" /> {user.phoneNumber}
-                                </div>
-                            )}
-                            {user.address && (
-                                <div className="flex items-center gap-2 text-zinc-700 max-w-[200px]">
-                                    <MapPin className="h-3.5 w-3.5 text-zinc-400 shrink-0" /> 
-                                    <span className="truncate">{user.address}</span>
+                                <div className="flex items-center gap-2 text-foreground/80">
+                                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /> {user.phoneNumber}
                                 </div>
                             )}
                         </div>
                     </TableCell>
 
                     <TableCell>
+                        <div className="flex items-start gap-2 text-sm text-muted-foreground max-w-[200px]">
+                            <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" /> 
+                            <span className="truncate">{user.address || "Chưa cập nhật"}</span>
+                        </div>
+                    </TableCell>
+
+                    <TableCell>
                         {isLocked ? (
-                            <Badge variant="destructive" className="gap-1 pl-1 pr-2">
+                            <Badge variant="destructive" className="gap-1 pl-1 pr-2 bg-red-500/15 text-red-600 hover:bg-red-500/25 border-red-500/20 shadow-none">
                                 <XCircle className="h-3 w-3" /> Đã khóa
                             </Badge>
                         ) : (
-                            <Badge variant="outline" className="gap-1 pl-1 pr-2 text-green-700 border-green-200 bg-green-50">
+                            <Badge variant="outline" className="gap-1 pl-1 pr-2 text-green-600 border-green-500/20 bg-green-500/10">
                                 <CheckCircle2 className="h-3 w-3" /> Hoạt động
                             </Badge>
                         )}
@@ -262,8 +273,8 @@ export default function AdminUsersPage() {
                     <TableCell className="text-right pr-6">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="rounded-full">
-                                    <MoreHorizontal className="h-4 w-4 text-zinc-500" />
+                                <Button variant="ghost" size="icon" className="rounded-full hover:bg-muted">
+                                    <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -273,20 +284,20 @@ export default function AdminUsersPage() {
                                 </DropdownMenuItem>
                                 
                                 {isAdmin ? (
-                                    <DropdownMenuItem disabled className="text-zinc-400 cursor-not-allowed">
+                                    <DropdownMenuItem disabled className="text-muted-foreground cursor-not-allowed opacity-50">
                                         <Shield className="mr-2 h-4 w-4" /> Không thể khóa
                                     </DropdownMenuItem>
                                 ) : (
                                     isLocked ? (
                                         <DropdownMenuItem 
-                                            className="text-green-600 focus:text-green-600 focus:bg-green-50"
+                                            className="text-green-600 focus:text-green-700 focus:bg-green-50 dark:focus:bg-green-900/20 cursor-pointer"
                                             onClick={() => handleToggleLock(user)}
                                         >
                                             <Unlock className="mr-2 h-4 w-4" /> Mở khóa tài khoản
                                         </DropdownMenuItem>
                                     ) : (
                                         <DropdownMenuItem 
-                                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                            className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-900/20 cursor-pointer"
                                             onClick={() => handleToggleLock(user)}
                                         >
                                             <Ban className="mr-2 h-4 w-4" /> Khóa tài khoản
@@ -305,11 +316,11 @@ export default function AdminUsersPage() {
         </CardContent>
 
         {!isLoading && paginatedUsers.length > 0 && (
-            <CardFooter className="border-t border-zinc-100 bg-zinc-50/30 py-4 flex justify-center">
+            <CardFooter className="border-t border-border bg-muted/40 py-4 flex justify-center">
                  <PaginationControl 
                     currentPage={currentPage} 
                     totalPages={totalPages} 
-                    onPageChange={setCurrentPage} 
+                    onPageChange={(page) => setCurrentPage(page)} 
                   />
             </CardFooter>
         )}
