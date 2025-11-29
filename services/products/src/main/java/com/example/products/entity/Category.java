@@ -6,7 +6,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.OffsetDateTime;
-import java.util.List;
 
 @Getter
 @Setter
@@ -24,6 +23,9 @@ public class Category {
     @Column(nullable = false, unique = true)
     private String name;
 
+    @Column(name = "icon")
+    private String icon;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 
@@ -34,8 +36,4 @@ public class Category {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
-    
-    // Lấy list sản phẩm từ category 
-    // @OneToMany(mappedBy = "category")
-    // private List<Product> products;
 }

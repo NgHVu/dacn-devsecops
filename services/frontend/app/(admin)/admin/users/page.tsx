@@ -40,7 +40,8 @@ import {
   Unlock,
   CheckCircle2,
   XCircle,
-  Shield
+  Shield,
+  Loader2
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -49,6 +50,24 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
 
 export default function AdminUsersPage() {
   const [allUsers, setAllUsers] = useState<UserResponse[]>([]);
@@ -58,6 +77,10 @@ export default function AdminUsersPage() {
   const ROWS_PER_PAGE = 10;
 
   const [searchQuery, setSearchQuery] = useState("");
+
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [userToAction, setUserToAction] = useState<UserResponse | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -77,30 +100,43 @@ export default function AdminUsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  const handleToggleLock = async (user: UserResponse) => {
+  const requestToggleLock = (user: UserResponse) => {
     if (user.role === "ROLE_ADMIN") {
         toast.warning("Không thể khóa tài khoản Quản trị viên.");
         return;
     }
+    setUserToAction(user);
+    setIsAlertOpen(true);
+  };
 
-    const action = user.accountNonLocked ? "khóa" : "mở khóa";
-    if (!window.confirm(`Bạn có chắc muốn ${action} tài khoản ${user.name}?`)) return;
+  const handleConfirmLock = async () => {
+    if (!userToAction) return;
 
     try {
-        const shouldLock = user.accountNonLocked ?? true; 
+        setIsProcessing(true);      
+        const isCurrentlyLocked = !userToAction.accountNonLocked;
+        const willLock = !isCurrentlyLocked; 
+
+        await userService.lockUser(userToAction.id, willLock);
         
-        // Gọi API lock (Cần bổ sung hàm lockUser trong userService nếu chưa có)
-        // await userService.lockUser(user.id, shouldLock);
-        
-        toast.success(`Đã ${action} tài khoản thành công! (Demo UI)`);
+        const actionText = willLock ? "Khóa" : "Mở khóa";
+        toast.success(`Đã ${actionText} tài khoản ${userToAction.name} thành công!`);
         
         setAllUsers(prev => prev.map(u => 
-            u.id === user.id ? { ...u, accountNonLocked: !shouldLock } : u
+            u.id === userToAction.id ? { ...u, accountNonLocked: !willLock } : u
         ));
 
     } catch (error) {
         console.error(error);
-        toast.error(`Thao tác thất bại.`);
+        
+        const apiError = error as ApiError;
+        const msg = apiError.response?.data?.message || "Thao tác thất bại.";
+        
+        toast.error(msg);
+    } finally {
+        setIsProcessing(false);
+        setIsAlertOpen(false);
+        setUserToAction(null);
     }
   };
 
@@ -150,7 +186,7 @@ export default function AdminUsersPage() {
               <Users className="h-5 w-5 text-blue-600" />
               Danh sách tài khoản
               <Badge variant="secondary" className="text-xs font-normal">
-                 {filteredUsers.length} users
+                 {filteredUsers.length} người dùng
               </Badge>
             </CardTitle>
             
@@ -219,7 +255,10 @@ export default function AdminUsersPage() {
                   return (
                   <TableRow 
                     key={user.id} 
-                    className={`group hover:bg-muted/50 transition-colors border-border ${isLocked ? "bg-red-500/5 hover:bg-red-500/10" : ""}`}
+                    className={`group hover:bg-muted/50 transition-colors border-border 
+                        ${isLocked 
+                            ? "bg-red-500/10 dark:bg-red-900/20 hover:bg-red-500/20 dark:hover:bg-red-900/30" 
+                            : ""}`}
                   >
                     <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
@@ -228,7 +267,9 @@ export default function AdminUsersPage() {
                                 <AvatarFallback>U</AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col">
-                                <span className={`font-semibold ${isLocked ? "text-red-600" : "text-foreground"}`}>{user.name}</span>
+                                <span className={`font-semibold ${isLocked ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
+                                    {user.name}
+                                </span>
                                 <span className="text-xs text-muted-foreground">ID: #{user.id}</span>
                             </div>
                         </div>
@@ -256,11 +297,15 @@ export default function AdminUsersPage() {
 
                     <TableCell>
                         {isLocked ? (
-                            <Badge variant="destructive" className="gap-1 pl-1 pr-2 bg-red-500/15 text-red-600 hover:bg-red-500/25 border-red-500/20 shadow-none">
+                            <Badge variant="destructive" 
+                                className="gap-1 pl-1 pr-2 bg-red-500/15 dark:bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/20 shadow-none hover:bg-red-500/25"
+                            >
                                 <XCircle className="h-3 w-3" /> Đã khóa
                             </Badge>
                         ) : (
-                            <Badge variant="outline" className="gap-1 pl-1 pr-2 text-green-600 border-green-500/20 bg-green-500/10">
+                            <Badge variant="outline" 
+                                className="gap-1 pl-1 pr-2 text-green-600 dark:text-green-400 border-green-500/20 bg-green-500/10"
+                            >
                                 <CheckCircle2 className="h-3 w-3" /> Hoạt động
                             </Badge>
                         )}
@@ -290,15 +335,15 @@ export default function AdminUsersPage() {
                                 ) : (
                                     isLocked ? (
                                         <DropdownMenuItem 
-                                            className="text-green-600 focus:text-green-700 focus:bg-green-50 dark:focus:bg-green-900/20 cursor-pointer"
-                                            onClick={() => handleToggleLock(user)}
+                                            className="text-green-600 dark:text-green-400 focus:text-green-700 focus:bg-green-50 dark:focus:bg-green-900/20 cursor-pointer"
+                                            onClick={() => requestToggleLock(user)}
                                         >
                                             <Unlock className="mr-2 h-4 w-4" /> Mở khóa tài khoản
                                         </DropdownMenuItem>
                                     ) : (
                                         <DropdownMenuItem 
-                                            className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-900/20 cursor-pointer"
-                                            onClick={() => handleToggleLock(user)}
+                                            className="text-red-600 dark:text-red-400 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-900/20 cursor-pointer"
+                                            onClick={() => requestToggleLock(user)}
                                         >
                                             <Ban className="mr-2 h-4 w-4" /> Khóa tài khoản
                                         </DropdownMenuItem>
@@ -325,6 +370,39 @@ export default function AdminUsersPage() {
             </CardFooter>
         )}
       </Card>
+
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+                {userToAction?.accountNonLocked ? "Khóa tài khoản?" : "Mở khóa tài khoản?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+                {userToAction?.accountNonLocked 
+                    ? <span>Bạn có chắc chắn muốn khóa tài khoản <span className="font-bold text-foreground">{userToAction?.name}</span>? Người dùng sẽ không thể đăng nhập cho đến khi được mở khóa.</span>
+                    : <span>Bạn có chắc chắn muốn mở khóa cho tài khoản <span className="font-bold text-foreground">{userToAction?.name}</span>?</span>
+                }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isProcessing}>Hủy bỏ</AlertDialogCancel>
+            <AlertDialogAction 
+                onClick={(e) => {
+                    e.preventDefault();
+                    handleConfirmLock();
+                }}
+                className={userToAction?.accountNonLocked ? "bg-red-600 hover:bg-red-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"}
+                disabled={isProcessing}
+            >
+                {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (
+                    userToAction?.accountNonLocked ? <Ban className="mr-2 h-4 w-4" /> : <Unlock className="mr-2 h-4 w-4" />
+                )}
+                {isProcessing ? "Đang xử lý..." : (userToAction?.accountNonLocked ? "Khóa ngay" : "Mở khóa")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }

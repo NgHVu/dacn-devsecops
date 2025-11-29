@@ -14,7 +14,9 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.products.dto.ProductCreateRequest;
 import com.example.products.dto.ProductCriteria; 
 import com.example.products.dto.ProductUpdateRequest;
+import com.example.products.entity.Category;
 import com.example.products.entity.Product;
+import com.example.products.repository.CategoryRepository; // Import thêm CategoryRepository
 import com.example.products.repository.ProductRepository;
 import com.example.products.service.ProductService;
 
@@ -33,6 +35,9 @@ class ProductServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private CategoryRepository categoryRepository; 
 
     @InjectMocks
     private ProductService productService;
@@ -54,10 +59,17 @@ class ProductServiceTest {
 
     @Test
     void testCreate_Success() {
-        ProductCreateRequest request = new ProductCreateRequest("Bún Bò Huế", new BigDecimal("45000"), 50, "bun-bo.jpg", 1L);        
-        Product savedProduct = Product.builder().id(1L).name("Bún Bò Huế").build();
+        ProductCreateRequest request = new ProductCreateRequest("Bún Bò Huế", "Mô tả ngon", new BigDecimal("45000"), 50, "bun-bo.jpg", 1L);        
+        
+        Category mockCategory = new Category();
+        mockCategory.setId(1L);
+
+        Product savedProduct = Product.builder().id(1L).name("Bún Bò Huế").description("Mô tả ngon").build();
+        
         when(productRepository.existsByNameIgnoreCase("Bún Bò Huế")).thenReturn(false);
+        when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory));
         when(productRepository.save(any(Product.class))).thenReturn(savedProduct);
+        
         Product createdProduct = productService.create(request);
         assertThat(createdProduct).isNotNull();
         assertThat(createdProduct.getId()).isEqualTo(1L);
@@ -65,7 +77,8 @@ class ProductServiceTest {
 
     @Test
     void testCreate_Conflict_ShouldThrowException() {
-        ProductCreateRequest request = new ProductCreateRequest("Phở Bò", new BigDecimal("50000"), 100, "pho-bo.jpg", 1L);        
+        ProductCreateRequest request = new ProductCreateRequest("Phở Bò", null, new BigDecimal("50000"), 100, "pho-bo.jpg", 1L);        
+        
         when(productRepository.existsByNameIgnoreCase("Phở Bò")).thenReturn(true);
         assertThrows(ResponseStatusException.class, () -> productService.create(request));
     }
@@ -73,11 +86,16 @@ class ProductServiceTest {
     @Test
     void testUpdatePartial_AllFields_Success() {
         Product existing = Product.builder().id(1L).name("Cũ").price(new BigDecimal("10000")).image("cu.jpg").build();
-        ProductUpdateRequest request = new ProductUpdateRequest("Mới", new BigDecimal("20000"), 20, "moi.jpg", null);        
+        
+        ProductUpdateRequest request = new ProductUpdateRequest("Mới", "Mô tả mới", new BigDecimal("20000"), 20, "moi.jpg", null);        
+        
         when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(productRepository.save(any(Product.class))).thenAnswer(i -> i.getArgument(0));
+        
         Product updated = productService.updatePartial(1L, request);
+        
         assertThat(updated.getName()).isEqualTo("Mới");
+        assertThat(updated.getDescription()).isEqualTo("Mô tả mới"); // Check thêm description
         assertThat(updated.getPrice()).isEqualByComparingTo("20000.00");
         assertThat(updated.getImage()).isEqualTo("moi.jpg");
     }
@@ -85,16 +103,21 @@ class ProductServiceTest {
     @Test
     void testUpdatePartial_NameConflict_ShouldThrowException() {
         Product existing = Product.builder().id(1L).name("Cơm").build();
-        ProductUpdateRequest request = new ProductUpdateRequest("Phở", null, null, null, null);
+        
+        ProductUpdateRequest request = new ProductUpdateRequest("Phở", null, null, null, null, null);
+        
         when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(productRepository.existsByNameIgnoreCase("Phở")).thenReturn(true);
+        
         assertThrows(ResponseStatusException.class, () -> productService.updatePartial(1L, request));
     }
     
     @Test
     void testUpdatePartial_InvalidPrice_ShouldThrowException() {
         Product existing = Product.builder().id(1L).name("Cơm").build();
-        ProductUpdateRequest request = new ProductUpdateRequest(null, new BigDecimal("0.00"), null, null, null);
+        
+        ProductUpdateRequest request = new ProductUpdateRequest(null, null, new BigDecimal("0.00"), null, null, null);
+        
         when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
         assertThrows(ResponseStatusException.class, () -> productService.updatePartial(1L, request));
     }
@@ -102,7 +125,6 @@ class ProductServiceTest {
     @SuppressWarnings("unchecked")
     @Test
     void testGetAllProducts_Search_ShouldCallRepo() {
-        // Arrange
         Page<Product> productPage = new PageImpl<>(List.of());
         when(productRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(productPage);
         

@@ -5,13 +5,17 @@ import com.example.products.entity.Category;
 public record CategoryDto(
     Long id,
     String name,
-    String description
+    String icon,
+    String description,
+    Long productCount 
 ) {
     public static CategoryDto fromEntity(Category category) {
         return new CategoryDto(
             category.getId(),
             category.getName(),
-            category.getDescription()
+            category.getIcon(),
+            category.getDescription(),
+            0L 
         );
     }
 }

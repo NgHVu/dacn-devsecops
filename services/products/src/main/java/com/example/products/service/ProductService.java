@@ -33,7 +33,6 @@ public class ProductService {
     private final ProductRepository repo;
     private final CategoryRepository categoryRepository; 
 
-    // --- LOGIC CHO READ ---
     @Transactional(readOnly = true)
     public Page<Product> getAllProducts(ProductCriteria criteria, Pageable pageable) {
         Specification<Product> spec = ProductSpecification.filterBy(criteria);
@@ -86,6 +85,7 @@ public class ProductService {
 
         Product entity = Product.builder()
                 .name(req.name().trim())
+                .description(req.description()) 
                 .price(normalizedPrice)
                 .stockQuantity(req.stockQuantity())
                 .image(req.image())
@@ -104,6 +104,10 @@ public class ProductService {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Tên sản phẩm đã tồn tại: " + newName);
             }
             existing.setName(newName);
+        }
+
+        if (req.description() != null) {
+            existing.setDescription(req.description());
         }
 
         if (req.price() != null) {

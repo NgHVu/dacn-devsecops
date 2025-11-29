@@ -40,14 +40,14 @@ public class DataSeeder implements CommandLineRunner {
 
         log.info("DataSeeder: Bắt đầu tạo dữ liệu mẫu với tên món ăn hấp dẫn...");
 
-        Category catMonHot = seedCategory("Món Hot", "Các món 'Best Seller' được yêu thích nhất");
-        Category catComTam = seedCategory("Cơm Tấm", "Cơm tấm Sài Gòn hạt vỡ chính hiệu");
-        Category catBunPho = seedCategory("Bún Phở", "Hương vị truyền thống Việt Nam đậm đà");
-        Category catDoUong = seedCategory("Đồ Uống", "Trà sữa, Cà phê & Nước ép tươi");
-        Category catPizza = seedCategory("Pizza", "Pizza Ý đế mỏng nướng củi");
-        Category catBanhMi = seedCategory("Bánh Mì", "Bánh mì Việt Nam giòn rụm đẫm nhân");
-        Category catTrangMieng = seedCategory("Tráng Miệng", "Ngọt ngào sau bữa ăn");
-        Category catDoNhau = seedCategory("Đồ Nhậu", "Mồi bén bia ngon lai rai");
+        Category catMonHot = seedCategory("Món Hot", "Các món 'Best Seller' được yêu thích nhất", "Flame");
+        Category catComTam = seedCategory("Cơm Tấm", "Cơm tấm Sài Gòn hạt vỡ chính hiệu", "Utensils");
+        Category catBunPho = seedCategory("Bún Phở", "Hương vị truyền thống Việt Nam đậm đà", "Soup");
+        Category catDoUong = seedCategory("Đồ Uống", "Trà sữa, Cà phê & Nước ép tươi", "Coffee");
+        Category catPizza = seedCategory("Pizza", "Pizza Ý đế mỏng nướng củi", "Pizza");
+        Category catBanhMi = seedCategory("Bánh Mì", "Bánh mì Việt Nam giòn rụm đẫm nhân", "Sandwich");
+        Category catTrangMieng = seedCategory("Tráng Miệng", "Ngọt ngào sau bữa ăn", "IceCream");
+        Category catDoNhau = seedCategory("Đồ Nhậu", "Mồi bén bia ngon lai rai", "Beer");
 
         List<Product> toInsert = new ArrayList<>();
 
@@ -113,13 +113,14 @@ public class DataSeeder implements CommandLineRunner {
         }
     }
 
-    private Category seedCategory(String name, String description) {
+    private Category seedCategory(String name, String description, String icon) {
         return categoryRepo.findAll().stream()
                 .filter(c -> c.getName().equalsIgnoreCase(name))
                 .findFirst()
                 .orElseGet(() -> categoryRepo.save(Category.builder()
                         .name(name)
                         .description(description)
+                        .icon(icon) 
                         .build()));
     }
 

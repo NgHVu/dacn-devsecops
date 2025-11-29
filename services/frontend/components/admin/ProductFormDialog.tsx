@@ -104,7 +104,7 @@ export function ProductFormDialog({
     if (isOpen) {
       form.reset({
         name: initialData?.name || "",
-        description: initialData?.description || "",
+        description: initialData?.description || "", 
         price: initialData?.price || 0,
         stockQuantity: initialData?.stockQuantity || 0,
         image: initialData?.image || "",
@@ -118,7 +118,7 @@ export function ProductFormDialog({
     
     const requestData: CreateProductRequest = {
       name: data.name,
-      description: data.description || null,
+      description: data.description || null, 
       price: data.price,
       stockQuantity: data.stockQuantity,
       image: data.image || null,

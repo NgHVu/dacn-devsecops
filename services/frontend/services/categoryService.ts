@@ -6,12 +6,23 @@ const getAllCategories = async (): Promise<Category[]> => {
   return response.data;
 };
 
-const createCategory = async (name: string, description?: string): Promise<Category> => {
-  const response = await apiClient.post<Category>('/api/categories', { name, description });
+const createCategory = async (data: { name: string; description?: string; icon?: string }): Promise<Category> => {
+  const response = await apiClient.post<Category>('/api/categories', data);
   return response.data;
+};
+
+const updateCategory = async (id: number, data: { name: string; description?: string; icon?: string }): Promise<Category> => {
+  const response = await apiClient.put<Category>(`/api/categories/${id}`, data);
+  return response.data;
+};
+
+const deleteCategory = async (id: number): Promise<void> => {
+  await apiClient.delete(`/api/categories/${id}`);
 };
 
 export const categoryService = {
   getAllCategories,
-  createCategory
+  createCategory,
+  updateCategory,
+  deleteCategory 
 };

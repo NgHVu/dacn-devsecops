@@ -17,7 +17,6 @@ import java.util.List;
 
 @Repository
 @Transactional(readOnly = true)
-// SỬA ĐỔI: Đổi tên Interface và Entity
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
     
     Page<Product> findByNameContainingIgnoreCase(String keyword, Pageable pageable);
@@ -41,4 +40,6 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     );
 
     Page<Product> findByPriceBetweenOrderByPriceAsc(BigDecimal min, BigDecimal max, Pageable pageable);
+    
+    long countByCategoryId(Long categoryId);
 }

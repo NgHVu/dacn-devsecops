@@ -12,6 +12,10 @@ public record ProductCreateRequest(
         @Schema(description = "Tên sản phẩm", example = "Cơm Tấm Sườn Bì Chả")
         String name,
 
+        @Size(max = 500, message = "Mô tả tối đa 500 ký tự")
+        @Schema(description = "Mô tả chi tiết món ăn", example = "Sườn nướng mật ong thơm ngon...")
+        String description,
+
         @NotNull(message = "Giá không được null")
         @DecimalMin(value = "0.01", message = "Giá phải lớn hơn hoặc bằng 0.01")
         @Digits(integer = 10, fraction = 2, message = "Giá không hợp lệ")

@@ -1,15 +1,12 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { toast } from "sonner";
 import { categoryService } from "@/services/categoryService";
 import { Category } from "@/types/product";
-import { Loader2, Plus, Layers, Search, FolderPlus, RotateCcw, AlertCircle, FolderOpen, Filter } from "lucide-react";
+import { Plus, Layers, Search, Filter, RotateCcw, AlertCircle, FolderOpen } from "lucide-react";
+import { getIconComponent } from "@/config/iconMapping";
 
-// UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,6 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { CategoryFormDialog } from "@/components/admin/CategoryFormDialog";
 import { CategoryActions } from "@/components/admin/CategoryActions";
+import { PaginationControl } from "@/components/ui/PaginationControl"; 
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -42,6 +40,9 @@ export default function AdminCategoriesPage() {
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
+
+  const [currentPage, setCurrentPage] = useState(1); 
+  const PAGE_SIZE = 8; 
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -62,9 +63,17 @@ export default function AdminCategoriesPage() {
     fetchCategories();
   }, [fetchCategories]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
   const filteredCategories = categories.filter(c => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const totalPages = Math.ceil(filteredCategories.length / PAGE_SIZE);
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const paginatedCategories = filteredCategories.slice(startIndex, startIndex + PAGE_SIZE);
 
   const handleAddNew = () => {
     setCurrentCategory(null);
@@ -109,7 +118,7 @@ export default function AdminCategoriesPage() {
               <Layers className="h-5 w-5 text-blue-600" />
               Danh sách danh mục
               <Badge variant="secondary" className="text-xs font-normal">
-                 {filteredCategories.length} items
+                 Hiển thị {paginatedCategories.length} / {filteredCategories.length} danh mục
               </Badge>
             </CardTitle>
             
@@ -135,9 +144,10 @@ export default function AdminCategoriesPage() {
             <TableHeader>
               <TableRow className="bg-muted/50 hover:bg-muted/50 border-border">
                 <TableHead className="w-[80px] pl-6 text-center">ID</TableHead>
+                <TableHead className="w-[100px] text-center">Icon</TableHead>
                 <TableHead className="min-w-[200px]">Tên danh mục</TableHead>
                 <TableHead>Mô tả</TableHead>
-                <TableHead className="text-right">Số món (Demo)</TableHead>
+                <TableHead className="text-right">Số món</TableHead>
                 <TableHead className="w-[100px] text-center pr-6">Hành động</TableHead>
               </TableRow>
             </TableHeader>
@@ -147,6 +157,7 @@ export default function AdminCategoriesPage() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i} className="border-border">
                     <TableCell className="pl-6 text-center"><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
+                    <TableCell className="text-center"><Skeleton className="h-8 w-8 mx-auto rounded-md" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
@@ -155,7 +166,7 @@ export default function AdminCategoriesPage() {
                 ))
               ) : error ? (
                 <TableRow>
-                   <TableCell colSpan={5} className="h-40 text-center border-border">
+                   <TableCell colSpan={6} className="h-40 text-center border-border">
                       <div className="flex flex-col items-center justify-center text-destructive gap-2">
                         <AlertCircle className="h-8 w-8" />
                         <p>{error}</p>
@@ -165,7 +176,7 @@ export default function AdminCategoriesPage() {
                 </TableRow>
               ) : filteredCategories.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-40 text-center text-muted-foreground border-border">
+                  <TableCell colSpan={6} className="h-40 text-center text-muted-foreground border-border">
                     <div className="flex flex-col items-center justify-center gap-2">
                         <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
                         <p>Không tìm thấy danh mục nào.</p>
@@ -173,30 +184,51 @@ export default function AdminCategoriesPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredCategories.map((cat) => (
-                  <TableRow key={cat.id} className="group hover:bg-muted/50 transition-colors border-border">
-                    <TableCell className="pl-6 text-center font-mono text-xs text-muted-foreground">#{cat.id}</TableCell>
-                    <TableCell className="font-semibold text-foreground">{cat.name}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm max-w-[300px] truncate">{cat.description || "—"}</TableCell>
-                    <TableCell className="text-right text-muted-foreground text-sm italic">--</TableCell>
-                    <TableCell className="text-center pr-6">
-                        <CategoryActions 
-                            category={cat}
-                            onEdit={() => handleEdit(cat)}
-                            onDeleted={handleSaved}
-                        />
-                    </TableCell>
-                  </TableRow>
-                ))
+                paginatedCategories.map((cat) => {
+                    const IconComp = getIconComponent(cat.icon);
+
+                    return (
+                        <TableRow key={cat.id} className="group hover:bg-muted/50 transition-colors border-border">
+                            <TableCell className="pl-6 text-center font-mono text-xs text-muted-foreground">#{cat.id}</TableCell>
+                            
+                            <TableCell className="text-center">
+                                <div className="h-9 w-9 mx-auto rounded-lg bg-background border border-border flex items-center justify-center text-orange-600 shadow-sm">
+                                    <IconComp className="h-5 w-5" />
+                                </div>
+                            </TableCell>
+
+                            <TableCell className="font-semibold text-foreground">{cat.name}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm max-w-[300px] truncate">{cat.description || "—"}</TableCell>
+                            
+                            <TableCell className="text-right font-medium text-foreground">
+                                {cat.productCount !== undefined ? cat.productCount : 0}
+                            </TableCell>
+
+                            <TableCell className="text-center pr-6">
+                                <CategoryActions 
+                                    category={cat}
+                                    onEdit={() => handleEdit(cat)}
+                                    onDeleted={handleSaved}
+                                />
+                            </TableCell>
+                        </TableRow>
+                    );
+                })
               )}
             </TableBody>
           </Table>
         </CardContent>
         
-        <CardFooter className="border-t border-border bg-muted/40 py-3 flex justify-between text-xs text-muted-foreground">
-            <span>Hiển thị {filteredCategories.length} kết quả</span>
-            <span>Trang 1/1</span>
-        </CardFooter>
+        {!isLoading && !error && filteredCategories.length > 0 && (
+            <CardFooter className="border-t border-border bg-muted/40 py-4 flex justify-center">
+                 <PaginationControl 
+                    currentPage={currentPage - 1} 
+
+                    totalPages={totalPages} 
+                    onPageChange={(page) => setCurrentPage(page + 1)} 
+                 />
+            </CardFooter>
+        )}
       </Card>
 
       <CategoryFormDialog 

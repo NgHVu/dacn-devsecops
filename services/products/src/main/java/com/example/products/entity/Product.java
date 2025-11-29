@@ -34,6 +34,10 @@ public class Product {
     @Column(nullable = false, length = 120, unique = true) 
     @Schema(description = "Tên món ăn", example = "Cơm Tấm Sườn Bì Chả")
     private String name;
+    
+    @Column(columnDefinition = "TEXT")
+    @Schema(description = "Mô tả chi tiết món ăn", example = "Sườn nướng mật ong thơm ngon...")
+    private String description;
 
     @NotNull(message = "Giá không được null")
     @DecimalMin(value = "0.01")

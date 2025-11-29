@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { productService } from "@/services/productService";
-import { type Product } from "@/types/product";
+import { categoryService } from "@/services/categoryService"; 
+import { type Product, type Category } from "@/types/product";
 import { formatPrice, getImageUrl } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"; 
 
 import { 
   PlusCircle, 
@@ -33,7 +41,8 @@ import {
   PackageOpen, 
   AlertCircle,
   Filter,
-  ImageIcon
+  ImageIcon,
+  Layers 
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,17 +52,32 @@ import { PaginationControl } from "@/components/ui/PaginationControl";
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0); 
   const PAGE_SIZE = 8; 
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+        try {
+            const data = await categoryService.getAllCategories();
+            setCategories(data);
+        } catch (err) {
+            console.error("Lỗi tải danh mục cho bộ lọc:", err);
+        }
+    };
+    fetchCategories();
+  }, []);
 
   const fetchProducts = useCallback(async (pageIndex: number) => {
     try {
@@ -63,11 +87,13 @@ export default function AdminProductsPage() {
       const data = await productService.getProducts({ 
           page: pageIndex, 
           size: PAGE_SIZE,
-          search: searchQuery || undefined 
+          search: searchQuery || undefined,
+          categoryId: selectedCategory !== "all" ? Number(selectedCategory) : undefined
       });
       
       setProducts(data.content);
       setTotalPages(data.totalPages); 
+      setTotalElements(data.totalElements); 
       setCurrentPage(data.number);    
       
     } catch (err) {
@@ -77,23 +103,18 @@ export default function AdminProductsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, selectedCategory]); 
 
   useEffect(() => {
     const timer = setTimeout(() => {
-        if (currentPage !== 0 && searchQuery) {
-             fetchProducts(0);
-        } else {
-             fetchProducts(currentPage);
-        }
+        fetchProducts(0);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchQuery]); 
+  }, [searchQuery, selectedCategory, fetchProducts]); 
 
-  useEffect(() => {
-      if (!searchQuery) fetchProducts(currentPage);
-  }, [currentPage]);
-
+  const handlePageChange = (page: number) => {
+      fetchProducts(page);
+  };
 
   const handleAddNew = () => {
     setCurrentProduct(null); 
@@ -142,15 +163,34 @@ export default function AdminProductsPage() {
 
       <Card className="shadow-sm border-border bg-card">
         <CardHeader className="p-4 sm:p-6 border-b border-border">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
             <CardTitle className="text-lg font-semibold flex items-center gap-2 text-card-foreground">
                 Danh sách món ăn
                 <Badge variant="secondary" className="text-xs font-normal">
-                    Tổng: {products.length} (Trang hiện tại)
+                    Hiển thị {products.length} / {totalElements} món
                 </Badge>
             </CardTitle>
             
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
+                <div className="w-full sm:w-[200px]">
+                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                        <SelectTrigger className="bg-background border-input">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                                <Filter className="h-4 w-4" />
+                                <SelectValue placeholder="Tất cả danh mục" />
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Tất cả danh mục</SelectItem>
+                            {categories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id.toString()}>
+                                    {cat.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+
                 <div className="relative w-full sm:w-72">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -161,9 +201,6 @@ export default function AdminProductsPage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
-                <Button variant="outline" size="icon" className="shrink-0">
-                    <Filter className="h-4 w-4" />
-                </Button>
             </div>
           </div>
         </CardHeader>
@@ -174,6 +211,7 @@ export default function AdminProductsPage() {
               <TableRow className="bg-muted/50 hover:bg-muted/50 border-border">
                 <TableHead className="w-[80px] pl-6">Ảnh</TableHead>
                 <TableHead className="min-w-[200px]">Tên món ăn</TableHead>
+                <TableHead className="min-w-[150px]">Danh mục</TableHead>
                 <TableHead className="text-right">Giá bán</TableHead>
                 <TableHead className="text-center">Trạng thái</TableHead>
                 <TableHead className="text-right">Tồn kho</TableHead>
@@ -187,6 +225,7 @@ export default function AdminProductsPage() {
                   <TableRow key={i}>
                     <TableCell className="pl-6"><Skeleton className="h-12 w-12 rounded-lg" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-[180px] mb-2" /><Skeleton className="h-3 w-[100px]" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-[100px] rounded-full" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-4 w-[80px] ml-auto" /></TableCell>
                     <TableCell className="text-center"><Skeleton className="h-6 w-[80px] mx-auto rounded-full" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-4 w-[40px] ml-auto" /></TableCell>
@@ -195,7 +234,7 @@ export default function AdminProductsPage() {
                 ))
               ) : error ? (
                 <TableRow>
-                   <TableCell colSpan={6} className="h-60 text-center">
+                   <TableCell colSpan={7} className="h-60 text-center">
                       <div className="flex flex-col items-center justify-center text-red-500 gap-2">
                         <AlertCircle className="h-10 w-10" />
                         <p className="font-medium">{error}</p>
@@ -205,13 +244,13 @@ export default function AdminProductsPage() {
                 </TableRow>
               ) : products.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-60 text-center">
+                  <TableCell colSpan={7} className="h-60 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
                       <div className="bg-muted p-4 rounded-full">
                           <PackageOpen className="h-10 w-10 opacity-50" />
                       </div>
                       <p className="font-medium">Không tìm thấy món ăn nào</p>
-                      <p className="text-sm">Thử thay đổi từ khóa hoặc thêm món mới.</p>
+                      <p className="text-sm">Thử thay đổi bộ lọc hoặc thêm món mới.</p>
                       <Button variant="link" onClick={handleAddNew} className="text-orange-600">Thêm ngay</Button>
                     </div>
                   </TableCell>
@@ -237,6 +276,17 @@ export default function AdminProductsPage() {
                             <span className="font-semibold text-foreground">{product.name}</span>
                             <span className="text-xs text-muted-foreground line-clamp-1">{product.description || "Không có mô tả"}</span>
                         </div>
+                    </TableCell>
+                    
+                    <TableCell>
+                        {product.category ? (
+                            <Badge variant="outline" className="font-normal text-muted-foreground flex w-fit items-center gap-1">
+                                <Layers className="h-3 w-3" />
+                                {product.category.name}
+                            </Badge>
+                        ) : (
+                            <span className="text-xs text-muted-foreground italic">--</span>
+                        )}
                     </TableCell>
                     
                     <TableCell className="text-right font-bold text-foreground tabular-nums">
@@ -282,7 +332,7 @@ export default function AdminProductsPage() {
                  <PaginationControl 
                     currentPage={currentPage} 
                     totalPages={totalPages} 
-                    onPageChange={(page) => setCurrentPage(page)} 
+                    onPageChange={handlePageChange} 
                  />
             </CardFooter>
         )}

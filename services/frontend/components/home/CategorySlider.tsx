@@ -2,32 +2,39 @@
 
 import React from "react";
 import Link from "next/link";
-import { 
-  Utensils, 
-  Coffee, 
-  Pizza, 
-  Soup, 
-  Sandwich, 
-  IceCream, 
-  Beer,
-  Flame,
-  ChevronRight
-} from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { ChevronRight } from "lucide-react";
+import { Category } from "@/types/product";
+import { getIconComponent } from "@/config/iconMapping";
+import { cn } from "@/lib/utils"; 
 
-// Dùng màu Orange/Red làm chủ đạo cho đồng bộ FoodHub
-const categories = [
-  { id: 1, name: "Tất cả", icon: Utensils, href: "/", color: "bg-zinc-100 text-zinc-600 group-hover:bg-zinc-800 group-hover:text-white" },
-  { id: 4, name: "Món Hot", icon: Flame, href: "/search?q=hot", color: "bg-red-100 text-red-600 group-hover:bg-red-600 group-hover:text-white" },
-  { id: 2, name: "Cơm Tấm", icon: Utensils, href: "/search?q=com", color: "bg-orange-100 text-orange-600 group-hover:bg-orange-600 group-hover:text-white" },
-  { id: 3, name: "Bún Phở", icon: Soup, href: "/search?q=pho", color: "bg-amber-100 text-amber-600 group-hover:bg-amber-600 group-hover:text-white" },
-  { id: 5, name: "Đồ Uống", icon: Coffee, href: "/search?q=nuoc", color: "bg-orange-50 text-orange-500 group-hover:bg-orange-500 group-hover:text-white" },
-  { id: 6, name: "Pizza", icon: Pizza, href: "/search?q=pizza", color: "bg-yellow-100 text-yellow-600 group-hover:bg-yellow-500 group-hover:text-white" },
-  { id: 7, name: "Bánh Mì", icon: Sandwich, href: "/search?q=banhmi", color: "bg-green-100 text-green-600 group-hover:bg-green-600 group-hover:text-white" },
-  { id: 8, name: "Tráng Miệng", icon: IceCream, href: "/search?q=kem", color: "bg-pink-100 text-pink-600 group-hover:bg-pink-500 group-hover:text-white" },
-  { id: 9, name: "Đồ Nhậu", icon: Beer, href: "/search?q=bia", color: "bg-purple-100 text-purple-600 group-hover:bg-purple-600 group-hover:text-white" },
+interface CategorySliderProps {
+  categories: Category[];
+}
+
+const colorCycle = [
+  "bg-zinc-100 text-zinc-600 group-hover:bg-zinc-800 group-hover:text-white",
+  "bg-orange-100 text-orange-600 group-hover:bg-orange-600 group-hover:text-white",
+  "bg-amber-100 text-amber-600 group-hover:bg-amber-600 group-hover:text-white",
+  "bg-red-100 text-red-600 group-hover:bg-red-600 group-hover:text-white",
+  "bg-yellow-100 text-yellow-600 group-hover:bg-yellow-500 group-hover:text-white",
+  "bg-green-100 text-green-600 group-hover:bg-green-600 group-hover:text-white",
+  "bg-pink-100 text-pink-600 group-hover:bg-pink-500 group-hover:text-white",
+  "bg-purple-100 text-purple-600 group-hover:bg-purple-600 group-hover:text-white",
+  "bg-blue-100 text-blue-600 group-hover:bg-blue-600 group-hover:text-white",
 ];
 
-export function CategorySlider() {
+export function CategorySlider({ categories = [] }: CategorySliderProps) {
+  const searchParams = useSearchParams();
+  const currentCategoryId = searchParams.get("categoryId");
+  const currentSort = searchParams.get("sort");
+
+  const allCategories = [
+    { id: -1, name: "Tất cả", icon: "Utensils", description: "" }, 
+    { id: -2, name: "Món Hot", icon: "Flame", description: "Best Seller" }, 
+    ...categories
+  ];
+
   return (
     <div className="py-2">
       <div className="flex items-center justify-between mb-6 px-1">
@@ -40,27 +47,54 @@ export function CategorySlider() {
         </Link>
       </div>
       
-      {/* Container cuộn ngang với hiệu ứng snap */}
       <div className="flex space-x-4 overflow-x-auto pb-6 pt-2 scrollbar-hide snap-x -mx-4 px-4 md:mx-0 md:px-0">
-        {categories.map((cat) => (
-          <Link 
-            key={cat.id} 
-            href={cat.href}
-            className="flex-shrink-0 snap-start group"
-          >
-            <div className="flex flex-col items-center gap-3 w-[100px] transition-all duration-300 hover:-translate-y-1">
-               {/* Icon Container */}
-               <div className={`w-20 h-20 rounded-[1.5rem] flex items-center justify-center transition-all duration-500 shadow-sm border border-transparent group-hover:shadow-lg group-hover:shadow-orange-500/20 ${cat.color}`}>
-                  <cat.icon className="w-9 h-9 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />
-               </div>
-               
-               {/* Label */}
-               <span className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors text-center">
-                 {cat.name}
-               </span>
-            </div>
-          </Link>
-        ))}
+        {allCategories.map((cat, index) => {
+          const IconComponent = getIconComponent(cat.icon);
+          const colorClass = colorCycle[index % colorCycle.length];
+          
+          let href = "/";
+          let isActive = false;
+
+          if (cat.id === -1) {
+             href = "/";
+             isActive = !currentCategoryId && !currentSort; 
+          } else if (cat.id === -2) {
+             href = "/?sort=rating_desc";
+             isActive = currentSort === "rating_desc";
+          } else {
+             href = `/?categoryId=${cat.id}#products`; 
+             isActive = currentCategoryId === String(cat.id);
+          }
+
+          return (
+            <Link 
+              key={cat.id} 
+              href={href}
+              className="flex-shrink-0 snap-start group"
+              scroll={false} 
+            >
+              <div className="flex flex-col items-center gap-3 w-[100px] transition-all duration-300 hover:-translate-y-1">
+                 <div className={cn(
+                    `w-20 h-20 rounded-[1.5rem] flex items-center justify-center transition-all duration-500 shadow-sm border border-transparent group-hover:shadow-lg group-hover:shadow-orange-500/20`,
+                    colorClass,
+                    isActive && "ring-4 ring-orange-500/30 scale-110 shadow-xl"
+                 )}>
+                    <IconComponent className={cn(
+                        "w-9 h-9 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3",
+                        isActive && "scale-125"
+                    )} />
+                 </div>
+                 
+                 <span className={cn(
+                    "text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors text-center line-clamp-1 px-1",
+                    isActive && "text-orange-600 font-extrabold"
+                 )}>
+                   {cat.name}
+                 </span>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

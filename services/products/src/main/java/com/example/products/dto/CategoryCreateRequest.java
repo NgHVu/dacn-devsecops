@@ -8,5 +8,7 @@ public record CategoryCreateRequest(
     @Size(max = 50, message = "Tên danh mục tối đa 50 ký tự")
     String name,
 
+    String icon,
+
     String description
 ) {}

@@ -4,6 +4,8 @@ export type Category = {
   id: number;
   name: string;
   description?: string;
+  icon?: string;
+  productCount?: number; 
 };
 
 export type GetProductsParams = {
@@ -25,9 +27,6 @@ export type Product = {
   stockQuantity: number;
   
   category?: Category; 
-  
-  // Giữ field nếu backend trả về cả 2, thường là object
-  // categoryId?: number; 
 
   createdAt: string;
   updatedAt: string;
@@ -36,7 +35,7 @@ export type Product = {
 export type PageableResponse<T> = {
   content: T[];
   totalPages: number;
-  totalElements: number;
+  totalElements: number; 
   size: number;
   number: number;
   last?: boolean;  
@@ -46,18 +45,13 @@ export type PageableResponse<T> = {
 
 export const productSchema = z.object({
   name: z.string().min(3, { message: "Tên phải có ít nhất 3 ký tự." }),
-  
   description: z.string().optional(),
-  
   price: z.coerce.number().min(0, { message: "Giá không thể âm." }),
-    
   stockQuantity: z.coerce.number()
     .int({ message: "Số lượng phải là số nguyên." })
     .min(0, { message: "Số lượng không thể âm." }),
-    
   categoryId: z.coerce.number()
     .min(1, { message: "Vui lòng chọn danh mục." }),
-
   image: z.string().trim().url({ message: "Phải là một đường dẫn URL hợp lệ." })
             .or(z.literal("")).optional(), 
 });

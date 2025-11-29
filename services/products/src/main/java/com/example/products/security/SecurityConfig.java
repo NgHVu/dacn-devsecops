@@ -40,6 +40,8 @@ public class SecurityConfig {
 
                         .requestMatchers("/uploads/**").permitAll() 
                         
+                        .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/**").permitAll()
+                        
                         .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll() 
                         
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/actuator/**").permitAll()

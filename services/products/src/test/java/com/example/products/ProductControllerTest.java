@@ -62,7 +62,7 @@ class ProductControllerTest {
     
     @Test
     void testCreate_ShouldReturn201Created() throws Exception {
-        ProductCreateRequest request = new ProductCreateRequest("Phở Bò", new BigDecimal("50000"), 100, "pho.jpg", 1L); // Thêm categoryId
+        ProductCreateRequest request = new ProductCreateRequest("Phở Bò", null, new BigDecimal("50000"), 100, "pho.jpg", 1L); 
         
         Product savedProduct = Product.builder().id(1L).name("Phở Bò").build();
         given(productService.create(any(ProductCreateRequest.class))).willReturn(savedProduct);
@@ -76,7 +76,7 @@ class ProductControllerTest {
     
     @Test
     void testUpdatePartial_ShouldReturn200OK() throws Exception {
-        ProductUpdateRequest request = new ProductUpdateRequest("Tên Mới", null, null, null, null);
+        ProductUpdateRequest request = new ProductUpdateRequest("Tên Mới", null, null, null, null, null);
         
         Product updatedProduct = Product.builder().id(1L).name("Tên Mới").build();
         given(productService.updatePartial(eq(1L), any(ProductUpdateRequest.class))).willReturn(updatedProduct);

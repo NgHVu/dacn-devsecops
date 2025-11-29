@@ -31,4 +31,19 @@ public class CategoryController {
     public ResponseEntity<CategoryDto> createCategory(@Valid @RequestBody CategoryCreateRequest request) {
         return ResponseEntity.ok(categoryService.createCategory(request));
     }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Cập nhật danh mục (Chỉ Admin)")
+    public ResponseEntity<CategoryDto> updateCategory(
+            @PathVariable Long id,
+            @Valid @RequestBody CategoryCreateRequest request) {
+        return ResponseEntity.ok(categoryService.updateCategory(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Xóa danh mục (Chỉ Admin)")
+    public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
+        categoryService.deleteCategory(id);
+        return ResponseEntity.noContent().build();
+    }
 }
