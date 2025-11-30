@@ -4,7 +4,9 @@ import {
   type PageableResponse,
   type CreateProductRequest,
   type UpdateProductRequest,
-  type GetProductsParams 
+  type GetProductsParams,
+  type Review,               // [CẬP NHẬT] Import thêm
+  type CreateReviewRequest   // [CẬP NHẬT] Import thêm
 } from '@/types/product';
 
 const getProducts = async (
@@ -65,11 +67,25 @@ const uploadImage = async (file: File): Promise<string> => {
   return response.data;
 };
 
+// [CẬP NHẬT] Hàm lấy danh sách review
+const getProductReviews = async (productId: number, page = 0, size = 5): Promise<PageableResponse<Review>> => {
+    const response = await apiClient.get<PageableResponse<Review>>(`/api/reviews/product/${productId}?page=${page}&size=${size}`);
+    return response.data;
+};
+
+// [CẬP NHẬT] Hàm tạo review
+const createReview = async (data: CreateReviewRequest): Promise<Review> => {
+    const response = await apiClient.post<Review>('/api/reviews', data);
+    return response.data;
+};
+
 export const productService = {
   getProducts,
   getProductById, 
   createProduct,
   updateProduct,
   deleteProduct,
-  uploadImage,    
+  uploadImage,
+  getProductReviews, // Export mới
+  createReview,      // Export mới
 };

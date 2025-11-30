@@ -7,7 +7,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime; 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,8 +18,7 @@ import java.util.List;
 @Builder
 @Entity
 @Table(name = "orders")
-@EntityListeners(AuditingEntityListener.class) 
-@EqualsAndHashCode(exclude = "items") 
+@EntityListeners(AuditingEntityListener.class)
 public class Order {
 
     @Id
@@ -29,55 +28,48 @@ public class Order {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    // Thông tin người nhận
+    @Column(name = "customer_name", nullable = false)
+    private String customerName;
+
+    @Column(name = "shipping_address", nullable = false)
+    private String shippingAddress;
+
+    @Column(name = "phone_number", nullable = false)
+    private String phoneNumber;
+
+    @Column(columnDefinition = "TEXT")
+    private String note;
+
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 50)
+    @Column(name = "status", nullable = false)
     private OrderStatus status;
 
-    @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
+    // Mặc định là COD
+    @Column(name = "payment_method")
+    private String paymentMethod; 
+
+    @Column(name = "payment_status")
+    private String paymentStatus;
+
+    @Column(name = "total_amount", nullable = false)
     private BigDecimal totalAmount;
 
-    @OneToMany(
-            mappedBy = "order",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true,
-            fetch = FetchType.LAZY
-    )
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
 
+    // Dùng Instant để tránh lỗi convert Timezone
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt;
+    private Instant createdAt;
 
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt;
+    private Instant updatedAt;
 
     public void addItem(OrderItem item) {
-        if (this.items == null) {
-            this.items = new ArrayList<>();
-        }
-        if (!this.items.contains(item)) {
-            this.items.add(item);
-            item.setOrder(this);
-        }
-    }
-
-    public void removeItem(OrderItem item) {
-        if (this.items != null && this.items.remove(item)) {
-            item.setOrder(null);
-        }
-    }
-
-    @Override
-    public String toString() {
-        return "Order{" +
-                "id=" + id +
-                ", userId=" + userId +
-                ", status=" + status +
-                ", totalAmount=" + totalAmount +
-                ", createdAt=" + createdAt +
-                ", updatedAt=" + updatedAt +
-                '}';
+        items.add(item);
+        item.setOrder(this);
     }
 }

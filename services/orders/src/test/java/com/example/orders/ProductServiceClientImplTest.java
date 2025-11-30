@@ -50,7 +50,8 @@ class ProductServiceClientImplTest {
     @Test
     @DisplayName("getProductsByIds: Thành công khi service trả về 200 OK")
     void testGetProductsByIds_Success() throws Exception {
-        ProductDto mockProduct = new ProductDto(101L, "Sản phẩm 1", new BigDecimal("50.00"), 100);
+        // [FIX] Cập nhật constructor ProductDto (thêm tham số image "img1.jpg")
+        ProductDto mockProduct = new ProductDto(101L, "Sản phẩm 1", new BigDecimal("50.00"), "img1.jpg", 100);
         String mockResponseBody = objectMapper.writeValueAsString(List.of(mockProduct));
         
         mockWebServer.enqueue(new MockResponse()
@@ -64,6 +65,8 @@ class ProductServiceClientImplTest {
 
         assertThat(result).isNotNull().hasSize(1);
         assertThat(result.get(0).name()).isEqualTo("Sản phẩm 1");
+        // Kiểm tra thêm ảnh nếu cần
+        assertThat(result.get(0).image()).isEqualTo("img1.jpg");
 
         var recordedRequest = mockWebServer.takeRequest();
         assertThat(recordedRequest.getMethod()).isEqualTo("GET");

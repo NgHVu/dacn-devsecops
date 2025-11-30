@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { productService } from "@/services/productService";
-import { Product } from "@/types/product";
+import { Product, Review } from "@/types/product"; // Import thêm Review
 import { useCart } from "@/context/CartContext";
 import { cn, formatPrice, getImageUrl } from "@/lib/utils";
 import { SIZES, TOPPINGS, ProductOption } from "@/config/productOptions";
@@ -14,9 +14,10 @@ import { ProductDetailSkeleton } from "@/components/skeletons/ProductDetailSkele
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Minus, Plus, ShoppingCart, ArrowLeft, Star, Clock, Check, ChevronRight } from "lucide-react";
+import { Minus, Plus, ShoppingCart, ArrowLeft, Star, Clock, Check, ChevronRight, User } from "lucide-react";
 import { toast } from "sonner";
 import { FadeIn } from "@/components/animations/FadeIn";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // Import Avatar nếu chưa có thì dùng div tròn
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -25,7 +26,10 @@ export default function ProductDetailPage() {
   const { addToCart } = useCart();
   
   const [product, setProduct] = useState<Product | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]); // State lưu reviews
   const [loading, setLoading] = useState(true);
+  
+  // Cart states
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState<ProductOption>(SIZES[0]);
   const [selectedToppings, setSelectedToppings] = useState<ProductOption[]>([]);
@@ -33,17 +37,25 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    const fetchProduct = async () => {
+    const fetchData = async () => {
       try {
-        const data = await productService.getProductById(Number(id));
-        setProduct(data);
+        setLoading(true);
+        // Gọi song song cả product và reviews
+        const [productData, reviewsData] = await Promise.all([
+            productService.getProductById(Number(id)),
+            productService.getProductReviews(Number(id), 0, 5) // Lấy 5 review mới nhất
+        ]);
+        
+        setProduct(productData);
+        setReviews(reviewsData.content);
       } catch (error) {
+        console.error(error);
         toast.error("Không thể tải thông tin sản phẩm");
       } finally {
         setLoading(false);
       }
     };
-    fetchProduct();
+    fetchData();
   }, [id]);
 
   const calculateTotalPrice = () => {
@@ -66,14 +78,28 @@ export default function ProductDetailPage() {
   const handleAddToCart = () => {
     if (!product) return;
     
-    // Gọi hàm thêm vào giỏ
-    // [CẬP NHẬT] Đã xóa toast thủ công ở đây. 
-    // CartContext sẽ tự động hiển thị toast đẹp (có hình + nút xem giỏ).
     addToCart(product, quantity, {
       size: selectedSize,
       toppings: selectedToppings,
       note: note
     });
+  };
+
+  // Helper render sao
+  const renderStars = (rating: number) => {
+    return (
+        <div className="flex gap-0.5">
+            {[1, 2, 3, 4, 5].map((star) => (
+                <Star 
+                    key={star} 
+                    className={cn(
+                        "h-4 w-4", 
+                        star <= Math.round(rating) ? "fill-orange-400 text-orange-400" : "fill-gray-200 text-gray-200"
+                    )} 
+                />
+            ))}
+        </div>
+    );
   };
 
   if (loading) return <ProductDetailSkeleton />;
@@ -95,7 +121,7 @@ export default function ProductDetailPage() {
     <div className="min-h-screen bg-background pb-32 animate-in fade-in duration-500">
       <div className="container px-4 py-6 max-w-6xl mx-auto">
         
-        {/* Breadcrumb / Back Button */}
+        {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
             <Link href="/" className="hover:text-orange-600 transition-colors">Trang chủ</Link>
             <ChevronRight className="h-4 w-4" />
@@ -132,8 +158,9 @@ export default function ProductDetailPage() {
                      </div>
                      
                      <div className="flex items-center gap-4 text-sm">
-                        <div className="flex items-center gap-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-1 rounded-md font-semibold">
-                            <Star className="h-4 w-4 fill-current" /> 4.8 (120+)
+                        <div className="flex items-center gap-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-3 py-1.5 rounded-full font-semibold">
+                            {renderStars(product.averageRating || 0)}
+                            <span>{(product.averageRating || 0).toFixed(1)} ({product.reviewCount || 0} đánh giá)</span>
                         </div>
                         <Separator orientation="vertical" className="h-4" />
                         <div className="flex items-center gap-1 text-muted-foreground">
@@ -217,6 +244,46 @@ export default function ProductDetailPage() {
                  </div>
              </FadeIn>
           </div>
+        </div>
+
+        {/* --- REVIEWS SECTION (NEW) --- */}
+        <div className="mt-16 lg:mt-24 max-w-4xl">
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                Đánh giá từ khách hàng
+                <span className="text-lg font-normal text-muted-foreground">({product.reviewCount || 0})</span>
+            </h2>
+            
+            <div className="space-y-6">
+                {reviews.length === 0 ? (
+                    <div className="text-center py-10 bg-muted/30 rounded-2xl border border-dashed">
+                        <p className="text-muted-foreground">Chưa có đánh giá nào. Hãy là người đầu tiên thưởng thức và đánh giá nhé!</p>
+                    </div>
+                ) : (
+                    reviews.map((review) => (
+                        <div key={review.id} className="bg-card p-6 rounded-2xl border border-border/50 shadow-sm">
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                    <Avatar className="h-10 w-10 border">
+                                        <AvatarFallback className="bg-orange-100 text-orange-700 font-bold">
+                                            {review.userName ? review.userName.charAt(0).toUpperCase() : "U"}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                        <p className="font-bold text-sm">{review.userName || "Người dùng ẩn danh"}</p>
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                            {renderStars(review.rating)}
+                                            <span>• {new Date(review.createdAt).toLocaleDateString('vi-VN')}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p className="text-foreground/90 leading-relaxed text-sm bg-muted/30 p-3 rounded-lg">
+                                {review.comment || "Khách hàng không để lại bình luận."}
+                            </p>
+                        </div>
+                    ))
+                )}
+            </div>
         </div>
       </div>
 

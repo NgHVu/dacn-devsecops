@@ -1,9 +1,9 @@
 export enum OrderStatus {
-  PENDING = "PENDING",      
-  CONFIRMED = "CONFIRMED",   
-  SHIPPING = "SHIPPING",     
-  DELIVERED = "DELIVERED",  
-  CANCELLED = "CANCELLED",  
+  PENDING = "PENDING",
+  CONFIRMED = "CONFIRMED",
+  SHIPPING = "SHIPPING",
+  DELIVERED = "DELIVERED",
+  CANCELLED = "CANCELLED",
 }
 
 export type PageableResponse<T> = {
@@ -23,7 +23,13 @@ export type CreateOrderItemRequest = {
   note?: string; // Thêm note nếu cần
 };
 
+// [CẬP NHẬT] Thêm các trường cần thiết cho Checkout
 export type CreateOrderRequest = {
+  customerName: string;
+  shippingAddress: string;
+  phoneNumber: string;
+  note?: string;
+  paymentMethod: string; // "COD" | "VNPAY" ...
   items: CreateOrderItemRequest[];
 };
 
@@ -37,10 +43,10 @@ export type OrderItem = {
 };
 
 export type Order = {
-  id: number; 
-  userId: number; 
+  id: number;
+  userId: number;
   items: OrderItem[];
-  totalAmount: number; 
+  totalAmount: number;
   status: OrderStatus;
   createdAt: string;
   updatedAt: string;

@@ -65,8 +65,18 @@ class OrderControllerTest {
     @DisplayName("POST /orders: Thành công (201 Created) khi đã xác thực và DTO hợp lệ")
     @WithMockUser
     void testCreateOrder_Success() throws Exception {
-        OrderItemRequest itemRequest = new OrderItemRequest(101L, 2);
-        OrderCreateRequest createRequest = new OrderCreateRequest(List.of(itemRequest));
+        // [FIX] Cập nhật constructor OrderItemRequest (3 tham số: id, quantity, note)
+        OrderItemRequest itemRequest = new OrderItemRequest(101L, 2, "Ít đá");
+        
+        // [FIX] Cập nhật constructor OrderCreateRequest (6 tham số: customerName, address, phone, note, paymentMethod, items)
+        OrderCreateRequest createRequest = new OrderCreateRequest(
+                "Nguyễn Văn Test",
+                "123 Đường Testing, Quận Test",
+                "0909123456",
+                "Giao nhanh nhé",
+                "COD",
+                List.of(itemRequest)
+        );
 
         OrderResponse responseDto = new OrderResponse(
                 1L, 
@@ -97,7 +107,16 @@ class OrderControllerTest {
     @DisplayName("POST /orders: Thất bại (400 Bad Request) khi DTO không hợp lệ")
     @WithMockUser
     void testCreateOrder_InvalidInput_ShouldReturnBadRequest() throws Exception {
-        OrderCreateRequest badRequest = new OrderCreateRequest(List.of()); // List rỗng
+        // [FIX] Tạo request không hợp lệ (Ví dụ: List items rỗng, tên rỗng)
+        // Các tham số rỗng sẽ kích hoạt @NotBlank, list rỗng kích hoạt @NotEmpty
+        OrderCreateRequest badRequest = new OrderCreateRequest(
+                "", // Tên rỗng -> Lỗi
+                "", 
+                "", 
+                "", 
+                "COD", 
+                List.of() // Items rỗng -> Lỗi
+        );
 
         mockMvc.perform(post("/api/v1/orders")
                         .header("Authorization", MOCK_TOKEN)

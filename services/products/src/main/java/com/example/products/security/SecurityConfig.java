@@ -35,16 +35,14 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        
                         .requestMatchers("/error").permitAll()
-
-                        .requestMatchers("/uploads/**").permitAll() 
+                        .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/actuator/**").permitAll()
                         
                         .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/**").permitAll()
-                        
-                        .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll() 
-                        
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/actuator/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/api/reviews/product/**").permitAll()
                         
                         .requestMatchers(HttpMethod.POST, "/api/products", "/api/products/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/products/**").hasAuthority("ROLE_ADMIN")

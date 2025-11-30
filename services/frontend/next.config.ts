@@ -17,31 +17,41 @@ const nextConfig: NextConfig = {
   },
 
   async rewrites() {
+    // URL của các service backend (ưu tiên lấy từ biến môi trường, fallback về localhost)
+    const PRODUCTS_SERVICE_URL = process.env.PRODUCTS_SERVICE_URL || "http://localhost:8081";
+    const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL || "http://localhost:8082";
+    const ORDERS_SERVICE_URL = process.env.ORDERS_SERVICE_URL || "http://localhost:8083";
+
     return [
-      // Users Service
+      // --- USERS SERVICE ---
       {
         source: '/api/auth/:path*',
-        destination: 'http://localhost:8082/api/auth/:path*',
+        destination: `${USERS_SERVICE_URL}/api/auth/:path*`,
       },
       {
         source: '/api/users/:path*',
-        destination: 'http://localhost:8082/api/users/:path*',
+        destination: `${USERS_SERVICE_URL}/api/users/:path*`,
       },
 
-      // Products Service
+      // --- PRODUCTS SERVICE ---
       {
         source: '/api/products/:path*',
-        destination: 'http://localhost:8081/api/products/:path*',
+        destination: `${PRODUCTS_SERVICE_URL}/api/products/:path*`,
       },
       {
         source: '/api/categories/:path*',
-        destination: 'http://localhost:8081/api/categories/:path*',
+        destination: `${PRODUCTS_SERVICE_URL}/api/categories/:path*`,
+      },
+      // [QUAN TRỌNG] Thêm đoạn này để map API Reviews sang Products Service
+      {
+        source: "/api/reviews/:path*",
+        destination: `${PRODUCTS_SERVICE_URL}/api/reviews/:path*`,
       },
 
-      // Orders Service 
+      // --- ORDERS SERVICE ---
       {
         source: '/api/orders/:path*',
-        destination: 'http://localhost:8083/api/v1/orders/:path*',
+        destination: `${ORDERS_SERVICE_URL}/api/v1/orders/:path*`,
       },
     ];
   },

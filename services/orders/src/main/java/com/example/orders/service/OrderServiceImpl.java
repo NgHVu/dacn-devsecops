@@ -21,12 +21,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.OffsetDateTime;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
+import java.time.OffsetDateTime; // Import thêm để convert
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -96,8 +101,22 @@ public class OrderServiceImpl implements OrderService {
 
         Order order = Order.builder()
                 .userId(userId)
+                .customerName(orderRequest.customerName())
+                .shippingAddress(orderRequest.shippingAddress())
+                .phoneNumber(orderRequest.phoneNumber())
+                .note(orderRequest.note())
                 .status(OrderStatus.PENDING)
+                .paymentMethod(orderRequest.paymentMethod() != null ? orderRequest.paymentMethod().toUpperCase() : "COD")
+                .items(new ArrayList<>())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
+
+        if ("COD".equalsIgnoreCase(order.getPaymentMethod())) {
+            order.setPaymentStatus("UNPAID");
+        } else {
+            order.setPaymentStatus("PAID");
+        }
 
         BigDecimal totalAmount = BigDecimal.ZERO;
 
@@ -111,12 +130,15 @@ public class OrderServiceImpl implements OrderService {
             
             BigDecimal price = product.price();
             String name = product.name();
+            String image = product.image();
 
             OrderItem orderItem = OrderItem.builder()
                     .productId(productId)
                     .productName(name)
                     .quantity(itemRequest.quantity())
-                    .price(price) 
+                    .price(price)
+                    .productImage(image)
+                    .note(itemRequest.note())
                     .build();
             
             order.addItem(orderItem);
@@ -177,6 +199,9 @@ public class OrderServiceImpl implements OrderService {
 
         log.info("Chuyển đổi trạng thái đơn hàng {}: {} -> {}", orderId, order.getStatus(), newStatus);
         order.setStatus(newStatus);
+        
+        order.setUpdatedAt(Instant.now());
+        
         Order savedOrder = orderRepository.save(order);
 
         triggerEmailNotification(savedOrder, "");
@@ -194,9 +219,16 @@ public class OrderServiceImpl implements OrderService {
 
         long totalOrders = orderRepository.count();
 
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        OffsetDateTime startOfMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
-        long newCustomers = orderRepository.countDistinctUsersInPeriod(startOfMonth, now);
+        Instant now = Instant.now();
+        ZonedDateTime zdtNow = now.atZone(ZoneOffset.UTC);
+        
+        Instant startOfMonth = zdtNow.withDayOfMonth(1).truncatedTo(ChronoUnit.DAYS).toInstant();
+        
+        // FIX 1: Convert Instant -> OffsetDateTime cho Repository
+        long newCustomers = orderRepository.countDistinctUsersInPeriod(
+            startOfMonth.atOffset(ZoneOffset.UTC), 
+            now.atOffset(ZoneOffset.UTC)
+        );
 
         double revenueGrowth = calculateRevenueGrowth(now, cancelledStatus);
 
@@ -221,14 +253,26 @@ public class OrderServiceImpl implements OrderService {
         );
     }
     
-    private double calculateRevenueGrowth(OffsetDateTime now, OrderStatus cancelledStatus) {
-        OffsetDateTime startOfThisMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
-        OffsetDateTime startOfLastMonth = startOfThisMonth.minusMonths(1);
+    private double calculateRevenueGrowth(Instant now, OrderStatus cancelledStatus) {
+        ZonedDateTime zdtNow = now.atZone(ZoneOffset.UTC);
         
-        BigDecimal thisMonthRev = orderRepository.sumRevenueInPeriod(startOfThisMonth, now, cancelledStatus);
+        Instant startOfThisMonth = zdtNow.withDayOfMonth(1).truncatedTo(ChronoUnit.DAYS).toInstant();
+        Instant startOfLastMonth = zdtNow.minusMonths(1).withDayOfMonth(1).truncatedTo(ChronoUnit.DAYS).toInstant();
+        Instant endOfLastMonth = startOfThisMonth.minusMillis(1); 
+
+        // FIX 2: Convert Instant -> OffsetDateTime cho Repository
+        BigDecimal thisMonthRev = orderRepository.sumRevenueInPeriod(
+            startOfThisMonth.atOffset(ZoneOffset.UTC), 
+            now.atOffset(ZoneOffset.UTC), 
+            cancelledStatus
+        );
         if (thisMonthRev == null) thisMonthRev = BigDecimal.ZERO;
         
-        BigDecimal lastMonthRev = orderRepository.sumRevenueInPeriod(startOfLastMonth, startOfThisMonth.minusSeconds(1), cancelledStatus);
+        BigDecimal lastMonthRev = orderRepository.sumRevenueInPeriod(
+            startOfLastMonth.atOffset(ZoneOffset.UTC), 
+            endOfLastMonth.atOffset(ZoneOffset.UTC), 
+            cancelledStatus
+        );
         if (lastMonthRev == null) lastMonthRev = BigDecimal.ZERO;
 
         if (lastMonthRev.compareTo(BigDecimal.ZERO) == 0) {
@@ -275,13 +319,16 @@ public class OrderServiceImpl implements OrderService {
                     .collect(Collectors.toList())
                 : List.of();
 
+        // FIX 3: Convert Instant -> OffsetDateTime cho DTO OrderResponse
+        // Vì DTO OrderResponse của bạn vẫn dùng OffsetDateTime, nên phải convert ngược lại
         return new OrderResponse(
                 order.getId(),
                 order.getUserId(),
                 order.getStatus() != null ? order.getStatus().name() : null,
                 order.getTotalAmount(),
                 itemResponses,
-                order.getCreatedAt(),
-                order.getUpdatedAt());
+                order.getCreatedAt() != null ? order.getCreatedAt().atOffset(ZoneOffset.UTC) : null,
+                order.getUpdatedAt() != null ? order.getUpdatedAt().atOffset(ZoneOffset.UTC) : null
+        );
     }
 }

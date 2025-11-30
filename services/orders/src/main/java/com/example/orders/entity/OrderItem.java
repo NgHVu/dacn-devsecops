@@ -1,78 +1,69 @@
 package com.example.orders.entity;
 
-import jakarta.persistence.*; 
+import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
-/**
- * Đại diện cho một mục hàng (một loại sản phẩm cụ thể với số lượng)
- * trong một đơn hàng {@link Order}.
- */
-@Getter 
+@Getter
 @Setter
-@NoArgsConstructor 
-@AllArgsConstructor 
-@Builder 
-@Entity 
-@Table(name = "order_items") // Ánh xạ vào bảng "order_items"
-@EntityListeners(AuditingEntityListener.class) // Kích hoạt Auditing
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Entity
+@Table(name = "order_items")
+@EntityListeners(AuditingEntityListener.class)
 @EqualsAndHashCode(exclude = "order")
 public class OrderItem {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY) 
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Quan hệ Nhiều-Một với Order
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", nullable = false)
+    private Order order;
 
-    // Đơn hàng chứa mục hàng này.
-    @ManyToOne(fetch = FetchType.LAZY) // Chỉ tải Order khi cần
-    @JoinColumn(name = "order_id", nullable = false) // Tên cột khóa ngoại, không được null
-    private Order order; // Liên kết ngược về đơn hàng chứa mục này
-
-    /**
-     * ID của sản phẩm được đặt trong mục hàng này.
-     * Thông tin chi tiết sản phẩm (tên, mô tả...) sẽ được lấy từ Products Service.
-     */
-    @Column(name = "product_id", nullable = false) 
+    @Column(name = "product_id", nullable = false)
     private Long productId;
 
-    @Column(name = "product_name", nullable = false) 
+    @Column(name = "product_name", nullable = false)
     private String productName;
-    
-    // Số lượng sản phẩm được đặt cho mục hàng này.
-    @Column(nullable = false) 
+
+    // Lưu ảnh sản phẩm để hiển thị trong lịch sử đơn hàng
+    @Column(name = "product_image")
+    private String productImage;
+
+    @Column(nullable = false)
     private Integer quantity;
 
-    /**
-     * Giá của một đơn vị sản phẩm tại thời điểm đơn hàng được tạo (snapshot price).
-     * Giá này được lưu lại để đảm bảo tính chính xác ngay cả khi giá sản phẩm thay đổi sau này.
-     */
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
-    // Thời điểm mục hàng được thêm vào đơn hàng.
-    @CreatedDate // Tự động điền thời gian tạo
+    // Lưu ghi chú cho từng món
+    @Column(name = "note")
+    private String note;
+
+    // [FIX] Chuyển sang Instant để đồng bộ với Order và tránh lỗi Auditing
+    @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
-    // Thời điểm mục hàng được cập nhật lần cuối (ít dùng, nhưng hữu ích cho auditing).
-    @LastModifiedDate // Tự động điền thời gian cập nhật
+    @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
-    // Ghi đè toString() để tránh lỗi LazyInitializationException khi log
     @Override
     public String toString() {
         return "OrderItem{" +
                 "id=" + id +
-                ", orderId=" + (order != null ? order.getId() : null) + // Chỉ lấy ID của Order
+                ", orderId=" + (order != null ? order.getId() : null) +
                 ", productId=" + productId +
+                ", productName='" + productName + '\'' +
                 ", quantity=" + quantity +
                 ", price=" + price +
                 ", createdAt=" + createdAt +

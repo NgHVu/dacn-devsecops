@@ -4,14 +4,12 @@ import com.example.orders.dto.ProductDto;
 import com.example.orders.dto.UserDto;
 import com.example.orders.dto.OrderCreateRequest;
 import com.example.orders.dto.OrderItemRequest;
-import com.example.orders.dto.OrderItemResponse;
 import com.example.orders.dto.OrderResponse;
 
 import com.example.orders.entity.Order;
 import com.example.orders.entity.OrderStatus;
 import com.example.orders.exception.OrderNotFoundException;
 import com.example.orders.repository.OrderRepository;
-import com.example.orders.service.OrderService;
 import com.example.orders.service.ProductServiceClient;
 import com.example.orders.service.UserServiceClient;
 import com.example.orders.service.OrderServiceImpl;
@@ -72,11 +70,24 @@ class OrderServiceImplTest {
     @BeforeEach
     void setUp() {
         mockUserDto = new UserDto(MOCK_USER_ID, "Test User", MOCK_EMAIL);
-        mockProduct1 = new ProductDto(101L, "Sản phẩm 1", new BigDecimal("50.00"), 100);
-        mockProduct2 = new ProductDto(102L, "Sản phẩm 2", new BigDecimal("100.00"), 50);
-        OrderItemRequest item1 = new OrderItemRequest(101L, 2);
-        OrderItemRequest item2 = new OrderItemRequest(102L, 1);
-        mockOrderRequest = new OrderCreateRequest(List.of(item1, item2));
+        // Cập nhật ProductDto với constructor mới (thêm tham số image)
+        mockProduct1 = new ProductDto(101L, "Sản phẩm 1", new BigDecimal("50.00"), "img1.jpg", 100);
+        mockProduct2 = new ProductDto(102L, "Sản phẩm 2", new BigDecimal("100.00"), "img2.jpg", 50);
+        
+        // Cập nhật OrderItemRequest với constructor mới (thêm tham số note)
+        OrderItemRequest item1 = new OrderItemRequest(101L, 2, "Ít đá");
+        OrderItemRequest item2 = new OrderItemRequest(102L, 1, null);
+        
+        // Cập nhật OrderCreateRequest với constructor mới (thêm thông tin giao hàng)
+        mockOrderRequest = new OrderCreateRequest(
+                "Khách Hàng Test",
+                "123 Đường Test",
+                "0909123456",
+                "Ghi chú đơn hàng",
+                "COD",
+                List.of(item1, item2)
+        );
+
         lenient().when(securityContext.getAuthentication()).thenReturn(authentication);
         lenient().when(authentication.getName()).thenReturn(MOCK_EMAIL);
         SecurityContextHolder.setContext(securityContext);
@@ -112,7 +123,7 @@ class OrderServiceImplTest {
         assertThat(response).isNotNull();
         assertThat(response.userId()).isEqualTo(MOCK_USER_ID);
         assertThat(response.status()).isEqualTo(OrderStatus.PENDING.name());
-        assertThat(response.totalAmount()).isEqualByComparingTo(new BigDecimal("200.00"));
+        assertThat(response.totalAmount()).isEqualByComparingTo(new BigDecimal("200.00")); // (50*2) + (100*1)
         assertThat(response.items()).hasSize(2);
         
         verify(userServiceClient, times(1)).getCurrentUser(MOCK_TOKEN);
@@ -121,7 +132,11 @@ class OrderServiceImplTest {
 
         Order savedOrder = orderCaptor.getValue();
         assertThat(savedOrder.getUserId()).isEqualTo(MOCK_USER_ID);
-        assertThat(savedOrder.getItems().get(0).getProductName()).isEqualTo("Sản phẩm 1");
+        // Kiểm tra xem note và image có được lưu đúng không
+        assertThat(savedOrder.getItems()).anyMatch(item -> 
+            item.getProductId().equals(101L) && "Ít đá".equals(item.getNote()) && "img1.jpg".equals(item.getProductImage())
+        );
+        assertThat(savedOrder.getPaymentMethod()).isEqualTo("COD");
     }
 
     @Test
@@ -141,24 +156,30 @@ class OrderServiceImplTest {
         Set<Long> productIds = Set.of(101L, 102L);
         
         when(productServiceClient.getProductsByIds(productIds, MOCK_TOKEN))
-                .thenReturn(List.of(mockProduct1));
+                .thenReturn(List.of(mockProduct1)); // Chỉ trả về 1 sản phẩm thay vì 2
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             orderService.createOrder(mockOrderRequest, MOCK_TOKEN);
         });
         
-        assertThat(exception.getMessage()).contains("Không thể lấy thông tin đầy đủ");
+        assertThat(exception.getMessage()).contains("Một số sản phẩm không tồn tại");
         verify(orderRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("createOrder: Ném lỗi IllegalArgumentException khi số lượng bằng 0")
     void testCreateOrder_InvalidQuantity_ShouldThrowException() {
-        OrderCreateRequest badRequest = new OrderCreateRequest(List.of(new OrderItemRequest(101L, 0)));
-        Set<Long> productIds = Set.of(101L);
-
+        // Tạo request lỗi với số lượng 0
+        OrderCreateRequest badRequest = new OrderCreateRequest(
+                "Tên", "Địa chỉ", "SĐT", null, "COD",
+                List.of(new OrderItemRequest(101L, 0, null))
+        );
+        
+        // Mock user để pass qua bước xác thực đầu tiên
         when(userServiceClient.getCurrentUser(MOCK_TOKEN)).thenReturn(mockUserDto);
         
+        // Mock product service để trả về sản phẩm (tránh lỗi product mismatch trước khi check quantity)
+        Set<Long> productIds = Set.of(101L);
         when(productServiceClient.getProductsByIds(productIds, MOCK_TOKEN))
                 .thenReturn(List.of(mockProduct1));
 
@@ -166,7 +187,7 @@ class OrderServiceImplTest {
             orderService.createOrder(badRequest, MOCK_TOKEN);
         });
         
-        assertThat(exception.getMessage()).isEqualTo("Số lượng sản phẩm 101 phải lớn hơn 0.");
+        assertThat(exception.getMessage()).contains("Số lượng sản phẩm phải lớn hơn 0");
         verify(orderRepository, never()).save(any());
     }
 

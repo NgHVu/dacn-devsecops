@@ -18,6 +18,16 @@ export type GetProductsParams = {
   maxPrice?: number;
 };
 
+// [CẬP NHẬT] Thêm type cho Review
+export type Review = {
+  id: number;
+  userId: string;
+  userName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+};
+
 export type Product = {
   id: number;
   name: string;
@@ -27,6 +37,11 @@ export type Product = {
   stockQuantity: number;
   
   category?: Category; 
+
+  // [CẬP NHẬT] Thêm các trường thống kê mới
+  averageRating?: number;
+  reviewCount?: number;
+  sold?: number;
 
   createdAt: string;
   updatedAt: string;
@@ -38,7 +53,7 @@ export type PageableResponse<T> = {
   totalElements: number; 
   size: number;
   number: number;
-  last?: boolean;  
+  last?: boolean;   
   first?: boolean;
   empty?: boolean;
 };
@@ -68,3 +83,12 @@ export type CreateProductRequest = {
 };
 
 export type UpdateProductRequest = Partial<CreateProductRequest>;
+
+// [CẬP NHẬT] Type cho request tạo review
+export type CreateReviewRequest = {
+    productId: number;
+    orderId: number;
+    rating: number;
+    comment: string;
+    userName?: string;
+};
