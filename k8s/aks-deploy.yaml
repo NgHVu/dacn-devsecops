@@ -1,0 +1,289 @@
+# ==========================
+# 1. USERS SERVICE (Blue & Green)
+# ==========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users-service-blue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: users-service
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: users-service
+        version: blue
+    spec:
+      containers:
+      - name: users-service
+        image: foodhubregistry.azurecr.io/user-service:latest
+        ports:
+        - containerPort: 8082
+        envFrom:
+        - configMapRef:
+            name: foodhub-config
+        - secretRef:
+            name: foodhub-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users-service-green
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: users-service
+      version: green
+  template:
+    metadata:
+      labels:
+        app: users-service
+        version: green
+    spec:
+      containers:
+      - name: users-service
+        image: foodhubregistry.azurecr.io/user-service:latest
+        ports:
+        - containerPort: 8082
+        envFrom:
+        - configMapRef:
+            name: foodhub-config
+        - secretRef:
+            name: foodhub-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: users-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8082
+    targetPort: 8082
+  selector:
+    app: users-service
+    version: blue   # <--- CÔNG TẮC (Đổi sang 'green' để chuyển traffic)
+
+---
+# ==========================
+# 2. PRODUCTS SERVICE (Blue & Green)
+# ==========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: products-service-blue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: products-service
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: products-service
+        version: blue
+    spec:
+      containers:
+      - name: products-service
+        image: foodhubregistry.azurecr.io/product-service:latest
+        ports:
+        - containerPort: 8081
+        envFrom:
+        - configMapRef:
+            name: foodhub-config
+        - secretRef:
+            name: foodhub-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: products-service-green
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: products-service
+      version: green
+  template:
+    metadata:
+      labels:
+        app: products-service
+        version: green
+    spec:
+      containers:
+      - name: products-service
+        image: foodhubregistry.azurecr.io/product-service:latest
+        ports:
+        - containerPort: 8081
+        envFrom:
+        - configMapRef:
+            name: foodhub-config
+        - secretRef:
+            name: foodhub-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: products-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8081
+    targetPort: 8081
+  selector:
+    app: products-service
+    version: blue   # <--- CÔNG TẮC
+
+---
+# ==========================
+# 3. ORDERS SERVICE (Blue & Green)
+# ==========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-service-blue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orders-service
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: orders-service
+        version: blue
+    spec:
+      containers:
+      - name: orders-service
+        image: foodhubregistry.azurecr.io/order-service:latest
+        ports:
+        - containerPort: 8083
+        # Mapping biến môi trường riêng cho Order
+        env:
+        - name: APP_CLIENT_USERS_SERVICE_URL
+          valueFrom: { configMapKeyRef: { name: foodhub-config, key: APP_SERVICES_USERS_URL } }
+        - name: APP_CLIENT_PRODUCTS_SERVICE_URL
+          valueFrom: { configMapKeyRef: { name: foodhub-config, key: APP_SERVICES_PRODUCTS_URL } }
+        envFrom:
+        - configMapRef:
+            name: foodhub-config
+        - secretRef:
+            name: foodhub-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-service-green
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orders-service
+      version: green
+  template:
+    metadata:
+      labels:
+        app: orders-service
+        version: green
+    spec:
+      containers:
+      - name: orders-service
+        image: foodhubregistry.azurecr.io/order-service:latest
+        ports:
+        - containerPort: 8083
+        env:
+        - name: APP_CLIENT_USERS_SERVICE_URL
+          valueFrom: { configMapKeyRef: { name: foodhub-config, key: APP_SERVICES_USERS_URL } }
+        - name: APP_CLIENT_PRODUCTS_SERVICE_URL
+          valueFrom: { configMapKeyRef: { name: foodhub-config, key: APP_SERVICES_PRODUCTS_URL } }
+        envFrom:
+        - configMapRef:
+            name: foodhub-config
+        - secretRef:
+            name: foodhub-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8083
+    targetPort: 8083
+  selector:
+    app: orders-service
+    version: blue   # <--- CÔNG TẮC
+
+---
+# ==========================
+# 4. FRONTEND (Blue & Green)
+# ==========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-blue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: frontend
+        version: blue
+    spec:
+      containers:
+      - name: frontend
+        image: foodhubregistry.azurecr.io/frontend-service:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-green
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+      version: green
+  template:
+    metadata:
+      labels:
+        app: frontend
+        version: green
+    spec:
+      containers:
+      - name: frontend
+        image: foodhubregistry.azurecr.io/frontend-service:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 3000
+  selector:
+    app: frontend
+    version: blue   # <--- CÔNG TẮC

@@ -19,6 +19,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate; // [NEW] Import RestTemplate
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -42,7 +43,9 @@ public class OrderServiceImpl implements OrderService {
     private final UserServiceClient userServiceClient;
     private final ProductServiceClient productServiceClient;
 
+    // Hàm này xử lý việc gửi thông báo (Email/Serverless)
     private void triggerEmailNotification(Order order, String token) {
+        // CÁCH 1: Gửi qua User Service (Logic cũ của bạn - Giữ nguyên nếu muốn)
         try {
             List<SendOrderEmailRequest.OrderItemDto> itemDtos = order.getItems().stream()
                 .map(item -> new SendOrderEmailRequest.OrderItemDto(
@@ -61,7 +64,31 @@ public class OrderServiceImpl implements OrderService {
 
             userServiceClient.sendOrderNotification(emailRequest, token);
         } catch (Exception e) {
-            log.error("Lỗi khi tạo request gửi mail: {}", e.getMessage());
+            log.error("Lỗi khi gọi User Service gửi mail: {}", e.getMessage());
+        }
+
+        // ========================================================================
+        // CÁCH 2: [NEW] GỌI AZURE FUNCTION (SERVERLESS) - YÊU CẦU BÀI TẬP
+        // ========================================================================
+        try {
+            // TODO: Thay thế URL này bằng Function URL bạn đã copy từ Azure Portal
+            // Ví dụ: https://foodhub-mailer.azurewebsites.net/api/HttpTrigger1
+            String azureFunctionUrl = "https://foodhub-mailer-func.azurewebsites.net/api/HttpTrigger1"; 
+            
+            // Tạo URL có tham số (Query Param)
+            // Trong thực tế, bạn nên gửi Email khách hàng thật vào đây
+            String finalUrl = azureFunctionUrl + "?orderId=" + order.getId() + "&email=khachhang@demo.com";
+
+            log.info("Đang kích hoạt Serverless Function tại: {}", finalUrl);
+
+            // Sử dụng RestTemplate để gọi HTTP GET (Fire and Forget)
+            RestTemplate restTemplate = new RestTemplate();
+            String response = restTemplate.getForObject(finalUrl, String.class);
+            
+            log.info("SERVERLESS RESPONSE: {}", response);
+        } catch (Exception e) {
+            // Lỗi ở đây không được làm chết luồng tạo đơn hàng chính
+            log.error("Lỗi khi gọi Azure Serverless Function: {}", e.getMessage());
         }
     }
 
@@ -162,6 +189,7 @@ public class OrderServiceImpl implements OrderService {
         Order savedOrder = orderRepository.save(order);
         log.info("Đã lưu đơn hàng thành công với ID: {}", savedOrder.getId());
 
+        // Kích hoạt thông báo (Bao gồm gọi Azure Function)
         triggerEmailNotification(savedOrder, bearerToken);
 
         return mapOrderToOrderResponse(savedOrder);
@@ -252,6 +280,8 @@ public class OrderServiceImpl implements OrderService {
         order.setUpdatedAt(Instant.now());
         
         Order savedOrder = orderRepository.save(order);
+        
+        // Gửi email thông báo trạng thái thay đổi
         triggerEmailNotification(savedOrder, bearerToken);
 
         return mapOrderToOrderResponse(savedOrder);

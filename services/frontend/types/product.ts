@@ -13,6 +13,8 @@ export type GetProductsParams = {
   size?: number;
   sort?: string; 
   search?: string;
+  // 👇 Đã thêm trường name vào đây để khớp với tham số truyền từ SearchPage
+  name?: string;
   categoryId?: number | string;
   minPrice?: number;
   maxPrice?: number;
@@ -56,7 +58,7 @@ export type PageableResponse<T> = {
   totalElements: number; 
   size: number;
   number: number;
-  last?: boolean;   
+  last?: boolean;    
   first?: boolean;
   empty?: boolean;
 };

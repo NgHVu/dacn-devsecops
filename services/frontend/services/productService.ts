@@ -19,8 +19,12 @@ const getProducts = async (
   if (params.size !== undefined) queryParams.append('size', String(params.size));
   if (params.sort) queryParams.append('sort', params.sort);
   
+  // Logic cũ của bạn là search, nhưng ở Page bạn đang truyền name
   if (params.search) queryParams.append('search', params.search);
   
+  // 👇 THÊM DÒNG NÀY: Để mapping tham số 'name' từ Page xuống URL
+  if (params.name) queryParams.append('name', params.name);
+
   if (params.categoryId) queryParams.append('categoryId', String(params.categoryId));
   if (params.minPrice) queryParams.append('minPrice', String(params.minPrice));
   if (params.maxPrice) queryParams.append('maxPrice', String(params.maxPrice));

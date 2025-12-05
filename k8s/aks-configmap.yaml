@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: foodhub-config
+data:
+  # --- DATABASE CONFIG ---
+  DB_USER: foodhubadmin
+  JPA_DDL_AUTO: update
+  
+  # Connection Strings (Trỏ về Azure PostgreSQL Flexible Server)
+  DB_URL_USERS: jdbc:postgresql://foodhub-db-server-2025.postgres.database.azure.com:5432/foodhub_users?sslmode=require
+  DB_URL_PRODUCTS: jdbc:postgresql://foodhub-db-server-2025.postgres.database.azure.com:5432/foodhub_products?sslmode=require
+  DB_URL_ORDERS: jdbc:postgresql://foodhub-db-server-2025.postgres.database.azure.com:5432/foodhub_orders?sslmode=require
+
+  # --- JWT CONFIG ---
+  JWT_EXPIRATION_MS: "86400000" # 24 giờ
+
+  # --- INTER-SERVICE COMMUNICATION ---
+  # Sử dụng tên Service ClusterIP nội bộ
+  APP_SERVICES_USERS_URL: http://users-service:8082
+  APP_SERVICES_PRODUCTS_URL: http://products-service:8081
+  APP_SERVICES_ORDERS_URL: http://orders-service:8083
+  
+  # --- FRONTEND ---
+  FRONTEND_URL: http://localhost:3000
+  NEXT_PUBLIC_GOOGLE_REDIRECT_URI: http://localhost:3000/callback
+
+  # [NEW] CẤU HÌNH API URL CHO FRONTEND
+  # Biến này chỉ Frontend mới dùng, nó phải trỏ đến IP Public của chính Frontend 
+  # (Vì Next.js Server-side Render/Server Actions cần gọi qua chính nó)
+  NEXT_PUBLIC_APP_URL: http://frontend:80 
+  # Note: Ta dùng tên Service nội bộ 'frontend' và Port 80 (cổng Service)
