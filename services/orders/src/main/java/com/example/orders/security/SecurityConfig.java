@@ -36,15 +36,19 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         // Allow Swagger & Docs
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/actuator/**").permitAll()
-                        
-                        // Admin Endpoints
+                        .requestMatchers("/api/internal/**").permitAll() 
+
+                        // Admin Only Endpoints
+                        // [MODIFIED] Bỏ chặn cứng PATCH tại đây để xử lý logic phân quyền mềm dẻo hơn trong Service
                         .requestMatchers(HttpMethod.GET, "/api/v1/orders").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/orders/**").hasAuthority("ROLE_ADMIN")
                         
                         // User Endpoints
                         .requestMatchers(HttpMethod.POST, "/api/v1/orders").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/orders/my").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/orders/{orderId}").authenticated()
+                        
+                        // [NEW] Cho phép authenticated user gọi PATCH, nhưng logic service sẽ quyết định được làm gì
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/orders/{orderId}/status").authenticated()
                         
                         // Default
                         .anyRequest().authenticated()

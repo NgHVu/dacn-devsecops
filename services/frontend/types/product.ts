@@ -23,9 +23,12 @@ export type Review = {
   id: number;
   userId: string;
   userName: string;
+  orderId: number; // [NEW] Thêm dòng này
   rating: number;
   comment: string;
   createdAt: string;
+  updatedAt?: string; // [NEW] Thêm dòng này (dấu ? vì có thể null hoặc undefined)
+  
 };
 
 export type Product = {

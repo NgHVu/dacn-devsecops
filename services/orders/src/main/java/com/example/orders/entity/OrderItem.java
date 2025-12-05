@@ -44,11 +44,14 @@ public class OrderItem {
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
+    // [NEW] Thêm trường Size để lưu cứng kích cỡ (Snapshot)
+    @Column(name = "size")
+    private String size;
+
     // Lưu ghi chú cho từng món
     @Column(name = "note")
     private String note;
 
-    // [FIX] Chuyển sang Instant để đồng bộ với Order và tránh lỗi Auditing
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -66,6 +69,7 @@ public class OrderItem {
                 ", productName='" + productName + '\'' +
                 ", quantity=" + quantity +
                 ", price=" + price +
+                ", size='" + size + '\'' +
                 ", createdAt=" + createdAt +
                 ", updatedAt=" + updatedAt +
                 '}';

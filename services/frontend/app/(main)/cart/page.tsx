@@ -61,8 +61,8 @@ interface CartItemExtended {
     image: string;
     quantity: number;
     totalPrice: number;
-    selectedSize?: { name: string; price: number };
-    selectedToppings?: { name: string; price: number }[];
+    // [FIXED] CartContext lưu size là string (tên size), không phải object
+    size?: string; 
     note?: string;
 }
 
@@ -77,7 +77,6 @@ const checkoutSchema = z.object({
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
-// Payload chuẩn
 interface OrderPayload {
     customerName: string;
     phoneNumber: string;
@@ -87,6 +86,7 @@ interface OrderPayload {
     items: {
         productId: number;
         quantity: number;
+        size?: string; 
         note?: string; 
     }[];
 }
@@ -122,9 +122,11 @@ export default function CartPage() {
         toast.error("Bạn chưa đăng nhập", { description: "Vui lòng đăng nhập để sử dụng tính năng này." });
         return;
     }
-    form.setValue("name", user.name || "");
+    // @ts-expect-error: User type might be inconsistent
+    form.setValue("name", user.name || user.username || "");
     form.setValue("phone", user.phoneNumber || "");
     form.setValue("address", user.address || "");
+    
     toast.success("Đã điền thông tin từ hồ sơ", { 
         icon: <Zap className="h-4 w-4 text-yellow-500 fill-yellow-500" />,
         description: "Kiểm tra lại thông tin trước khi đặt hàng nhé!"
@@ -146,22 +148,13 @@ export default function CartPage() {
       shippingAddress: values.address,
       note: values.note,
       paymentMethod: values.paymentMethod,
-      items: items.map((item) => {
-        let itemNote = "";
-        const details = [];
-        if (item.selectedSize) details.push(`Size: ${item.selectedSize.name}`);
-        if (item.selectedToppings && item.selectedToppings.length > 0) {
-            details.push(`Topping: ${item.selectedToppings.map(t => t.name).join(", ")}`);
-        }
-        if (details.length > 0) itemNote += details.join(" | ");
-        if (item.note) itemNote += (itemNote ? " | Ghi chú: " : "") + item.note;
-
-        return {
-            productId: item.id,
-            quantity: item.quantity,
-            note: itemNote 
-        };
-      }),
+      items: items.map((item) => ({
+          productId: item.id,
+          quantity: item.quantity,
+          // [FIXED] item.size đã là string, lấy trực tiếp, không truy cập .name nữa
+          size: item.size || undefined, 
+          note: item.note 
+      })),
     };
 
     try {
@@ -169,11 +162,13 @@ export default function CartPage() {
       clearCart();
       toast.success("Đặt hàng thành công!", { description: "Đang chuyển hướng đến trang đơn hàng..." });
       
-      if (values.paymentMethod !== 'COD') {
-          setTimeout(() => router.push("/orders?status=paid"), 1000);
-      } else {
-          setTimeout(() => router.push("/orders"), 1000);
-      }
+      setTimeout(() => {
+          if (values.paymentMethod !== 'COD') {
+             router.push("/orders?status=paid");
+          } else {
+             router.push("/orders");
+          }
+      }, 1000);
       
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 400) {
@@ -244,7 +239,7 @@ export default function CartPage() {
               <FadeIn>
                 <div className="bg-card rounded-[1.5rem] border border-border/60 shadow-sm overflow-hidden px-6 py-2 divide-y divide-border/40">
                     {items.map((item) => (
-                        // @ts-expect-error: Tạm thời bỏ qua lỗi prop type
+                        // @ts-expect-error: Tạm thời bỏ qua lỗi prop type nếu CartItemRow chưa update
                         <CartItemRow key={item.uniqueKey} item={item} />
                     ))}
                 </div>
@@ -317,7 +312,6 @@ export default function CartPage() {
                                             )}
                                         />
 
-                                        {/* SỬA ĐỔI: Chuyển Input thành Textarea cho địa chỉ */}
                                         <FormField
                                             control={form.control}
                                             name="address"
@@ -339,7 +333,6 @@ export default function CartPage() {
                                             )}
                                         />
 
-                                        {/* SỬA ĐỔI: Thêm class break-all cho ghi chú */}
                                         <FormField
                                             control={form.control}
                                             name="note"
@@ -364,7 +357,6 @@ export default function CartPage() {
 
                                     <Separator className="border-dashed border-border" />
 
-                                    {/* SỬA ĐỔI: Cấu trúc lại Radio Group dùng Label để fix lỗi click */}
                                     <FormField
                                         control={form.control}
                                         name="paymentMethod"

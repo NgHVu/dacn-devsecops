@@ -1,6 +1,7 @@
 package com.example.orders.service;
 
 import com.example.orders.dto.ProductDto;
+import com.example.orders.dto.ProductStockRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,46 +26,79 @@ public class ProductServiceClientImpl implements ProductServiceClient {
 
     @Override
     public List<ProductDto> getProductsByIds(Set<Long> productIds, String bearerToken) {
-        if (productIds == null || productIds.isEmpty()) {
-            log.warn("productIds rỗng hoặc null, không gọi Product Service.");
-            return List.of();
-        }
+        if (productIds == null || productIds.isEmpty()) return List.of();
 
-        String idsParam = productIds.stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining(","));
-
+        String idsParam = productIds.stream().map(String::valueOf).collect(Collectors.joining(","));
         String uri = productsServiceUrl + "/api/products/batch?ids=" + idsParam;
         
-        log.debug("Gọi Product Service URI: {}", uri); 
-
-        List<ProductDto> productDtos = webClient.get()
+        return webClient.get()
                 .uri(uri)
                 .header("Authorization", bearerToken) 
                 .retrieve()
-                .onStatus(HttpStatusCode::is4xxClientError, response -> {
-                    log.error("Lỗi Client khi gọi Product Service ({}) tại URI [{}]: {}",
-                            response.statusCode(), uri, response.bodyToMono(String.class));
-                    return response.bodyToMono(String.class)
-                            .flatMap(body -> Mono.error(new IllegalArgumentException("Không tìm thấy sản phẩm hoặc request không hợp lệ: " + body)));
-                })
-                .onStatus(HttpStatusCode::is5xxServerError, response -> {
-                    log.error("Lỗi Server khi gọi Product Service ({}) tại URI [{}]: {}",
-                            response.statusCode(), uri, response.bodyToMono(String.class));
-                    return response.bodyToMono(String.class)
-                            .flatMap(body -> Mono.error(new RuntimeException("Lỗi phía Product Service: " + body)));
-                })
+                .onStatus(HttpStatusCode::is4xxClientError, response -> 
+                    response.bodyToMono(String.class).flatMap(body -> Mono.error(new IllegalArgumentException("Lỗi Client: " + body)))
+                )
+                .onStatus(HttpStatusCode::is5xxServerError, response -> 
+                    response.bodyToMono(String.class).flatMap(body -> Mono.error(new RuntimeException("Lỗi Product Service: " + body)))
+                )
                 .bodyToFlux(ProductDto.class)
                 .collectList()
                 .block();
+    }
 
-        if (productDtos == null || productDtos.size() != productIds.size()) {
-            log.warn("Số lượng sản phẩm trả về từ Product Service ({}) không khớp yêu cầu ({}) cho các ID: {}",
-                    productDtos != null ? productDtos.size() : 0, productIds.size(), productIds);
-            throw new IllegalArgumentException("Không thể lấy thông tin đầy đủ cho tất cả sản phẩm yêu cầu.");
+    @Override
+    public void reduceStock(List<ProductStockRequest> requests, String bearerToken) {
+        String uri = productsServiceUrl + "/api/products/internal/reduce-stock";
+        log.info("Calling reduce stock: {}", uri);
+
+        webClient.post()
+                .uri(uri)
+                .header("Authorization", bearerToken) 
+                .bodyValue(requests)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, response -> 
+                    response.bodyToMono(String.class).flatMap(body -> Mono.error(new IllegalStateException(body)))
+                )
+                .toBodilessEntity()
+                .block();
+    }
+
+    @Override
+    public void restoreStock(List<ProductStockRequest> requests, String bearerToken) {
+        String uri = productsServiceUrl + "/api/products/internal/restore-stock";
+        log.info("Calling restore stock: {}", uri);
+
+        webClient.post()
+                .uri(uri)
+                .header("Authorization", bearerToken) 
+                .bodyValue(requests)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, response -> 
+                    response.bodyToMono(String.class).flatMap(body -> Mono.error(new RuntimeException("Lỗi hoàn kho: " + body)))
+                )
+                .toBodilessEntity()
+                .block();
+    }
+    
+    // [NEW] API để lấy số lượng sản phẩm đang active cho Dashboard
+    @Override
+    public long countActiveProducts() {
+        String uri = productsServiceUrl + "/api/products/internal/count-active";
+        
+        try {
+            return webClient.get()
+                    .uri(uri)
+                    // Internal API không cần token nếu được permitAll (dùng cho thống kê chung)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, response -> {
+                        log.error("Lỗi khi gọi countActiveProducts: {}", response.statusCode());
+                        return Mono.error(new RuntimeException("Product Service lỗi khi đếm sản phẩm active."));
+                    })
+                    .bodyToMono(Long.class)
+                    .block();
+        } catch (Exception e) {
+            log.error("Không thể kết nối đến Product Service để đếm sản phẩm: {}", e.getMessage());
+            return 0;
         }
-
-        log.info("Lấy thành công thông tin {} sản phẩm từ Product Service.", productDtos.size());
-        return productDtos;
     }
 }

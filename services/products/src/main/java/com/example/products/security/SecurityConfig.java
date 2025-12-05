@@ -39,11 +39,17 @@ public class SecurityConfig {
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/actuator/**").permitAll()
                         
-                        .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll()
+                        // [NEW] Cho phép các API nội bộ (Internal Stock APIs) được truy cập bởi User đã xác thực
+                        // Vì Orders Service gửi kèm token của User, nên ta cần cấp quyền cho authenticated users.
+                        // Logic kiểm tra vai trò sẽ nằm ở Product Controller/Service (PreAuthorize) nếu cần thêm.
+                        .requestMatchers(HttpMethod.POST, "/api/products/internal/**").authenticated()
 
+                        // Public GET Endpoints
+                        .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reviews/product/**").permitAll()
                         
+                        // Admin/Authenticated POST/PATCH/DELETE Endpoints
                         .requestMatchers(HttpMethod.POST, "/api/products", "/api/products/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/products/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAuthority("ROLE_ADMIN")

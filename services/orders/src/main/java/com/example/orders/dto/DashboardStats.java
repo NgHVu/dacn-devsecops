@@ -4,12 +4,13 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public record DashboardStats(
-    BigDecimal totalRevenue,    
-    double revenueGrowth,       
-    long totalOrders,           
-    long newCustomers,          
-    List<MonthlyStats> monthlyRevenue, 
-    List<OrderResponse> recentSales   
+    BigDecimal totalRevenue,
+    double revenueGrowth,
+    long totalOrders,
+    long newCustomers,
+    long activeProducts, // [ADDED] Số lượng sản phẩm đang active
+    List<MonthlyStats> monthlyRevenue,
+    List<OrderResponse> recentSales
 ) {
     public record MonthlyStats(String name, BigDecimal total) {}
 }

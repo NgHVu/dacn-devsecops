@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
-// [FIX] Đổi từ Geist sang Be_Vietnam_Pro
 import { Be_Vietnam_Pro } from "next/font/google"; 
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider"; 
-import { AuthProvider } from "@/context/AuthContext";
-import { CartProvider } from "@/context/CartContext";
-import { Toaster } from "@/components/ui/sonner"; 
+// Sử dụng đường dẫn tương đối để đảm bảo tìm thấy file trong cấu trúc dự án của bạn
+import { ThemeProvider } from "../components/theme-provider"; 
+import { AuthProvider } from "../context/AuthContext";
+import { CartProvider } from "../context/CartContext";
+import { Toaster } from "../components/ui/sonner"; 
+import { AutoScroll } from "../components/utils/AutoScroll";
 
-// [FIX] Cấu hình font Be Vietnam Pro
 const beVietnamPro = Be_Vietnam_Pro({
   variable: "--font-be-vietnam-pro",
-  subsets: ["latin", "vietnamese"], // Quan trọng: Thêm vietnamese để dấu hiển thị đẹp
-  weight: ["300", "400", "500", "600", "700", "800"], // Load các độ đậm cần thiết
+  subsets: ["latin", "vietnamese"],
+  weight: ["300", "400", "500", "600", "700", "800"],
   display: "swap",
 });
 
@@ -28,8 +28,7 @@ export default function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning className="scroll-smooth"> 
       <body
-        // [FIX] Áp dụng font mới vào body
-        className={`${beVietnamPro.className} antialiased min-h-screen bg-background font-sans`}
+        className={`${beVietnamPro.className} antialiased min-h-screen bg-background font-sans relative`}
       >
         <ThemeProvider
           attribute="class"
@@ -37,8 +36,15 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          {/* Global Background Pattern */}
+          <div className="fixed inset-0 -z-10 h-full w-full bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px]">
+              <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-orange-400 opacity-20 blur-[100px]"></div>
+          </div>
+
           <AuthProvider>
             <CartProvider>
+              {/* AutoScroll sẽ tự động cuộn xuống danh sách món khi chuyển trang */}
+              <AutoScroll />
               {children}
             </CartProvider>
           </AuthProvider>
