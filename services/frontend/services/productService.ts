@@ -5,8 +5,8 @@ import {
   type CreateProductRequest,
   type UpdateProductRequest,
   type GetProductsParams,
-  type Review,              
-  type CreateReviewRequest
+  type Review,               // [CẬP NHẬT] Import thêm
+  type CreateReviewRequest   // [CẬP NHẬT] Import thêm
 } from '@/types/product';
 
 const getProducts = async (
@@ -83,18 +83,6 @@ const createReview = async (data: CreateReviewRequest): Promise<Review> => {
     return response.data;
 };
 
-// [MỚI] Hàm cập nhật review
-// Lưu ý: data cần bao gồm cả productId và orderId vì Backend DTO yêu cầu @NotNull
-const updateReview = async (reviewId: number, data: CreateReviewRequest): Promise<Review> => {
-    const response = await apiClient.put<Review>(`/api/reviews/${reviewId}`, data);
-    return response.data;
-};
-
-// [MỚI] Hàm xóa review
-const deleteReview = async (reviewId: number): Promise<void> => {
-    await apiClient.delete(`/api/reviews/${reviewId}`);
-};
-
 export const productService = {
   getProducts,
   getProductById, 
@@ -102,8 +90,6 @@ export const productService = {
   updateProduct,
   deleteProduct,
   uploadImage,
-  getProductReviews,
-  createReview,
-  updateReview, // Export function mới
-  deleteReview, // Export function mới
+  getProductReviews, // Export mới
+  createReview,      // Export mới
 };

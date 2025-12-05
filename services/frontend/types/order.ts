@@ -17,33 +17,29 @@ export type PageableResponse<T> = {
   empty: boolean;
 };
 
-// [UPDATED] Thêm size vào request gửi đi
 export type CreateOrderItemRequest = {
   productId: number;
   quantity: number;
-  size?: string; // <-- Bổ sung field này
-  note?: string;
+  note?: string; // Thêm note nếu cần
 };
 
+// [CẬP NHẬT] Thêm các trường cần thiết cho Checkout
 export type CreateOrderRequest = {
   customerName: string;
   shippingAddress: string;
   phoneNumber: string;
   note?: string;
-  paymentMethod: string;
+  paymentMethod: string; // "COD" | "VNPAY" ...
   items: CreateOrderItemRequest[];
 };
 
-// [UPDATED] Thêm size vào response nhận về để hiển thị
 export type OrderItem = {
   id: number;
   productId: number;
   quantity: number;
   price: number;
   productName: string;
-  productImage?: string;
-  size?: string; // <-- Bổ sung field này
-  note?: string;
+  productImage?: string; // Optional nếu backend chưa trả về
 };
 
 export type Order = {
@@ -51,16 +47,9 @@ export type Order = {
   userId: number;
   items: OrderItem[];
   totalAmount: number;
-  status: OrderStatus | string;
+  status: OrderStatus;
   createdAt: string;
   updatedAt: string;
-
-  customerName: string;
-  shippingAddress: string;
-  phoneNumber: string;
-  note?: string;
-  paymentMethod: string;
-  paymentStatus?: string;
 };
 
 export type OrderStatusUpdate = {

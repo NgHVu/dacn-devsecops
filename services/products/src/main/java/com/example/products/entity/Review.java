@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.OffsetDateTime;
 
@@ -16,7 +15,7 @@ import java.time.OffsetDateTime;
 @Entity
 @Table(name = "reviews", indexes = {
     @Index(name = "idx_review_product", columnList = "product_id"),
-    @Index(name = "idx_review_user_product", columnList = "user_id, product_id")
+    @Index(name = "idx_review_user_product", columnList = "user_id, product_id") // Để check user đã review chưa
 })
 public class Review {
 
@@ -25,13 +24,13 @@ public class Review {
     private Long id;
 
     @Column(name = "user_id", nullable = false)
-    private String userId;
+    private String userId; // ID từ Users Service
 
     @Column(name = "user_name")
-    private String userName;
+    private String userName; // Cache tên người dùng để hiển thị nhanh
 
     @Column(name = "order_id", nullable = false)
-    private Long orderId;
+    private Long orderId; // ID đơn hàng để đảm bảo "Verified Purchase"
 
     @NotNull
     @Min(1)
@@ -47,13 +46,8 @@ public class Review {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
-    // [NEW] Thêm trường này để fix lỗi setUpdatedAt
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private OffsetDateTime updatedAt;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
-    @JsonIgnore
+    @JsonIgnore // Tránh vòng lặp JSON vô hạn
     private Product product;
 }

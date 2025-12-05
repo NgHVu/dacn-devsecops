@@ -1,6 +1,6 @@
 package com.example.orders.service;
 
-import com.example.orders.dto.DashboardStats;
+import com.example.orders.dto.DashboardStats; // <-- Import mới
 import com.example.orders.dto.OrderCreateRequest;
 import com.example.orders.dto.OrderResponse;
 import com.example.orders.dto.OrderStatusUpdate;
@@ -17,9 +17,7 @@ public interface OrderService {
 
     Page<OrderResponse> getAllOrders(Pageable pageable);
 
-    // [UPDATED] Thêm tham số bearerToken để check quyền trong logic nghiệp vụ
-    OrderResponse updateOrderStatus(Long orderId, OrderStatusUpdate statusUpdate, String bearerToken);
+    OrderResponse updateOrderStatus(Long orderId, OrderStatusUpdate statusUpdate);
     
     DashboardStats getDashboardStats();
-    
 }

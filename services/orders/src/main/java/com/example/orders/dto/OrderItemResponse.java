@@ -19,17 +19,6 @@ public record OrderItemResponse(
         Integer quantity,
 
         @Schema(description = "Giá của một đơn vị sản phẩm tại thời điểm đặt hàng", example = "12.75")
-        BigDecimal price,
-
-        @Schema(description = "Ảnh sản phẩm tại thời điểm đặt hàng")
-        String productImage,
-
-        // [NEW] Trả về size
-        @Schema(description = "Kích cỡ món ăn", example = "L")
-        String size,
-
-        @Schema(description = "Ghi chú riêng cho món này (note...)", 
-                example = "Ít đá")
-        String note
+        BigDecimal price
 ) {
 }

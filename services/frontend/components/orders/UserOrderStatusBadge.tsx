@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 interface OrderStatusBadgeProps {
-  status: OrderStatus | string; 
+  status: OrderStatus;
 }
 
 export function UserOrderStatusBadge({ status }: OrderStatusBadgeProps) {
@@ -50,10 +50,10 @@ export function UserOrderStatusBadge({ status }: OrderStatusBadgeProps) {
     },
   };
 
-  const current = config[status as OrderStatus] || {
+  const current = config[status] || {
     style: "bg-gray-500/15 text-gray-600 dark:text-gray-400 border-gray-500/20",
     icon: Clock,
-    label: status // Hiển thị luôn chuỗi status gốc nếu không tìm thấy trong config
+    label: status
   };
 
   const Icon = current.icon;

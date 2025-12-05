@@ -16,11 +16,7 @@ public record OrderItemRequest(
         @Min(value = 1, message = "Số lượng phải ít nhất là 1.")
         Integer quantity,
 
-        // [NEW] Thêm trường size
-        @Schema(description = "Kích cỡ món ăn", example = "L")
-        String size,
-
-        @Schema(description = "Ghi chú cho món ăn (Ví dụ: Không hành...)", example = "Ít đá")
+        @Schema(description = "Ghi chú cho món ăn (Ví dụ: Không hành, size L...)", example = "Ít đá")
         String note
 ) {
 }

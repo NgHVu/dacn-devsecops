@@ -11,8 +11,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -72,13 +70,6 @@ public class Product {
     @Builder.Default
     @Schema(description = "Số lượng đã bán (dùng cho Best Seller)", example = "1200")
     private Integer sold = 0;
-
-    // --- RELATIONSHIPS ---
-
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    @JsonIgnoreProperties("product") // Tránh vòng lặp vô tận khi serialize JSON
-    private List<Review> reviews = new ArrayList<>();
 
     // -----------------------------------------
 
