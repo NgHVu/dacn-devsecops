@@ -6,9 +6,13 @@ import com.example.products.dto.ProductCriteria;
 import com.example.products.dto.ProductUpdateRequest;
 import com.example.products.entity.Product;
 import com.example.products.service.ProductService;
+import com.example.products.security.JwtTokenProvider;
+import com.example.products.security.JwtAuthenticationEntryPoint;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
@@ -25,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ProductController.class)
+@AutoConfigureMockMvc(addFilters = false) // [FIX] Tắt security filters để không cần dependency spring-security-test
 class ProductControllerTest {
 
     @Autowired
@@ -35,6 +40,13 @@ class ProductControllerTest {
 
     @MockBean
     private ProductService productService;
+
+    // Mock các Bean bảo mật để ApplicationContext khởi tạo thành công
+    @MockBean
+    private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
     @Test
     void testList_ShouldReturn200OK() throws Exception {
@@ -67,6 +79,7 @@ class ProductControllerTest {
         Product savedProduct = Product.builder().id(1L).name("Phở Bò").build();
         given(productService.create(any(ProductCreateRequest.class))).willReturn(savedProduct);
 
+        // Không cần csrf() và @WithMockUser nữa vì filters đã bị tắt
         mockMvc.perform(post("/api/products")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))

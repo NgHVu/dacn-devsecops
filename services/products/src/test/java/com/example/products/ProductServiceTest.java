@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest; // Import PageRequest
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.web.server.ResponseStatusException;
@@ -16,7 +17,7 @@ import com.example.products.dto.ProductCriteria;
 import com.example.products.dto.ProductUpdateRequest;
 import com.example.products.entity.Category;
 import com.example.products.entity.Product;
-import com.example.products.repository.CategoryRepository; // Import thêm CategoryRepository
+import com.example.products.repository.CategoryRepository;
 import com.example.products.repository.ProductRepository;
 import com.example.products.service.ProductService;
 
@@ -95,7 +96,7 @@ class ProductServiceTest {
         Product updated = productService.updatePartial(1L, request);
         
         assertThat(updated.getName()).isEqualTo("Mới");
-        assertThat(updated.getDescription()).isEqualTo("Mô tả mới"); // Check thêm description
+        assertThat(updated.getDescription()).isEqualTo("Mô tả mới"); 
         assertThat(updated.getPrice()).isEqualByComparingTo("20000.00");
         assertThat(updated.getImage()).isEqualTo("moi.jpg");
     }
@@ -130,7 +131,8 @@ class ProductServiceTest {
         
         ProductCriteria criteria = new ProductCriteria("cơm", null, null, null, "newest");
         
-        productService.getAllProducts(criteria, Pageable.unpaged());
+        // [FIX] Sử dụng PageRequest.of thay vì Pageable.unpaged() để tránh lỗi UnsupportedOperationException
+        productService.getAllProducts(criteria, PageRequest.of(0, 10));
         
         verify(productRepository, times(1)).findAll(any(Specification.class), any(Pageable.class));
     }
@@ -143,7 +145,8 @@ class ProductServiceTest {
         
         ProductCriteria criteria = new ProductCriteria(null, null, new BigDecimal("10000"), new BigDecimal("50000"), null);
         
-        productService.getAllProducts(criteria, Pageable.unpaged());
+        // [FIX] Sử dụng PageRequest.of thay vì Pageable.unpaged()
+        productService.getAllProducts(criteria, PageRequest.of(0, 10));
         
         verify(productRepository, times(1)).findAll(any(Specification.class), any(Pageable.class));
     }
