@@ -6,7 +6,7 @@ import com.example.products.entity.Category;
 import com.example.products.exception.ResourceNotFoundException;
 import com.example.products.repository.CategoryRepository;
 import com.example.products.repository.ProductRepository;
-import com.example.products.service.CategoryService; // Import service từ package con
+import com.example.products.service.CategoryService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,8 +49,9 @@ class CategoryServiceTest {
     @Test
     @DisplayName("Create: Should create category successfully")
     void createCategory_Success() {
-        CategoryCreateRequest req = new CategoryCreateRequest("New Cat", "Desc", "icon.png");
-        Category savedCategory = Category.builder().id(1L).name("New Cat").icon("icon.png").description("Desc").build();
+        // Correct order: name, icon, description
+        CategoryCreateRequest req = new CategoryCreateRequest("New Cat", "icon.png", "Description");
+        Category savedCategory = Category.builder().id(1L).name("New Cat").icon("icon.png").description("Description").build();
         
         when(categoryRepository.existsByNameIgnoreCase("New Cat")).thenReturn(false);
         when(categoryRepository.save(any(Category.class))).thenReturn(savedCategory);
@@ -59,12 +60,15 @@ class CategoryServiceTest {
 
         assertThat(result.id()).isEqualTo(1L);
         assertThat(result.name()).isEqualTo("New Cat");
+        // Kiểm tra thêm để đảm bảo mapping đúng
+        assertThat(result.icon()).isEqualTo("icon.png");
+        assertThat(result.description()).isEqualTo("Description");
     }
 
     @Test
     @DisplayName("Create: Should throw 409 if name exists")
     void createCategory_Conflict() {
-        CategoryCreateRequest req = new CategoryCreateRequest("Exist", "Desc", "icon");
+        CategoryCreateRequest req = new CategoryCreateRequest("Exist", "icon", "Desc");
         when(categoryRepository.existsByNameIgnoreCase("Exist")).thenReturn(true);
 
         assertThatThrownBy(() -> categoryService.createCategory(req))
@@ -76,22 +80,31 @@ class CategoryServiceTest {
     @DisplayName("Update: Should update category fields")
     void updateCategory_Success() {
         Category existing = Category.builder().id(1L).name("Old").build();
-        CategoryCreateRequest req = new CategoryCreateRequest("New Name", "New Desc", "New Icon");
+        
+        // FIX: Đổi thứ tự tham số khớp với Record (Name, Icon, Description)
+        // Dùng giá trị khác nhau hoàn toàn để dễ debug
+        String newName = "New Name";
+        String newIcon = "new-icon.png";
+        String newDesc = "New Description";
+        
+        CategoryCreateRequest req = new CategoryCreateRequest(newName, newIcon, newDesc);
         
         when(categoryRepository.findById(1L)).thenReturn(Optional.of(existing));
+        
+        // Mock save trả về entity đã update
         when(categoryRepository.save(any(Category.class))).thenAnswer(i -> i.getArgument(0));
 
         CategoryDto result = categoryService.updateCategory(1L, req);
 
-        assertThat(result.name()).isEqualTo("New Name");
-        assertThat(result.description()).isEqualTo("New Desc");
-        assertThat(result.icon()).isEqualTo("New Icon");
+        assertThat(result.name()).isEqualTo(newName);
+        assertThat(result.icon()).isEqualTo(newIcon); 
+        assertThat(result.description()).isEqualTo(newDesc);
     }
 
     @Test
     @DisplayName("Update: Should throw NotFound if id invalid")
     void updateCategory_NotFound() {
-        CategoryCreateRequest req = new CategoryCreateRequest("Name", "Desc", "Icon");
+        CategoryCreateRequest req = new CategoryCreateRequest("Name", "Icon", "Desc");
         when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> categoryService.updateCategory(99L, req))
