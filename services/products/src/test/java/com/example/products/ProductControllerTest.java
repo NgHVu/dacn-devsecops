@@ -3,6 +3,7 @@ package com.example.products;
 import com.example.products.controller.ProductController;
 import com.example.products.dto.ProductCreateRequest;
 import com.example.products.dto.ProductCriteria; 
+import com.example.products.dto.ProductStockRequest; // Import mới
 import com.example.products.dto.ProductUpdateRequest;
 import com.example.products.entity.Product;
 import com.example.products.service.ProductService;
@@ -21,15 +22,17 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ProductController.class)
-@AutoConfigureMockMvc(addFilters = false) // [FIX] Tắt security filters để không cần dependency spring-security-test
+@AutoConfigureMockMvc(addFilters = false)
 class ProductControllerTest {
 
     @Autowired
@@ -41,7 +44,6 @@ class ProductControllerTest {
     @MockBean
     private ProductService productService;
 
-    // Mock các Bean bảo mật để ApplicationContext khởi tạo thành công
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
 
@@ -71,6 +73,28 @@ class ProductControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Cơm Tấm"));
     }
+
+    // [NEW] Test API Top 10
+    @Test
+    void testTop10_ShouldReturn200OK() throws Exception {
+        List<Product> topProducts = List.of(Product.builder().id(1L).name("Hot Item").build());
+        given(productService.getTop10()).willReturn(topProducts);
+
+        mockMvc.perform(get("/api/products/top"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("Hot Item"));
+    }
+
+    // [NEW] Test API Batch
+    @Test
+    void testBatch_ShouldReturn200OK() throws Exception {
+        List<Product> products = List.of(Product.builder().id(1L).build());
+        given(productService.getBatch(anyList())).willReturn(products);
+
+        mockMvc.perform(get("/api/products/batch").param("ids", "1,2,3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
     
     @Test
     void testCreate_ShouldReturn201Created() throws Exception {
@@ -79,7 +103,6 @@ class ProductControllerTest {
         Product savedProduct = Product.builder().id(1L).name("Phở Bò").build();
         given(productService.create(any(ProductCreateRequest.class))).willReturn(savedProduct);
 
-        // Không cần csrf() và @WithMockUser nữa vì filters đã bị tắt
         mockMvc.perform(post("/api/products")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -105,5 +128,37 @@ class ProductControllerTest {
     void testDelete_ShouldReturn204NoContent() throws Exception {
         mockMvc.perform(delete("/api/products/{id}", 1L))
                 .andExpect(status().isNoContent());
+    }
+
+    // [NEW] Test API Reduce Stock (Internal)
+    @Test
+    void testReduceStock_ShouldReturn200OK() throws Exception {
+        List<ProductStockRequest> requests = List.of(new ProductStockRequest(1L, 5));
+        
+        mockMvc.perform(post("/api/products/internal/reduce-stock")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(requests)))
+                .andExpect(status().isOk());
+    }
+
+    // [NEW] Test API Restore Stock (Internal)
+    @Test
+    void testRestoreStock_ShouldReturn200OK() throws Exception {
+        List<ProductStockRequest> requests = List.of(new ProductStockRequest(1L, 5));
+        
+        mockMvc.perform(post("/api/products/internal/restore-stock")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(requests)))
+                .andExpect(status().isOk());
+    }
+
+    // [NEW] Test API Count Active (Internal)
+    @Test
+    void testCountActiveProducts_ShouldReturn200OK() throws Exception {
+        given(productService.countActiveProducts()).willReturn(10L);
+
+        mockMvc.perform(get("/api/products/internal/count-active"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("10"));
     }
 }
