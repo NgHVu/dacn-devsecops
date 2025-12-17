@@ -162,6 +162,7 @@
 
                         <!-- 2. Configuration & Infrastructure -->
                         <exclude>**/config/**</exclude>
+                        <exclude>**/SecurityConfig.java</exclude>
 
                         <!-- 3. Models (Boilerplate code handled by Lombok) -->
                         <exclude>**/entity/**</exclude>
