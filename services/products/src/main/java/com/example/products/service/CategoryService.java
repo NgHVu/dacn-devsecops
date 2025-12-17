@@ -39,6 +39,8 @@ public class CategoryService {
                 .build();
 
         Category saved = categoryRepository.save(category);
+        
+        // Correct order: id, name, icon, description, productCount
         return new CategoryDto(saved.getId(), saved.getName(), saved.getIcon(), saved.getDescription(), 0L);
     }
 
@@ -51,6 +53,8 @@ public class CategoryService {
         category.setIcon(request.icon());
         
         Category updated = categoryRepository.save(category);
+        
+        // Correct order: id, name, icon, description, productCount
         return new CategoryDto(updated.getId(), updated.getName(), updated.getIcon(), updated.getDescription(), 0L);
     }
 
