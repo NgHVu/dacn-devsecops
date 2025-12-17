@@ -25,6 +25,10 @@ RUN java -Djarmode=layertools -jar target/*.jar extract
 # Sử dụng image JRE (Runtime) 21 tối giản của Alpine
 FROM eclipse-temurin:21-jre-alpine
 
+# [SECURITY FIX] Cập nhật toàn bộ gói phần mềm trong Alpine để vá lỗ hổng (như libpng)
+# --no-cache giúp không lưu lại file rác cài đặt, giữ image nhỏ gọn
+RUN apk update && apk upgrade --no-cache
+
 # Tạo user không có quyền root
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
