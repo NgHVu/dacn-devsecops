@@ -156,10 +156,22 @@
                 <version>${jacoco.version}</version>
                 <configuration>
                     <excludes>
-                        <exclude>**/DataSeeder.java</exclude>
+                        <!-- 1. Entry Point & Seeder -->
                         <exclude>**/ProductServiceApplication.java</exclude>
-                        <exclude>**/config/*</exclude>
-                        <exclude>**/*Request.java</exclude>
+                        <exclude>**/DataSeeder.java</exclude>
+
+                        <!-- 2. Configuration & Infrastructure -->
+                        <exclude>**/config/**</exclude>
+
+                        <!-- 3. Models (Boilerplate code handled by Lombok) -->
+                        <exclude>**/entity/**</exclude>
+                        <exclude>**/dto/**</exclude>
+            
+                        <!-- 4. Exception Definitions -->
+                        <exclude>**/exception/**</exclude>
+            
+                        <!-- 5. Clients/External Integrations (Nếu sau này có FeignClient) -->
+                        <exclude>**/client/**</exclude>
                     </excludes>
                 </configuration>
                 <executions>
