@@ -19,44 +19,65 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+    private static final String ROLE_ADMIN = "ROLE_ADMIN";
+    
+    // API Path Constants to avoid Magic Strings
+    private static final String API_PRODUCTS_PUBLIC = "/api/products/**";
+    private static final String API_PRODUCTS_INTERNAL = "/api/products/internal/**";
+    private static final String API_CATEGORIES_PUBLIC = "/api/categories/**";
+    private static final String API_REVIEWS_PUBLIC = "/api/reviews/product/**";
+    
+    // Swagger/Docs Paths
+    private static final String[] SWAGGER_WHITELIST = {
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/actuator/**",
+            "/error"
+    };
+
     private final JwtAuthenticationEntryPoint unauthorizedHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable)
-                .cors(Customizer.withDefaults())
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(unauthorizedHandler)
-                )
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/error").permitAll()
-                        .requestMatchers("/uploads/**").permitAll()
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/actuator/**").permitAll()
-                        
-                        // [NEW] Cho phép các API nội bộ (Internal Stock APIs) được truy cập bởi User đã xác thực
-                        // Vì Orders Service gửi kèm token của User, nên ta cần cấp quyền cho authenticated users.
-                        // Logic kiểm tra vai trò sẽ nằm ở Product Controller/Service (PreAuthorize) nếu cần thêm.
-                        .requestMatchers(HttpMethod.POST, "/api/products/internal/**").authenticated()
+            .csrf(AbstractHttpConfigurer::disable)
+            .cors(Customizer.withDefaults())
+            
+            .exceptionHandling(exception -> exception
+                .authenticationEntryPoint(unauthorizedHandler)
+            )
+            
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            
+            .authorizeHttpRequests(authorize -> authorize
+                // 1. Static Resources & Docs
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/uploads/**").permitAll()
+                .requestMatchers(SWAGGER_WHITELIST).permitAll()
+                
+                // 2. Internal Service APIs (Authenticated Users/Services)
+                .requestMatchers(HttpMethod.POST, API_PRODUCTS_INTERNAL).authenticated()
 
-                        // Public GET Endpoints
-                        .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/reviews/product/**").permitAll()
-                        
-                        // Admin/Authenticated POST/PATCH/DELETE Endpoints
-                        .requestMatchers(HttpMethod.POST, "/api/products", "/api/products/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/products/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAuthority("ROLE_ADMIN")
-                        
-                        .anyRequest().authenticated()
-                )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                // 3. Public GET APIs
+                .requestMatchers(HttpMethod.GET, "/api/products").permitAll() // List
+                .requestMatchers(HttpMethod.GET, API_PRODUCTS_PUBLIC).permitAll() // Detail
+                .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
+                .requestMatchers(HttpMethod.GET, API_CATEGORIES_PUBLIC).permitAll()
+                .requestMatchers(HttpMethod.GET, API_REVIEWS_PUBLIC).permitAll()
+                
+                // 4. Admin Management APIs
+                .requestMatchers(HttpMethod.POST, API_PRODUCTS_PUBLIC).hasAuthority(ROLE_ADMIN)
+                .requestMatchers(HttpMethod.PATCH, API_PRODUCTS_PUBLIC).hasAuthority(ROLE_ADMIN)
+                .requestMatchers(HttpMethod.DELETE, API_PRODUCTS_PUBLIC).hasAuthority(ROLE_ADMIN)
+                
+                // 5. Default
+                .anyRequest().authenticated()
+            )
+            
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

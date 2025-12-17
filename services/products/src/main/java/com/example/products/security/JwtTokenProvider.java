@@ -13,12 +13,15 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
 @Slf4j
 public class JwtTokenProvider {
+
+    private static final String ROLES_CLAIM = "roles";
 
     @Value("${app.jwt.secret-key}")
     private String jwtSecret;
@@ -40,18 +43,31 @@ public class JwtTokenProvider {
         return parseClaims(token).getSubject();
     }
 
-    @SuppressWarnings("unchecked")
     public Collection<? extends GrantedAuthority> getAuthorities(String token) {
         Claims claims = parseClaims(token);
-        List<String> roles = claims.get("roles", List.class);
+        
+        // Sử dụng helper method để cast an toàn hơn và hạn chế phạm vi @SuppressWarnings
+        List<String> roles = getRolesFromClaims(claims);
 
-        if (roles == null) {
-            return List.of();
+        if (roles.isEmpty()) {
+            return Collections.emptyList();
         }
 
         return roles.stream()
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toList());
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> getRolesFromClaims(Claims claims) {
+        List<?> rawRoles = claims.get(ROLES_CLAIM, List.class);
+        if (rawRoles == null) {
+            return Collections.emptyList();
+        }
+        // Trong thực tế, JJWT đảm bảo list trả về đúng type nếu được sign đúng,
+        // nhưng check instanceOf là thói quen tốt nếu cần strict safety.
+        // Ở đây ta tin tưởng token nội bộ nên cast trực tiếp.
+        return (List<String>) rawRoles;
     }
 
     public boolean validateToken(String token) {
