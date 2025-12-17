@@ -8,7 +8,7 @@ interface OrderStatusBadgeProps {
 }
 
 export function OrderStatusBadge({ status }: OrderStatusBadgeProps) {
-  // [FIX] Thay 'any' bằng 'LucideIcon'
+  // [FIX] Thay 'any' bằng 'LucideIcon' để type safe hơn
   const config: Record<OrderStatus, { color: string; icon: LucideIcon; label: string }> = {
     [OrderStatus.PENDING]: { 
         color: "bg-yellow-100 text-yellow-700 border-yellow-200", 
@@ -37,6 +37,7 @@ export function OrderStatusBadge({ status }: OrderStatusBadgeProps) {
     },
   };
 
+  // Fallback an toàn nếu status không khớp
   const { color, icon: Icon, label } = config[status] || { color: "bg-gray-100", icon: Clock, label: status };
 
   return (

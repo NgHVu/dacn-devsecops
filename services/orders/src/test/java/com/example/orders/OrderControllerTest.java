@@ -24,7 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime; 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -51,7 +51,7 @@ class OrderControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
-    
+
     @MockBean
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
@@ -62,13 +62,13 @@ class OrderControllerTest {
     private final String MOCK_TOKEN = "Bearer dummy.token.123";
 
     @Test
-    @DisplayName("POST /orders: Thành công (201 Created) khi đã xác thực và DTO hợp lệ")
+    @DisplayName("POST /api/v1/orders: Thành công (201 Created) khi đã xác thực và DTO hợp lệ")
     @WithMockUser
     void testCreateOrder_Success() throws Exception {
-        // [FIX] Cập nhật constructor OrderItemRequest (3 tham số: id, quantity, note)
-        OrderItemRequest itemRequest = new OrderItemRequest(101L, 2, "Ít đá");
-        
-        // [FIX] Cập nhật constructor OrderCreateRequest (6 tham số: customerName, address, phone, note, paymentMethod, items)
+        // Item request khớp OrderItemRequest(productId, quantity, size, note)
+        OrderItemRequest itemRequest = new OrderItemRequest(101L, 2, "L", "Ít đá");
+
+        // Request khớp OrderCreateRequest(...)
         OrderCreateRequest createRequest = new OrderCreateRequest(
                 "Nguyễn Văn Test",
                 "123 Đường Testing, Quận Test",
@@ -78,17 +78,36 @@ class OrderControllerTest {
                 List.of(itemRequest)
         );
 
-        OrderResponse responseDto = new OrderResponse(
-                1L, 
-                1L, 
-                "PENDING", 
-                new BigDecimal("100.00"),
-                List.of(new OrderItemResponse(1L, 101L, "Sản phẩm 1", 2, new BigDecimal("50.00"))),
-                OffsetDateTime.now(), 
-                OffsetDateTime.now()  
+        // Item response khớp record OrderItemResponse hiện tại:
+        // (id, productId, productName, quantity, price, productImage, size, note)
+        OrderItemResponse itemResponse = new OrderItemResponse(
+                1L,
+                101L,
+                "Sản phẩm 1",
+                2,
+                new BigDecimal("50.00"),
+                "https://example.com/img.jpg",
+                "L",
+                "Ít đá"
         );
 
-        // Mock hành vi của Service
+        // Khởi tạo OrderResponse theo đúng thứ tự field mới
+        OrderResponse responseDto = new OrderResponse(
+                1L,                                  // id
+                1L,                                  // userId
+                "PENDING",                           // status
+                new BigDecimal("100.00"),            // totalAmount
+                "Nguyễn Văn Test",                   // customerName
+                "123 Đường Testing, Quận Test",      // shippingAddress
+                "0909123456",                        // phoneNumber
+                "Giao nhanh nhé",                    // note
+                "COD",                               // paymentMethod
+                "UNPAID",                            // paymentStatus
+                List.of(itemResponse),               // items
+                OffsetDateTime.now(),                // createdAt
+                OffsetDateTime.now()                 // updatedAt
+        );
+
         when(orderService.createOrder(any(OrderCreateRequest.class), eq(MOCK_TOKEN)))
                 .thenReturn(responseDto);
 
@@ -104,18 +123,17 @@ class OrderControllerTest {
     }
 
     @Test
-    @DisplayName("POST /orders: Thất bại (400 Bad Request) khi DTO không hợp lệ")
+    @DisplayName("POST /api/v1/orders: Thất bại (400 Bad Request) khi DTO không hợp lệ")
     @WithMockUser
     void testCreateOrder_InvalidInput_ShouldReturnBadRequest() throws Exception {
-        // [FIX] Tạo request không hợp lệ (Ví dụ: List items rỗng, tên rỗng)
-        // Các tham số rỗng sẽ kích hoạt @NotBlank, list rỗng kích hoạt @NotEmpty
+        // Request không hợp lệ: tên rỗng, địa chỉ rỗng, phone rỗng, items rỗng
         OrderCreateRequest badRequest = new OrderCreateRequest(
-                "", // Tên rỗng -> Lỗi
-                "", 
-                "", 
-                "", 
-                "COD", 
-                List.of() // Items rỗng -> Lỗi
+                "",
+                "",
+                "",
+                "",
+                "COD",
+                List.of()
         );
 
         mockMvc.perform(post("/api/v1/orders")
@@ -129,7 +147,7 @@ class OrderControllerTest {
     }
 
     @Test
-    @DisplayName("GET /orders/my: Thành công (200 OK) khi đã xác thực")
+    @DisplayName("GET /api/v1/orders/my: Thành công (200 OK) khi đã xác thực")
     @WithMockUser(username = MOCK_EMAIL)
     void testGetMyOrders_Success() throws Exception {
         Page<OrderResponse> mockPage = Page.empty();
@@ -146,20 +164,20 @@ class OrderControllerTest {
     }
 
     @Test
-    @DisplayName("GET /orders/my: Thất bại (401 Unauthorized) khi chưa xác thực")
+    @DisplayName("GET /api/v1/orders/my: Thất bại (401 Unauthorized) khi chưa xác thực")
     void testGetMyOrders_Unauthorized() throws Exception {
         mockMvc.perform(get("/api/v1/orders/my"))
                 .andExpect(status().isUnauthorized());
 
         verify(orderService, never()).getOrders(any(), any(), any());
     }
-    
+
     @Test
-    @DisplayName("GET /orders/{orderId}: Thất bại (404 Not Found) khi đơn hàng không tồn tại")
+    @DisplayName("GET /api/v1/orders/{orderId}: Thất bại (404 Not Found) khi đơn hàng không tồn tại")
     @WithMockUser(username = MOCK_EMAIL)
     void testGetOrderById_NotFound() throws Exception {
         Long orderId = 99L;
-        
+
         when(orderService.getOrderById(orderId, MOCK_EMAIL, MOCK_TOKEN))
                 .thenThrow(new OrderNotFoundException("Không tìm thấy đơn hàng"));
 

@@ -70,13 +70,13 @@ class OrderServiceImplTest {
     @BeforeEach
     void setUp() {
         mockUserDto = new UserDto(MOCK_USER_ID, "Test User", MOCK_EMAIL);
-        // Cập nhật ProductDto với constructor mới (thêm tham số image)
+        // Cập nhật ProductDto với constructor mới
         mockProduct1 = new ProductDto(101L, "Sản phẩm 1", new BigDecimal("50.00"), "img1.jpg", 100);
         mockProduct2 = new ProductDto(102L, "Sản phẩm 2", new BigDecimal("100.00"), "img2.jpg", 50);
         
-        // Cập nhật OrderItemRequest với constructor mới (thêm tham số note)
-        OrderItemRequest item1 = new OrderItemRequest(101L, 2, "Ít đá");
-        OrderItemRequest item2 = new OrderItemRequest(102L, 1, null);
+        // Cập nhật OrderItemRequest với constructor mới (thêm tham số size và note)
+        OrderItemRequest item1 = new OrderItemRequest(101L, 2, "L", "Ít đá");
+        OrderItemRequest item2 = new OrderItemRequest(102L, 1, null, null);
         
         // Cập nhật OrderCreateRequest với constructor mới (thêm thông tin giao hàng)
         mockOrderRequest = new OrderCreateRequest(
@@ -132,9 +132,12 @@ class OrderServiceImplTest {
 
         Order savedOrder = orderCaptor.getValue();
         assertThat(savedOrder.getUserId()).isEqualTo(MOCK_USER_ID);
-        // Kiểm tra xem note và image có được lưu đúng không
+        // Kiểm tra xem note, image và size có được lưu đúng không
         assertThat(savedOrder.getItems()).anyMatch(item -> 
-            item.getProductId().equals(101L) && "Ít đá".equals(item.getNote()) && "img1.jpg".equals(item.getProductImage())
+            item.getProductId().equals(101L) && 
+            "Ít đá".equals(item.getNote()) && 
+            "img1.jpg".equals(item.getProductImage()) &&
+            "L".equals(item.getSize())
         );
         assertThat(savedOrder.getPaymentMethod()).isEqualTo("COD");
     }
@@ -172,7 +175,7 @@ class OrderServiceImplTest {
         // Tạo request lỗi với số lượng 0
         OrderCreateRequest badRequest = new OrderCreateRequest(
                 "Tên", "Địa chỉ", "SĐT", null, "COD",
-                List.of(new OrderItemRequest(101L, 0, null))
+                List.of(new OrderItemRequest(101L, 0, null, null))
         );
         
         // Mock user để pass qua bước xác thực đầu tiên

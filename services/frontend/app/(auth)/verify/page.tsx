@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -55,6 +54,7 @@ function VerifyPage() {
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false); // <--- THÊM STATE NÀY
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(OTP_LIFESPAN_SECONDS);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
@@ -63,6 +63,9 @@ function VerifyPage() {
 
   // 1. Logic đếm ngược
   useEffect(() => {
+    // Nếu đã thành công thì không cần chạy countdown nữa để tránh UI giật
+    if (isSuccess) return; 
+
     const calculateRemainingTime = () => {
       const pendingData = localStorage.getItem(PENDING_VERIFICATION_KEY);
 
@@ -90,11 +93,10 @@ function VerifyPage() {
     calculateRemainingTime();
     const interval: NodeJS.Timeout = setInterval(calculateRemainingTime, 1000);
     return () => clearInterval(interval);
-  }, [isResending]); 
+  }, [isResending, isSuccess]); // Thêm dependency isSuccess
 
   // Auto focus vào ô nhập đầu tiên khi tải trang
   useEffect(() => {
-    // Delay nhẹ để đảm bảo Slot đầu tiên đã mount
     const timer = setTimeout(() => {
         otpInputRef.current?.focus();
     }, 100);
@@ -103,12 +105,13 @@ function VerifyPage() {
 
   // 2. Xử lý xác thực
   const handleVerify = async (finalOtp: string) => {
-    if (isLoading) return; 
+    if (isLoading || isSuccess) return; 
     
     setIsLoading(true);
     setError(null);
     setResendMessage(null);
 
+    // Chỉ check countdown nếu chưa success
     if (countdown <= 0) {
         setError("Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.");
         setIsLoading(false);
@@ -117,7 +120,6 @@ function VerifyPage() {
 
     if (!email || finalOtp.length < 6) {
       setError("Vui lòng nhập đủ 6 chữ số OTP.");
-      // QUAN TRỌNG: Phải set loading false trước khi focus
       setIsLoading(false);
       setTimeout(() => otpInputRef.current?.focus(), 50);
       return;
@@ -125,7 +127,11 @@ function VerifyPage() {
 
     try {
       const data = await authService.verifyAccount({ email, otp: finalOtp }); 
+      
+      // --- KHẮC PHỤC TẠI ĐÂY ---
+      setIsSuccess(true); // 1. Đánh dấu thành công ngay lập tức
       localStorage.removeItem(PENDING_VERIFICATION_KEY); 
+      
       await login(data.accessToken);
       router.push("/"); 
     } catch (err) {
@@ -135,14 +141,10 @@ function VerifyPage() {
         errorMessage = err.response?.data?.message || err.response?.data || "Mã OTP không hợp lệ.";
       }
       
-      // --- FIX LOGIC FOCUS ---
       setError(errorMessage);
-      setOtp(""); // 1. Xóa mã cũ
-      
-      // 2. QUAN TRỌNG: Mở khóa input NGAY LẬP TỨC (để trình duyệt cho phép focus)
+      setOtp(""); 
       setIsLoading(false); 
 
-      // 3. Đợi React render lại UI (Input enabled) rồi mới focus
       setTimeout(() => {
         otpInputRef.current?.focus();
       }, 50);
@@ -151,7 +153,7 @@ function VerifyPage() {
 
   // 3. Xử lý gửi lại mã
   const handleResendOtp = async () => {
-    if (isResending || countdown > 0) return;
+    if (isResending || countdown > 0 || isSuccess) return;
 
     setIsResending(true);
     setError(null);
@@ -176,6 +178,9 @@ function VerifyPage() {
       };
       localStorage.setItem(PENDING_VERIFICATION_KEY, JSON.stringify(verificationData));
       
+      // Reset countdown state ngay lập tức để UI cập nhật
+      setCountdown(OTP_LIFESPAN_SECONDS);
+
     } catch (err) {
       console.error("Lỗi khi gửi lại OTP:", err);
       let errorMessage = "Không thể gửi lại mã OTP.";
@@ -199,12 +204,15 @@ function VerifyPage() {
   };
   
   return (
-    // Card "Vô hình" để khớp Layout
     <Card className="w-full border-0 shadow-none bg-transparent transition-all">
       <CardHeader className="text-center px-0 pb-2">
         <div className="flex justify-center mb-4">
-          <div className="h-16 w-16 rounded-full bg-orange-100 flex items-center justify-center animate-pulse">
-            <ShieldCheck className="h-8 w-8 text-orange-600" />
+          <div className={`h-16 w-16 rounded-full flex items-center justify-center animate-pulse ${isSuccess ? 'bg-green-100' : 'bg-orange-100'}`}>
+            {isSuccess ? (
+                <CheckCircle2 className="h-8 w-8 text-green-600" />
+            ) : (
+                <ShieldCheck className="h-8 w-8 text-orange-600" />
+            )}
           </div>
         </div>
         <CardTitle className="text-2xl font-bold tracking-tight">Xác thực tài khoản</CardTitle>
@@ -241,21 +249,32 @@ function VerifyPage() {
             value={otp}
             onChange={handleOtpChange}
             onComplete={handleVerify}
-            disabled={isLoading || isResending}
+            disabled={isLoading || isResending || isSuccess} // Disable khi success
             className="gap-2"
           >
             <InputOTPGroup className="gap-2">
-              <InputOTPSlot index={0} className="h-12 w-10 sm:w-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 text-lg shadow-sm" />
-              <InputOTPSlot index={1} className="h-12 w-10 sm:w-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 text-lg shadow-sm" />
-              <InputOTPSlot index={2} className="h-12 w-10 sm:w-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 text-lg shadow-sm" />
-              <InputOTPSlot index={3} className="h-12 w-10 sm:w-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 text-lg shadow-sm" />
-              <InputOTPSlot index={4} className="h-12 w-10 sm:w-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 text-lg shadow-sm" />
-              <InputOTPSlot index={5} className="h-12 w-10 sm:w-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 text-lg shadow-sm" />
+                {[0, 1, 2, 3, 4, 5].map((index) => (
+                     <InputOTPSlot 
+                        key={index}
+                        index={index} 
+                        className={`h-12 w-10 sm:w-12 border-gray-300 text-lg shadow-sm ${
+                            isSuccess 
+                            ? 'border-green-500 ring-green-500 text-green-600 bg-green-50' 
+                            : 'focus:border-orange-500 focus:ring-orange-500'
+                        }`} 
+                     />
+                ))}
             </InputOTPGroup>
           </InputOTP>
           
           <div className="min-h-[20px]">
-            {countdown > 0 ? (
+            {isSuccess ? (
+               // --- HIỂN THỊ TRẠNG THÁI THÀNH CÔNG ---
+               <p className="text-sm font-medium text-green-600 flex items-center gap-1.5 animate-in fade-in slide-in-from-bottom-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Xác thực thành công! Đang chuyển hướng...
+               </p>
+            ) : countdown > 0 ? (
               <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Hết hạn sau: <span className="font-bold text-orange-600 tabular-nums">{formatTime(countdown)}</span>
@@ -272,14 +291,14 @@ function VerifyPage() {
 
       <CardFooter className="flex flex-col gap-4 px-0 pb-0">
         <Button 
-          className="w-full h-11 text-base font-semibold bg-orange-600 hover:bg-orange-500" 
+          className={`w-full h-11 text-base font-semibold ${isSuccess ? 'bg-green-600 hover:bg-green-500' : 'bg-orange-600 hover:bg-orange-500'}`}
           onClick={() => handleVerify(otp)}
-          disabled={isLoading || isResending || otp.length < 6}
+          disabled={isLoading || isResending || otp.length < 6 || isSuccess}
         >
-          {isLoading ? (
+          {isLoading || isSuccess ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Đang kiểm tra...
+              {isSuccess ? <CheckCircle2 className="mr-2 h-4 w-4" /> : <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSuccess ? "Đã xác thực" : "Đang kiểm tra..."}
             </>
           ) : (
             "Xác thực ngay"
@@ -290,7 +309,7 @@ function VerifyPage() {
           <button
             className="text-muted-foreground hover:text-orange-600 transition-colors flex items-center gap-1"
             onClick={handleChangeEmail}
-            disabled={isLoading || isResending}
+            disabled={isLoading || isResending || isSuccess}
           >
             <ChevronLeft className="h-3 w-3" />
             Đổi email
@@ -298,12 +317,12 @@ function VerifyPage() {
 
           <button
             className={`font-medium transition-colors ${
-              countdown > 0 || isLoading || isResending
+              countdown > 0 || isLoading || isResending || isSuccess
                 ? "text-muted-foreground cursor-not-allowed opacity-50"
                 : "text-orange-600 hover:text-orange-500 hover:underline"
             }`}
             onClick={handleResendOtp}
-            disabled={isLoading || isResending || countdown > 0} 
+            disabled={isLoading || isResending || countdown > 0 || isSuccess} 
           >
             {isResending ? "Đang gửi lại..." : "Gửi lại mã mới"}
           </button>

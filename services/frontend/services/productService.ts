@@ -5,8 +5,8 @@ import {
   type CreateProductRequest,
   type UpdateProductRequest,
   type GetProductsParams,
-  type Review,               // [CẬP NHẬT] Import thêm
-  type CreateReviewRequest   // [CẬP NHẬT] Import thêm
+  type Review,              
+  type CreateReviewRequest
 } from '@/types/product';
 
 const getProducts = async (
@@ -19,12 +19,8 @@ const getProducts = async (
   if (params.size !== undefined) queryParams.append('size', String(params.size));
   if (params.sort) queryParams.append('sort', params.sort);
   
-  // Logic cũ của bạn là search, nhưng ở Page bạn đang truyền name
   if (params.search) queryParams.append('search', params.search);
   
-  // 👇 THÊM DÒNG NÀY: Để mapping tham số 'name' từ Page xuống URL
-  if (params.name) queryParams.append('name', params.name);
-
   if (params.categoryId) queryParams.append('categoryId', String(params.categoryId));
   if (params.minPrice) queryParams.append('minPrice', String(params.minPrice));
   if (params.maxPrice) queryParams.append('maxPrice', String(params.maxPrice));
@@ -83,6 +79,18 @@ const createReview = async (data: CreateReviewRequest): Promise<Review> => {
     return response.data;
 };
 
+// [MỚI] Hàm cập nhật review
+// Lưu ý: data cần bao gồm cả productId và orderId vì Backend DTO yêu cầu @NotNull
+const updateReview = async (reviewId: number, data: CreateReviewRequest): Promise<Review> => {
+    const response = await apiClient.put<Review>(`/api/reviews/${reviewId}`, data);
+    return response.data;
+};
+
+// [MỚI] Hàm xóa review
+const deleteReview = async (reviewId: number): Promise<void> => {
+    await apiClient.delete(`/api/reviews/${reviewId}`);
+};
+
 export const productService = {
   getProducts,
   getProductById, 
@@ -90,6 +98,8 @@ export const productService = {
   updateProduct,
   deleteProduct,
   uploadImage,
-  getProductReviews, // Export mới
-  createReview,      // Export mới
+  getProductReviews,
+  createReview,
+  updateReview, // Export function mới
+  deleteReview, // Export function mới
 };

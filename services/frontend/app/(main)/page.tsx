@@ -1,5 +1,5 @@
 import React, { Suspense } from "react";
-import { Sparkles, PackageOpen, Utensils, FilterX } from "lucide-react";
+import { Sparkles, PackageOpen, Utensils, FilterX, Info } from "lucide-react";
 import { productService } from "@/services/productService";
 import { categoryService } from "@/services/categoryService"; 
 import { type PageableResponse, type Product, type Category } from "@/types/product";
@@ -11,6 +11,7 @@ import { FadeIn } from "@/components/animations/FadeIn";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 export const dynamic = 'force-dynamic';
 
@@ -20,20 +21,24 @@ interface HomePageProps {
 
 export default function HomePage({ searchParams }: HomePageProps) {
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden bg-background">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-20 relative z-10">
         
-        <div className="space-y-16">
+        {/* HERO & CATEGORY SECTION */}
+        <div className="space-y-10">
             <FadeIn>
                 <HeroBanner />
             </FadeIn>
             
-            <Suspense fallback={<CategoryListSkeleton />}>
-                <CategoryListSection />
-            </Suspense>
+            <div className="space-y-4">
+              <Suspense fallback={<CategoryListSkeleton />}>
+                  <CategoryListSection />
+              </Suspense>
+            </div>
         </div>
 
-        <div id="products" className="scroll-mt-24 space-y-10">
+        {/* PRODUCTS SECTION */}
+        <div id="products" className="scroll-mt-24 space-y-8">
           <Suspense fallback={<ProductListSkeleton />}>
              <ProductListSection searchParams={searchParams} />
           </Suspense>
@@ -44,20 +49,17 @@ export default function HomePage({ searchParams }: HomePageProps) {
   );
 }
 
+// --- DATA FETCHING COMPONENTS ---
+
 async function CategoryListSection() {
     let categories: Category[] = [];
-    let isError = false;
-
     try {
         categories = await categoryService.getAllCategories();
     } catch (err) {
         console.error("Lỗi danh mục:", err);
-        isError = true;
     }
 
-    if (isError) {
-        return <p className="text-center text-sm text-muted-foreground">Không thể tải danh mục.</p>;
-    }
+    if (!categories.length) return null;
 
     return (
         <div className="animate-in fade-in duration-500">
@@ -84,6 +86,7 @@ async function ProductListSection({ searchParams }: { searchParams: Promise<{ [k
 
     let productResponse: PageableResponse<Product>;
     let categoryName = "";
+    let categoryDescription = ""; // [NEW] Biến lưu mô tả danh mục
 
     try {
         const [pResponse, cResponse] = await Promise.all([
@@ -94,8 +97,14 @@ async function ProductListSection({ searchParams }: { searchParams: Promise<{ [k
         ]);
         
         productResponse = pResponse;
-        if (categoryId && cResponse.length > 0) {
-            categoryName = cResponse.find(c => c.id === categoryId)?.name || "";
+        
+        // [LOGIC LẤY TÊN & MÔ TẢ DANH MỤC]
+        if (categoryId && Array.isArray(cResponse)) {
+            const currentCategory = cResponse.find(c => c.id === categoryId);
+            if (currentCategory) {
+                categoryName = currentCategory.name;
+                categoryDescription = currentCategory.description || "";
+            }
         }
     } catch (err) {
         console.error("Lỗi sản phẩm:", err);
@@ -105,13 +114,13 @@ async function ProductListSection({ searchParams }: { searchParams: Promise<{ [k
         };
     }
 
-    const products = productResponse.content;
+    const products = productResponse.content || [];
     const isFiltering = !!categoryId || !!sort || !!search;
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border/40 pb-4">
-            <div>
+            <div className="max-w-3xl">
               <h2 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
                 {categoryName ? (
                     <>
@@ -132,21 +141,34 @@ async function ProductListSection({ searchParams }: { searchParams: Promise<{ [k
                     </>
                 )}
               </h2>
-              <p className="text-muted-foreground mt-2 text-lg">
-                {categoryName ? `Danh sách các món ${categoryName} hấp dẫn` : "Khám phá những hương vị tuyệt vời được yêu thích nhất tại FoodHub"}
+              
+              {/* [NEW] Hiển thị mô tả danh mục */}
+              <p className="text-muted-foreground mt-2 text-lg flex items-start gap-2">
+                {categoryName ? (
+                   <>
+                      {categoryDescription ? (
+                         <span>{categoryDescription}</span>
+                      ) : (
+                         <span>Danh sách các món <b>{categoryName}</b> hấp dẫn đang chờ bạn thưởng thức</span>
+                      )}
+                   </>
+                ) : sort === 'rating_desc' ? (
+                   "Tuyển tập những món ăn được cộng đồng FoodHub đánh giá cao nhất"
+                ) : (
+                   "Khám phá những hương vị tuyệt vời được yêu thích nhất tại FoodHub"
+                )}
               </p>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
                 {isFiltering && (
                     <Link href="/">
-                        <Button variant="outline" className="rounded-full border-dashed">
-                            <FilterX className="mr-2 h-4 w-4" /> Bỏ lọc
+                        <Button variant="outline" size="sm" className="rounded-full border-dashed h-9">
+                            <FilterX className="mr-2 h-3.5 w-3.5" /> Bỏ lọc
                         </Button>
                     </Link>
                 )}
-                <div className="inline-flex items-center rounded-full border px-4 py-2 text-sm font-medium bg-background/50 backdrop-blur-sm shadow-sm">
-                    <Utensils className="mr-2 h-4 w-4 text-orange-600" />
+                <div className="hidden sm:inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium bg-background/50 backdrop-blur-sm shadow-sm">
                     <span className="text-foreground font-bold">{productResponse.totalElements}</span>
                     <span className="ml-1 text-muted-foreground">món ăn</span>
                 </div>
@@ -172,14 +194,14 @@ async function ProductListSection({ searchParams }: { searchParams: Promise<{ [k
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-10">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-8">
                 {products.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}
               </div>
 
               {productResponse.totalPages > 1 && (
-                <div className="pt-16 pb-8 flex justify-center">
+                <div className="pt-12 pb-8 flex justify-center">
                   <PaginationUrlControl 
                     currentPage={backendPage} 
                     totalPages={productResponse.totalPages} 
@@ -192,12 +214,14 @@ async function ProductListSection({ searchParams }: { searchParams: Promise<{ [k
     );
 }
 
+// --- SKELETONS ---
+
 function CategoryListSkeleton() {
     return (
-        <div className="flex space-x-4 overflow-x-auto pb-6 pt-2">
-            {[...Array(8)].map((_, i) => (
-                <div key={i} className="flex flex-col items-center gap-3 w-[100px] shrink-0">
-                    <Skeleton className="w-20 h-20 rounded-[1.5rem]" />
+        <div className="flex gap-4 overflow-hidden pb-4">
+            {[...Array(6)].map((_, i) => (
+                <div key={i} className="flex flex-col items-center gap-2 shrink-0">
+                    <Skeleton className="w-16 h-16 rounded-2xl" />
                     <Skeleton className="w-12 h-3" />
                 </div>
             ))}
@@ -218,7 +242,7 @@ function ProductListSkeleton() {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {[...Array(8)].map((_, i) => (
                     <div key={i} className="space-y-3">
-                        <Skeleton className="h-[200px] w-full rounded-xl" />
+                        <Skeleton className="h-[250px] w-full rounded-2xl" />
                         <div className="space-y-2">
                             <Skeleton className="h-4 w-3/4" />
                             <Skeleton className="h-4 w-1/2" />

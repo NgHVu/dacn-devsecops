@@ -13,8 +13,6 @@ export type GetProductsParams = {
   size?: number;
   sort?: string; 
   search?: string;
-  // 👇 Đã thêm trường name vào đây để khớp với tham số truyền từ SearchPage
-  name?: string;
   categoryId?: number | string;
   minPrice?: number;
   maxPrice?: number;
@@ -25,9 +23,12 @@ export type Review = {
   id: number;
   userId: string;
   userName: string;
+  orderId: number; // [NEW] Thêm dòng này
   rating: number;
   comment: string;
   createdAt: string;
+  updatedAt?: string; // [NEW] Thêm dòng này (dấu ? vì có thể null hoặc undefined)
+  
 };
 
 export type Product = {
@@ -55,7 +56,7 @@ export type PageableResponse<T> = {
   totalElements: number; 
   size: number;
   number: number;
-  last?: boolean;    
+  last?: boolean;   
   first?: boolean;
   empty?: boolean;
 };

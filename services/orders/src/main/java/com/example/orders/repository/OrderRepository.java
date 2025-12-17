@@ -11,7 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
+import java.time.Instant; // [FIXED] Import Instant
 import java.util.List;
 import java.util.Optional;
 
@@ -29,27 +29,30 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT SUM(o.totalAmount) FROM Order o WHERE o.status <> :cancelledStatus")
     BigDecimal sumTotalRevenue(@Param("cancelledStatus") OrderStatus cancelledStatus);
 
+    // [FIXED] Thay đổi tham số sang Instant
     @Query("SELECT COUNT(o) FROM Order o WHERE o.createdAt >= :startDate AND o.createdAt <= :endDate")
-    long countOrdersInPeriod(@Param("startDate") OffsetDateTime startDate, @Param("endDate") OffsetDateTime endDate);
+    long countOrdersInPeriod(@Param("startDate") Instant startDate, @Param("endDate") Instant endDate);
 
+    // [FIXED] Thay đổi tham số sang Instant
     @Query("SELECT COUNT(DISTINCT o.userId) FROM Order o WHERE o.createdAt >= :startDate AND o.createdAt <= :endDate")
-    long countDistinctUsersInPeriod(@Param("startDate") OffsetDateTime startDate, @Param("endDate") OffsetDateTime endDate);
+    long countDistinctUsersInPeriod(@Param("startDate") Instant startDate, @Param("endDate") Instant endDate);
 
     @Query("""
-        SELECT new com.example.orders.dto.MonthlyRevenue(
-            CAST(EXTRACT(YEAR FROM o.createdAt) AS int), 
-            CAST(EXTRACT(MONTH FROM o.createdAt) AS int), 
-            SUM(o.totalAmount)
-        ) 
-        FROM Order o 
-        WHERE o.status <> :cancelledStatus
-        GROUP BY CAST(EXTRACT(YEAR FROM o.createdAt) AS int), CAST(EXTRACT(MONTH FROM o.createdAt) AS int)
-        ORDER BY CAST(EXTRACT(YEAR FROM o.createdAt) AS int), CAST(EXTRACT(MONTH FROM o.createdAt) AS int)
-        """)
+         SELECT new com.example.orders.dto.MonthlyRevenue(
+             CAST(EXTRACT(YEAR FROM o.createdAt) AS int), 
+             CAST(EXTRACT(MONTH FROM o.createdAt) AS int), 
+             SUM(o.totalAmount)
+         ) 
+         FROM Order o 
+         WHERE o.status <> :cancelledStatus
+         GROUP BY CAST(EXTRACT(YEAR FROM o.createdAt) AS int), CAST(EXTRACT(MONTH FROM o.createdAt) AS int)
+         ORDER BY CAST(EXTRACT(YEAR FROM o.createdAt) AS int), CAST(EXTRACT(MONTH FROM o.createdAt) AS int)
+         """)
     List<MonthlyRevenue> getMonthlyRevenue(@Param("cancelledStatus") OrderStatus cancelledStatus);
 
+    // [FIXED] Thay đổi tham số sang Instant
     @Query("SELECT SUM(o.totalAmount) FROM Order o WHERE o.createdAt >= :startDate AND o.createdAt <= :endDate AND o.status <> :cancelledStatus")
-    BigDecimal sumRevenueInPeriod(@Param("startDate") OffsetDateTime startDate, 
-                                  @Param("endDate") OffsetDateTime endDate, 
+    BigDecimal sumRevenueInPeriod(@Param("startDate") Instant startDate, 
+                                  @Param("endDate") Instant endDate, 
                                   @Param("cancelledStatus") OrderStatus cancelledStatus);
 }

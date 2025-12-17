@@ -4,12 +4,9 @@ import com.example.orders.dto.DashboardStats;
 import com.example.orders.dto.OrderCreateRequest;
 import com.example.orders.dto.OrderResponse;
 import com.example.orders.dto.OrderStatusUpdate;
-import com.example.orders.dto.DashboardStats; 
 import com.example.orders.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -78,19 +75,23 @@ public class OrderController {
     }
 
     @Operation(
-            summary = "[ADMIN] Cập nhật trạng thái đơn hàng",
-            description = "Chuyển trạng thái đơn hàng (VD: PENDING -> CONFIRMED). Có kiểm tra luồng hợp lệ.",
+            summary = "Cập nhật trạng thái đơn hàng (Admin & User hủy đơn)",
+            description = "Admin có thể chỉnh mọi trạng thái. User chỉ được phép chuyển sang CANCELLED nếu đơn đang PENDING.",
             security = @SecurityRequirement(name = "bearerAuth")
     )
     @ApiResponse(responseCode = "200", description = "Cập nhật thành công")
     @ApiResponse(responseCode = "400", description = "Trạng thái không hợp lệ hoặc vi phạm luồng")
+    @ApiResponse(responseCode = "403", description = "Không có quyền thay đổi đơn này")
     @PatchMapping("/{orderId}/status")
     public ResponseEntity<OrderResponse> updateOrderStatus(
             @PathVariable Long orderId,
-            @Valid @RequestBody OrderStatusUpdate statusUpdate) {
+            @Valid @RequestBody OrderStatusUpdate statusUpdate,
+            @Parameter(hidden = true) @RequestHeader("Authorization") String bearerToken) { // [UPDATED] Thêm tham số bearerToken
         
-        log.info("Admin cập nhật đơn hàng ID: {} sang trạng thái: {}", orderId, statusUpdate.getStatus());
-        return ResponseEntity.ok(orderService.updateOrderStatus(orderId, statusUpdate));
+        log.info("Yêu cầu cập nhật đơn hàng ID: {} sang trạng thái: {}", orderId, statusUpdate.getStatus());
+        
+        // [UPDATED] Truyền token xuống service để kiểm tra quyền sở hữu
+        return ResponseEntity.ok(orderService.updateOrderStatus(orderId, statusUpdate, bearerToken));
     }
 
     @Operation(

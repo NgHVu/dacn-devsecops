@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react"; 
 import Link from "next/link";
-import { useRouter } from "next/navigation"; 
+import { useRouter, useSearchParams } from "next/navigation"; 
 import { ShoppingCart, User, LogOut, LayoutDashboard, UtensilsCrossed, Search, Menu, ClipboardList } from "lucide-react"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,9 +26,20 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose 
 
 export default function Navbar() {
   const router = useRouter();
+  const searchParams = useSearchParams(); // To populate search box from URL
   const { user, isAuthenticated, logout } = useAuth();
   const { totalItems } = useCart();
   const [scrolled, setScrolled] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Sync search input with URL query param 'q' or 'search'
+  useEffect(() => {
+    const q = searchParams.get("q") || searchParams.get("search");
+    if (q) {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      setSearchQuery(q);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -50,7 +61,10 @@ export default function Navbar() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // Logic search...
+    if (searchQuery.trim()) {
+       // Redirect to /search page with query param 'q'
+       router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
   };
 
   return (
@@ -163,6 +177,8 @@ export default function Navbar() {
                   type="search"
                   placeholder="Tìm món ngon..."
                   className="w-full bg-muted/50 pl-10 pr-4 h-10 rounded-full border-transparent focus:bg-background focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all shadow-sm"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
              </div>
            </form>

@@ -5,7 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification; 
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.products.dto.ProductCreateRequest;
 import com.example.products.dto.ProductCriteria;
+import com.example.products.dto.ProductStockRequest;
 import com.example.products.dto.ProductUpdateRequest;
 import com.example.products.entity.Category;
 import com.example.products.entity.Product;
@@ -31,7 +32,7 @@ import java.util.List;
 public class ProductService {
 
     private final ProductRepository repo;
-    private final CategoryRepository categoryRepository; 
+    private final CategoryRepository categoryRepository;
 
     @Transactional(readOnly = true)
     public Page<Product> getAllProducts(ProductCriteria criteria, Pageable pageable) {
@@ -45,6 +46,16 @@ public class ProductService {
                 case "price_desc" -> sort = Sort.by("price").descending();
                 case "name_asc" -> sort = Sort.by("name").ascending();
                 case "newest" -> sort = Sort.by("updatedAt").descending();
+                
+                case "rating_desc" -> {
+                    sort = Sort.by("averageRating").descending()
+                            .and(Sort.by("reviewCount").descending());
+                    
+                    spec = spec.and((root, query, cb) -> 
+                        cb.greaterThanOrEqualTo(root.get("averageRating"), 4.0)
+                    );
+                }
+                
                 default -> {
                     if (pageable.getSort().isSorted()) {
                         sort = pageable.getSort();
@@ -54,6 +65,7 @@ public class ProductService {
         }
 
         Pageable sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
+        
         return repo.findAll(spec, sortedPageable);
     }
 
@@ -72,6 +84,13 @@ public class ProductService {
     public List<Product> getBatch(List<Long> ids) {
         return repo.findAllByIdIn(ids);
     }
+    
+    // [NEW] Hàm đếm sản phẩm đang active
+    @Transactional(readOnly = true)
+    public long countActiveProducts() {
+        // Gọi hàm tự động sinh của Spring Data JPA: COUNT(p) WHERE p.stockQuantity > 0
+        return repo.countByStockQuantityGreaterThan(0); 
+    }
 
     public Product create(ProductCreateRequest req) {
         if (repo.existsByNameIgnoreCase(req.name())) {
@@ -85,13 +104,15 @@ public class ProductService {
 
         Product entity = Product.builder()
                 .name(req.name().trim())
-                .description(req.description()) 
+                .description(req.description())
                 .price(normalizedPrice)
                 .stockQuantity(req.stockQuantity())
                 .image(req.image())
-                .category(category) 
+                .category(category)
+                .averageRating(0.0)
+                .reviewCount(0)
                 .build();
-        
+
         return repo.save(entity);
     }
 
@@ -120,7 +141,7 @@ public class ProductService {
 
         if (req.stockQuantity() != null) {
             if (req.stockQuantity() < 0) {
-                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số lượng tồn kho không thể âm");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số lượng tồn kho không thể âm");
             }
             existing.setStockQuantity(req.stockQuantity());
         }
@@ -143,5 +164,21 @@ public class ProductService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm với ID: " + id);
         }
         repo.deleteById(id);
+    }
+    
+    public void reduceStock(List<ProductStockRequest> requests) {
+        for (ProductStockRequest req : requests) {
+            int updatedRows = repo.reduceStock(req.productId(), req.quantity());
+            
+            if (updatedRows == 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sản phẩm ID " + req.productId() + " không đủ hàng tồn kho.");
+            }
+        }
+    }
+
+    public void restoreStock(List<ProductStockRequest> requests) {
+        for (ProductStockRequest req : requests) {
+            repo.restoreStock(req.productId(), req.quantity());
+        }
     }
 }

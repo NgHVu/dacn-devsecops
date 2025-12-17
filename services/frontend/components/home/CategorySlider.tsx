@@ -1,12 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useRef, useState, MouseEvent, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Category } from "@/types/product";
 import { getIconComponent } from "@/config/iconMapping";
-import { cn } from "@/lib/utils"; 
+import { cn } from "@/lib/utils";
 
 interface CategorySliderProps {
   categories: Category[];
@@ -28,11 +28,58 @@ export function CategorySlider({ categories = [] }: CategorySliderProps) {
   const searchParams = useSearchParams();
   const currentCategoryId = searchParams.get("categoryId");
   const currentSort = searchParams.get("sort");
+  
+  // --- LOGIC KÉO THẢ (DRAG TO SCROLL) ---
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const handleMouseDown = (e: MouseEvent) => {
+    if (!scrollRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - scrollRef.current.offsetLeft);
+    setScrollLeft(scrollRef.current.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    scrollRef.current.scrollLeft = scrollLeft - walk;
+  };
+
+  // --- AUTO SCROLL TO ACTIVE ITEM ---
+  useEffect(() => {
+    if (scrollRef.current) {
+        let targetId = currentCategoryId;
+        if (!targetId && currentSort === "rating_desc") targetId = "-2"; // ID giả định cho Món Hot
+        if (!targetId && !currentSort) targetId = "-1"; // ID giả định cho Tất cả
+
+        if (targetId) {
+            const activeElement = scrollRef.current.querySelector(`[data-cat-id="${targetId}"]`) as HTMLElement;
+            if (activeElement) {
+                const container = scrollRef.current;
+                const offset = activeElement.offsetLeft - (container.clientWidth / 2) + (activeElement.clientWidth / 2);
+                container.scrollTo({ left: offset, behavior: 'smooth' });
+            }
+        }
+    }
+  }, [currentCategoryId, currentSort]);
 
   const allCategories = [
-    { id: -1, name: "Tất cả", icon: "Utensils", description: "" }, 
-    { id: -2, name: "Món Hot", icon: "Flame", description: "Best Seller" }, 
-    ...categories
+    { id: -1, name: "Tất cả", icon: "Utensils", description: "" },
+    { id: -2, name: "Món Hot", icon: "Flame", description: "Best Seller" },
+    ...categories,
   ];
 
   return (
@@ -41,56 +88,79 @@ export function CategorySlider({ categories = [] }: CategorySliderProps) {
         <h3 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
           Danh mục món ăn
         </h3>
-        <Link href="/menu" className="group flex items-center gap-1 text-sm font-semibold text-orange-600 hover:text-orange-700 transition-colors">
-          Xem tất cả 
+        <Link
+          href="/menu"
+          className="group flex items-center gap-1 text-sm font-semibold text-orange-600 hover:text-orange-700 transition-colors"
+        >
+          Xem tất cả
           <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
         </Link>
       </div>
-      
-      <div className="flex space-x-4 overflow-x-auto pb-6 pt-2 scrollbar-hide snap-x -mx-4 px-4 md:mx-0 md:px-0">
+
+      <div
+        ref={scrollRef}
+        className={cn(
+            "flex space-x-4 overflow-x-auto pb-6 pt-4 -mx-4 px-4 md:mx-0 md:px-0",
+            "scrollbar-hide snap-x", 
+            "cursor-grab active:cursor-grabbing select-none"
+        )}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+      >
         {allCategories.map((cat, index) => {
           const IconComponent = getIconComponent(cat.icon);
           const colorClass = colorCycle[index % colorCycle.length];
-          
+
           let href = "/";
           let isActive = false;
 
+          // [LOGIC LINK & ACTIVE]
           if (cat.id === -1) {
-             href = "/";
-             isActive = !currentCategoryId && !currentSort; 
+            href = "/";
+            isActive = !currentCategoryId && !currentSort;
           } else if (cat.id === -2) {
-             href = "/?sort=rating_desc";
-             isActive = currentSort === "rating_desc";
+            href = "/?sort=rating_desc#products"; // Thêm anchor để scroll xuống list
+            isActive = currentSort === "rating_desc";
           } else {
-             href = `/?categoryId=${cat.id}#products`; 
-             isActive = currentCategoryId === String(cat.id);
+            href = `/?categoryId=${cat.id}#products`;
+            isActive = currentCategoryId === String(cat.id);
           }
 
           return (
-            <Link 
-              key={cat.id} 
+            <Link
+              key={cat.id}
               href={href}
+              data-cat-id={cat.id}
               className="flex-shrink-0 snap-start group"
-              scroll={false} 
+              scroll={false}
+              draggable={false} 
             >
               <div className="flex flex-col items-center gap-3 w-[100px] transition-all duration-300 hover:-translate-y-1">
-                 <div className={cn(
+                <div
+                  className={cn(
                     `w-20 h-20 rounded-[1.5rem] flex items-center justify-center transition-all duration-500 shadow-sm border border-transparent group-hover:shadow-lg group-hover:shadow-orange-500/20`,
                     colorClass,
                     isActive && "ring-4 ring-orange-500/30 scale-110 shadow-xl"
-                 )}>
-                    <IconComponent className={cn(
-                        "w-9 h-9 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3",
-                        isActive && "scale-125"
-                    )} />
-                 </div>
-                 
-                 <span className={cn(
+                  )}
+                >
+                  <IconComponent
+                    className={cn(
+                      "w-9 h-9 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3",
+                      isActive && "scale-125"
+                    )}
+                  />
+                </div>
+
+                <span
+                  className={cn(
                     "text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors text-center line-clamp-1 px-1",
                     isActive && "text-orange-600 font-extrabold"
-                 )}>
-                   {cat.name}
-                 </span>
+                  )}
+                >
+                  {cat.name}
+                </span>
               </div>
             </Link>
           );
