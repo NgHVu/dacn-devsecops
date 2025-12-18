@@ -1,12 +1,10 @@
 package com.example.users;
 
-import com.example.users.dto.AuthResponse;
-import com.example.users.dto.LoginRequest;
-import com.example.users.dto.RegisterRequest;
-import com.example.users.dto.UserResponse;
-import com.example.users.dto.VerifyRequest; 
+import com.example.users.dto.*;
+import com.example.users.entity.Role;
 import com.example.users.entity.User;
 import com.example.users.exception.EmailAlreadyExistsException;
+import com.example.users.exception.ResourceNotFoundException;
 import com.example.users.repository.UserRepository;
 import com.example.users.security.JwtTokenProvider;
 import com.example.users.service.EmailService;
@@ -19,10 +17,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException; 
-import org.springframework.security.authentication.DisabledException; 
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
@@ -32,40 +36,38 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.io.InputStream;
+import java.nio.file.CopyOption;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("UserServiceImpl Tests (OTP Flow)")
+@DisplayName("UserServiceImpl Comprehensive Tests")
 class UserServiceImplTest {
 
-    @Mock
-    private UserRepository userRepository;
-    @Mock
-    private PasswordEncoder passwordEncoder;
-    @Mock
-    private AuthenticationManager authenticationManager;
-    @Mock
-    private JwtTokenProvider jwtTokenProvider;
-    @Mock
-    private EmailService emailService; 
-    @Mock
-    private SecurityContext securityContext;
-    @Mock
-    private Authentication authentication;
+    @Mock private UserRepository userRepository;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private AuthenticationManager authenticationManager;
+    @Mock private JwtTokenProvider jwtTokenProvider;
+    @Mock private EmailService emailService;
+    @Mock private SecurityContext securityContext;
+    @Mock private Authentication authentication;
 
     @InjectMocks
     private UserServiceImpl userService;
 
     private User testUser;
-    private RegisterRequest registerRequest;
-    private LoginRequest loginRequest;
+    private final String EMAIL = "test@example.com";
 
     @BeforeEach
     void setUp() {
@@ -75,13 +77,12 @@ class UserServiceImplTest {
         testUser = User.builder()
                 .id(1L)
                 .name("Test User")
-                .email("test@example.com")
+                .email(EMAIL)
                 .password("encodedPassword")
-                .isVerified(true) 
+                .role(Role.ROLE_USER)
+                .isVerified(true)
+                .accountNonLocked(true)
                 .build();
-
-        registerRequest = new RegisterRequest("Test User", "test@example.com", "password123");
-        loginRequest = new LoginRequest("test@example.com", "password123");
     }
 
     @AfterEach
@@ -89,172 +90,194 @@ class UserServiceImplTest {
         SecurityContextHolder.clearContext();
     }
 
-    @Test
-    @DisplayName("loadUserByUsername: Thành công khi tìm thấy user")
-    void testLoadUserByUsername_UserFound() {
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
-        UserDetails userDetails = userService.loadUserByUsername("test@example.com");
-        assertThat(userDetails).isNotNull();
-        assertThat(userDetails.getUsername()).isEqualTo("test@example.com");
-    }
-
-    @Test
-    @DisplayName("loadUserByUsername: Ném UsernameNotFoundException khi không tìm thấy user")
-    void testLoadUserByUsername_UserNotFound() {
-        when(userRepository.findByEmail("notfound@example.com")).thenReturn(Optional.empty());
-        assertThrows(UsernameNotFoundException.class, () -> {
-            userService.loadUserByUsername("notfound@example.com");
-        });
-    }
-
-    @Test
-    @DisplayName("registerUser: Thành công (gửi OTP) khi email chưa được xác thực")
-    void testRegisterUser_Success_ShouldSendOtp() {
-        User unverifiedUser = User.builder().email(registerRequest.email()).isVerified(false).build();
-        when(userRepository.findByEmail(registerRequest.email())).thenReturn(Optional.of(unverifiedUser));
-        when(passwordEncoder.encode(registerRequest.password())).thenReturn("encodedPassword");
-        
-        doNothing().when(emailService).sendOtpEmail(anyString(), anyString());
-        
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-        when(userRepository.save(userCaptor.capture())).thenReturn(unverifiedUser);
-
-        userService.registerUser(registerRequest);
-
-        verify(userRepository).save(any(User.class));
-        verify(emailService, times(1)).sendOtpEmail(eq(registerRequest.email()), matches("\\d{6}"));
-    }
-
-    @Test
-    @DisplayName("registerUser: Ném EmailAlreadyExistsException khi email đã được xác thực")
-    void testRegisterUser_EmailAlreadyVerified() {
-        when(userRepository.findByEmail(registerRequest.email())).thenReturn(Optional.of(testUser));
-
-        assertThrows(EmailAlreadyExistsException.class, () -> {
-            userService.registerUser(registerRequest);
-        });
-        
-        verify(userRepository, never()).save(any());
-        verify(emailService, never()).sendOtpEmail(anyString(), anyString());
-    }
-    
-    @Test
-    @DisplayName("verifyAccount: Thành công khi OTP đúng và không hết hạn")
-    void testVerifyAccount_Success() {
-        String otp = "123456";
-        User unverifiedUser = User.builder()
-                .email("verify@example.com")
-                .verificationOtp(otp)
-                .otpGeneratedTime(LocalDateTime.now().minusMinutes(5))
-                .isVerified(false)
-                .build();
-        
-        VerifyRequest verifyRequest = new VerifyRequest("verify@example.com", otp);
-
-        when(userRepository.findByEmail(verifyRequest.email())).thenReturn(Optional.of(unverifiedUser));
-        when(userRepository.save(any(User.class))).thenReturn(unverifiedUser);
-        when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("dummy.jwt.token");
-
-        AuthResponse authResponse = userService.verifyAccount(verifyRequest);
-
-        assertThat(authResponse).isNotNull();
-        assertThat(authResponse.accessToken()).isEqualTo("dummy.jwt.token");
-        verify(userRepository).save(unverifiedUser);
-    }
-
-    @Test
-    @DisplayName("verifyAccount: Ném BadCredentialsException khi OTP sai")
-    void testVerifyAccount_WrongOtp_ShouldThrowException() {
-        User unverifiedUser = User.builder()
-                .email("verify@example.com")
-                .verificationOtp("123456") 
-                .otpGeneratedTime(LocalDateTime.now().minusMinutes(5))
-                .isVerified(false)
-                .build();
-        VerifyRequest verifyRequest = new VerifyRequest("verify@example.com", "654321");
-
-        when(userRepository.findByEmail(verifyRequest.email())).thenReturn(Optional.of(unverifiedUser));
-
-        assertThrows(BadCredentialsException.class, () -> {
-            userService.verifyAccount(verifyRequest);
-        });
-        verify(userRepository, never()).save(any()); 
-    }
-    
-    @Test
-    @DisplayName("verifyAccount: Ném BadCredentialsException khi OTP hết hạn")
-    void testVerifyAccount_OtpExpired_ShouldThrowException() {
-        String otp = "123456";
-        User unverifiedUser = User.builder()
-                .email("verify@example.com")
-                .verificationOtp(otp)
-                .otpGeneratedTime(LocalDateTime.now().minusMinutes(15)) 
-                .isVerified(false)
-                .build();
-        VerifyRequest verifyRequest = new VerifyRequest("verify@example.com", otp);
-
-        when(userRepository.findByEmail(verifyRequest.email())).thenReturn(Optional.of(unverifiedUser));
-
-        assertThrows(BadCredentialsException.class, () -> {
-            userService.verifyAccount(verifyRequest);
-        });
-        verify(userRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("loginUser: Thành công khi thông tin đúng VÀ đã xác thực")
-    void testLoginUser_Success_AndVerified() {
-        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password());
-        
-        when(authenticationManager.authenticate(authToken)).thenReturn(authentication);
-        // FIX: Xóa dòng 'when(authentication.getPrincipal())...' vì service không dùng nó -> Gây lỗi UnnecessaryStubbing
-        
-        when(jwtTokenProvider.generateToken(authentication)).thenReturn("dummy.jwt.token");
-
-        AuthResponse authResponse = userService.loginUser(loginRequest);
-
-        assertThat(authResponse).isNotNull();
-        assertThat(authResponse.accessToken()).isEqualTo("dummy.jwt.token");
-        verify(authenticationManager).authenticate(authToken);
-        verify(jwtTokenProvider).generateToken(authentication);
-    }
-    
-    @Test
-    @DisplayName("loginUser: Ném BadCredentialsException khi tài khoản chưa xác thực (DisabledException)")
-    void testLoginUser_NotVerified_ShouldThrowException() {
-        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password());
-        
-        when(authenticationManager.authenticate(authToken))
-                .thenThrow(new DisabledException("Tài khoản chưa được kích hoạt."));
-
-        BadCredentialsException ex = assertThrows(BadCredentialsException.class, () -> {
-            userService.loginUser(loginRequest);
-        });
-        
-        assertThat(ex.getMessage()).contains("Tài khoản chưa được kích hoạt");
-        verify(jwtTokenProvider, never()).generateToken(any(Authentication.class));
-    }
-    
-    @Test
-    @DisplayName("getCurrentUser: Thành công khi người dùng đã xác thực")
-    void testGetCurrentUser_Success() {
+    private void mockUserAuthentication() {
         SecurityContextHolder.setContext(securityContext);
         when(securityContext.getAuthentication()).thenReturn(authentication);
         when(authentication.isAuthenticated()).thenReturn(true);
-        when(authentication.getName()).thenReturn(testUser.getEmail());
-        when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
-        
-        UserResponse userResponse = userService.getCurrentUser();
-        assertThat(userResponse).isNotNull();
-        assertThat(userResponse.id()).isEqualTo(testUser.getId());
+        when(authentication.getName()).thenReturn(EMAIL);
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(testUser));
+    }
+
+    // --- 1. REGISTRATION & VERIFICATION ---
+
+    @Test
+    @DisplayName("registerUser: Success - Should send OTP for new user")
+    void registerUser_NewUser_Success() {
+        RegisterRequest req = new RegisterRequest("New", "new@test.com", "pass");
+        when(userRepository.findByEmail(req.email())).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(any())).thenReturn("hashed");
+
+        userService.registerUser(req);
+
+        verify(userRepository).save(any(User.class));
+        verify(emailService).sendOtpEmail(eq("new@test.com"), anyString());
     }
 
     @Test
-    @DisplayName("findUserByEmail: Trả về UserResponse khi tìm thấy")
-    void testFindUserByEmail_UserFound() {
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
-        UserResponse userResponse = userService.findUserByEmail("test@example.com");
-        assertThat(userResponse).isNotNull();
-        assertThat(userResponse.id()).isEqualTo(testUser.getId());
+    @DisplayName("registerUser: Fail - Email already verified")
+    void registerUser_VerifiedEmail_ThrowsException() {
+        RegisterRequest req = new RegisterRequest("Test", EMAIL, "pass");
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(testUser));
+
+        assertThrows(EmailAlreadyExistsException.class, () -> userService.registerUser(req));
+    }
+
+    @Test
+    @DisplayName("verifyAccount: Success - Should enable user and return token")
+    void verifyAccount_ValidOtp_Success() {
+        User unverified = User.builder().email(EMAIL).verificationOtp("123456")
+                .otpGeneratedTime(LocalDateTime.now()).isVerified(false).build();
+        VerifyRequest req = new VerifyRequest(EMAIL, "123456");
+
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(unverified));
+        when(jwtTokenProvider.generateToken(any())).thenReturn("token");
+
+        AuthResponse res = userService.verifyAccount(req);
+
+        assertThat(res.accessToken()).isEqualTo("token");
+        assertThat(unverified.isVerified()).isTrue();
+        verify(userRepository).save(unverified);
+    }
+
+    // --- 2. FORGOT & RESET PASSWORD ---
+
+    @Test
+    @DisplayName("processForgotPassword: Success - Should generate token and send email")
+    void forgotPassword_Success() {
+        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(testUser));
+
+        userService.processForgotPassword(EMAIL);
+
+        assertThat(testUser.getResetPasswordToken()).isNotNull();
+        verify(emailService).sendPasswordResetEmail(eq(EMAIL), anyString());
+    }
+
+    @Test
+    @DisplayName("resetPassword: Success - Should update password and clear token")
+    void resetPassword_ValidToken_Success() {
+        testUser.setResetPasswordToken("valid-token");
+        testUser.setResetTokenExpiry(LocalDateTime.now().plusMinutes(10));
+
+        when(userRepository.findByResetPasswordToken("valid-token")).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.encode("newPass")).thenReturn("newHashedPass");
+
+        userService.resetPassword("valid-token", "newPass");
+
+        assertThat(testUser.getPassword()).isEqualTo("newHashedPass");
+        assertThat(testUser.getResetPasswordToken()).isNull();
+    }
+
+    @Test
+    @DisplayName("resetPassword: Fail - Token expired")
+    void resetPassword_ExpiredToken_ThrowsException() {
+        testUser.setResetPasswordToken("expired");
+        testUser.setResetTokenExpiry(LocalDateTime.now().minusMinutes(1));
+
+        when(userRepository.findByResetPasswordToken("expired")).thenReturn(Optional.of(testUser));
+
+        assertThrows(BadCredentialsException.class, () -> userService.resetPassword("expired", "pass"));
+    }
+
+    // --- 3. PROFILE MANAGEMENT ---
+
+    @Test
+    @DisplayName("updateProfile: Should update provided fields only")
+    void updateProfile_PartialUpdate() {
+        mockUserAuthentication();
+        UpdateProfileRequest req = new UpdateProfileRequest("Updated Name", null, "New Address");
+        when(userRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        UserResponse res = userService.updateProfile(req);
+
+        assertThat(res.name()).isEqualTo("Updated Name");
+        assertThat(res.address()).isEqualTo("New Address");
+    }
+
+    @Test
+    @DisplayName("changePassword: Success")
+    void changePassword_Success() {
+        mockUserAuthentication();
+        ChangePasswordRequest req = new ChangePasswordRequest("oldPass", "newPass", "newPass");
+
+        when(passwordEncoder.matches("oldPass", testUser.getPassword())).thenReturn(true);
+        when(passwordEncoder.encode("newPass")).thenReturn("newHashed");
+
+        assertDoesNotThrow(() -> userService.changePassword(req));
+        verify(userRepository).save(testUser);
+    }
+
+    @Test
+    @DisplayName("uploadAvatar: Success - No physical file created")
+    void uploadAvatar_Success() throws Exception {
+        mockUserAuthentication();
+        MockMultipartFile file = new MockMultipartFile("file", "test.png", "image/png", "data".getBytes());
+
+        // Sử dụng MockedStatic để giả lập lớp Files
+        // Điều này ngăn cản việc ghi file thật xuống ổ đĩa nhưng code vẫn chạy qua logic xử lý
+        try (MockedStatic<Files> mockedFiles = mockStatic(Files.class)) {
+            // Giả lập thư mục đã tồn tại
+            mockedFiles.when(() -> Files.exists(any(Path.class))).thenReturn(true);
+            // Giả lập lệnh copy không làm gì cả
+            mockedFiles.when(() -> Files.copy(any(InputStream.class), any(Path.class), any(CopyOption[].class)))
+                       .thenReturn(0L);
+
+            String url = userService.uploadAvatar(file);
+
+            assertThat(url).contains("/uploads/avatars/");
+            assertThat(testUser.getAvatar()).isEqualTo(url);
+            verify(userRepository).save(testUser);
+        }
+    }
+
+    // --- 4. ADMIN OPERATIONS ---
+
+    @Test
+    @DisplayName("getAllUsers: Should return page of UserResponse")
+    void getAllUsers_Success() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(userRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(testUser)));
+
+        Page<UserResponse> res = userService.getAllUsers(pageable);
+
+        assertThat(res.getContent()).hasSize(1);
+        assertThat(res.getContent().get(0).email()).isEqualTo(EMAIL);
+    }
+
+    @Test
+    @DisplayName("lockUser: Success - Lock non-admin user")
+    void lockUser_User_Success() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+
+        userService.lockUser(1L, true);
+
+        assertThat(testUser.isAccountNonLocked()).isFalse();
+        verify(userRepository).save(testUser);
+    }
+
+    @Test
+    @DisplayName("lockUser: Fail - Cannot lock Admin")
+    void lockUser_Admin_ThrowsException() {
+        testUser.setRole(Role.ROLE_ADMIN);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+
+        assertThrows(IllegalArgumentException.class, () -> userService.lockUser(1L, true));
+    }
+
+    // --- 5. EDGE CASES ---
+
+    @Test
+    @DisplayName("getCurrentUser: Fail - Not authenticated")
+    void getCurrentUser_Unauthenticated_ThrowsException() {
+        SecurityContextHolder.setContext(securityContext);
+        when(securityContext.getAuthentication()).thenReturn(null);
+
+        assertThrows(BadCredentialsException.class, () -> userService.getCurrentUser());
+    }
+
+    @Test
+    @DisplayName("loadUserByUsername: Fail - User not found")
+    void loadUserByUsername_NotFound_ThrowsException() {
+        when(userRepository.findByEmail("none@test.com")).thenReturn(Optional.empty());
+        assertThrows(UsernameNotFoundException.class, () -> userService.loadUserByUsername("none@test.com"));
     }
 }

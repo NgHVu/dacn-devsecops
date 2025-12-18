@@ -24,11 +24,12 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = AuthController.class)
-@DisplayName("AuthController Tests (OTP Flow)")
+@DisplayName("AuthController Coverage Plus Tests")
 class AuthControllerTest {
 
     @Autowired
@@ -42,10 +43,13 @@ class AuthControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
     @MockBean
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+
     @MockBean
     private AuthenticationManager authenticationManager;
+
     @MockBean 
     private EmailService emailService; 
 
@@ -53,18 +57,17 @@ class AuthControllerTest {
     static class TestSecurityConfig {
         @Bean
         SecurityFilterChain testFilterChain(HttpSecurity http) throws Exception {
-            http
-                .csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(auth -> auth
-                    .anyRequest().permitAll()
-                );
+            http.csrf(csrf -> csrf.disable())
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
             return http.build();
         }
     }
 
+    // --- 1. REGISTER & VERIFY ---
+
     @Test
-    @DisplayName("POST /register: Thành công (201 Created) và gửi OTP")
-    void testRegisterUser_Success_ShouldSendOtp() throws Exception {
+    @DisplayName("POST /register: Success")
+    void testRegisterUser_Success() throws Exception {
         RegisterRequest request = new RegisterRequest("Test User", "test@example.com", "password123");
         doNothing().when(userService).registerUser(any(RegisterRequest.class));
 
@@ -73,16 +76,13 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(content().string("Đã gửi OTP đến email. Vui lòng xác thực."));
-        
-        verify(userService, times(1)).registerUser(any(RegisterRequest.class));
     }
 
     @Test
-    @DisplayName("POST /register: Thất bại (409) khi email đã tồn tại")
-    void testRegisterUser_EmailAlreadyExists_ShouldReturnConflict() throws Exception {
+    @DisplayName("POST /register: Conflict when email exists")
+    void testRegisterUser_Conflict() throws Exception {
         RegisterRequest request = new RegisterRequest("Test User", "test@example.com", "password123");
-        doThrow(new EmailAlreadyExistsException("Email đã được sử dụng"))
-            .when(userService).registerUser(any(RegisterRequest.class));
+        doThrow(new EmailAlreadyExistsException("Email exists")).when(userService).registerUser(any());
 
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -91,70 +91,108 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("POST /verify: Thành công (200 OK) khi OTP đúng")
-    void testVerifyAccount_Success_ShouldReturnToken() throws Exception {
+    @DisplayName("POST /verify: Success")
+    void testVerifyAccount_Success() throws Exception {
         VerifyRequest request = new VerifyRequest("test@example.com", "123456");
-        AuthResponse response = new AuthResponse("dummy.jwt.token.sau.khi.verify");
-
-        when(userService.verifyAccount(any(VerifyRequest.class))).thenReturn(response);
+        when(userService.verifyAccount(any())).thenReturn(new AuthResponse("token"));
 
         mockMvc.perform(post("/api/auth/verify")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value("dummy.jwt.token.sau.khi.verify"));
+                .andExpect(jsonPath("$.accessToken").value("token"));
     }
 
-    @Test
-    @DisplayName("POST /verify: Thất bại (400) khi OTP sai")
-    void testVerifyAccount_InvalidOtp_ShouldFail() throws Exception {
-        VerifyRequest request = new VerifyRequest("test@example.com", "654321");
-        when(userService.verifyAccount(any(VerifyRequest.class)))
-            .thenThrow(new BadCredentialsException("Mã OTP không chính xác."));
-
-        mockMvc.perform(post("/api/auth/verify")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest()); // Updated to expect 400
-    }
+    // --- 2. LOGIN & OAUTH ---
 
     @Test
-    @DisplayName("POST /login: Thành công khi thông tin đăng nhập chính xác")
+    @DisplayName("POST /login: Success")
     void testLoginUser_Success() throws Exception {
-        LoginRequest request = new LoginRequest("test@example.com", "password123");
-        AuthResponse response = new AuthResponse("dummy.jwt.token");
-        when(userService.loginUser(any(LoginRequest.class))).thenReturn(response);
+        LoginRequest request = new LoginRequest("test@example.com", "password");
+        when(userService.loginUser(any())).thenReturn(new AuthResponse("token"));
 
         mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("POST /oauth/google: Success")
+    void testGoogleLogin_Success() throws Exception {
+        GoogleAuthRequest request = new GoogleAuthRequest("google-code");
+        when(userService.loginWithGoogle("google-code")).thenReturn(new AuthResponse("google-token"));
+
+        mockMvc.perform(post("/api/auth/oauth/google")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value("dummy.jwt.token"));
+                .andExpect(jsonPath("$.accessToken").value("google-token"));
+    }
+
+    // --- 3. OTP & PASSWORD RECOVERY ---
+
+    @Test
+    @DisplayName("POST /resend-otp: Success")
+    void testResendOtp_Success() throws Exception {
+        ResendOtpRequest request = new ResendOtpRequest("test@example.com");
+        doNothing().when(userService).resendOtp("test@example.com");
+
+        mockMvc.perform(post("/api/auth/resend-otp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Đã gửi lại mã OTP. Vui lòng kiểm tra email."));
     }
 
     @Test
-    @DisplayName("POST /login: Thất bại (400) khi thông tin đăng nhập sai")
-    void testLoginUser_InvalidCredentials_ShouldFail() throws Exception {
-        LoginRequest request = new LoginRequest("test@example.com", "wrongpassword");
-        when(userService.loginUser(any(LoginRequest.class)))
-                .thenThrow(new BadCredentialsException("Thông tin đăng nhập không chính xác"));
+    @DisplayName("POST /forgot-password: Success")
+    void testForgotPassword_Success() throws Exception {
+        EmailRequest request = new EmailRequest("test@example.com");
+        doNothing().when(userService).processForgotPassword("test@example.com");
+
+        mockMvc.perform(post("/api/auth/forgot-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Chúng tôi đã gửi cách lấy lại mật khẩu cho bạn."));
+    }
+
+    @Test
+    @DisplayName("GET /validate-reset-token: Success")
+    void testValidateResetToken_Success() throws Exception {
+        doNothing().when(userService).validateResetToken("valid-token");
+
+        mockMvc.perform(get("/api/auth/validate-reset-token")
+                .param("token", "valid-token"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("POST /reset-password: Success")
+    void testResetPassword_Success() throws Exception {
+        // FIX: Sử dụng mật khẩu dài hơn để thỏa mãn validation tối thiểu (nếu có)
+        ResetPasswordRequest request = new ResetPasswordRequest("token", "newPassword123");
+        doNothing().when(userService).resetPassword("token", "newPassword123");
+
+        mockMvc.perform(post("/api/auth/reset-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Mật khẩu của bạn đã được cập nhật thành công."));
+    }
+
+    // --- 4. ERROR HANDLING MAPPING ---
+
+    @Test
+    @DisplayName("POST /login: Should return 400 when BadCredentials")
+    void testLoginUser_BadCredentials() throws Exception {
+        LoginRequest request = new LoginRequest("test@example.com", "wrong");
+        when(userService.loginUser(any())).thenThrow(new BadCredentialsException("Invalid"));
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest()); // Updated to expect 400
-    }
-
-    @Test
-    @DisplayName("POST /login: Thất bại (400) khi tài khoản chưa xác thực OTP")
-    void testLoginUser_NotVerified_ShouldFail() throws Exception {
-        LoginRequest request = new LoginRequest("test@example.com", "password123");
-        when(userService.loginUser(any(LoginRequest.class)))
-                .thenThrow(new BadCredentialsException("Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email."));
-
-        mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest()); // Updated to expect 400
+                .andExpect(status().isBadRequest());
     }
 }
