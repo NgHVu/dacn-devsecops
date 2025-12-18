@@ -164,6 +164,12 @@
                         <exclude>**/security/SecurityConfig.java</exclude>
                         <exclude>**/dto/**</exclude>
                         <exclude>**/entity/**</exclude>
+                        
+                        <!-- 4. Exception Definitions -->
+                        <exclude>**/exception/**</exclude>
+            
+                        <!-- 5. Clients/External Integrations (Nếu sau này có FeignClient) -->
+                        <exclude>**/client/**</exclude>
                     </excludes>
                 </configuration>
                 <executions>
