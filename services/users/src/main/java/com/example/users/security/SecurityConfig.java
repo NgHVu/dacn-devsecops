@@ -9,6 +9,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity; // Quan trọng
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -20,13 +21,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity // <--- BỔ SUNG DÒNG NÀY để @PreAuthorize hoạt động
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationEntryPoint unauthorizedHandler;
 
-    // 1. Tạo Bean cho Filter tại đây. 
-    // Dùng @Lazy UserService để phá vòng lặp dependency (UserService <-> PasswordEncoder)
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter(JwtTokenProvider tokenProvider, 
                                                            @Lazy UserService userService) {
@@ -62,14 +62,13 @@ public class SecurityConfig {
                     "/actuator/**"
                 ).permitAll()
                 .requestMatchers(HttpMethod.POST,
-                    "/api/auth/**" // Gom nhóm các API auth
+                    "/api/auth/**"
                 ).permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/auth/validate-reset-token").permitAll()
                 .requestMatchers("/api/internal/**").permitAll()
                 .anyRequest().authenticated()
             )
             
-            // Inject filter đã khai báo ở trên
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

@@ -5,16 +5,20 @@ import com.example.users.repository.UserRepository;
 import com.example.users.security.JwtTokenProvider;
 import com.example.users.service.EmailService;
 import com.example.users.service.UserService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -23,18 +27,18 @@ import java.util.List;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("Security Layer Integration Tests")
+// Sử dụng DirtiesContext để buộc reload Context sau mỗi test method, tránh rò rỉ SecurityContext
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 @TestPropertySource(properties = {
-    // Cấu hình JWT thật để test logic generate/validate
-    "app.jwt.secret-key=bXktc2VjcmV0LWtleS1mb3ItZGV2c2Vjb3BzLXRlc3RpbmctcHVycG9zZXMtYmV5b25kLXNhbXBsZQ==", // > 256 bits
+    "app.jwt.secret-key=bXktc2VjcmV0LWtleS1mb3ItZGV2c2Vjb3BzLXRlc3RpbmctcHVycG9zZXMtYmV5b25kLXNhbXBsZQ==",
     "app.jwt.expiration-ms=3600000",
-    
-    // Các giá trị giả (Dummy) để thỏa mãn @Value trong các Bean khác nếu chúng vô tình được khởi tạo
     "spring.mail.username=test-user",
     "app.frontend.url=http://localhost:3000",
     "app.oauth.google.redirect-uri=http://localhost/callback"
@@ -45,21 +49,21 @@ class SecurityIntegrationTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private JwtTokenProvider tokenProvider; // Sử dụng Bean thật để test integration
+    private JwtTokenProvider tokenProvider;
 
-    // --- MOCK CÁC DEPENDENCY ĐỂ TRÁNH LỖI CONTEXT LOAD ---
-    
     @MockBean
     private UserService userService;
 
-    // Mock EmailService & UserRepository để InternalEmailController khởi tạo được mà không lỗi
     @MockBean
     private EmailService emailService;
 
     @MockBean
     private UserRepository userRepository;
 
-    // -----------------------------------------------------
+    @BeforeEach
+    void setUp() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     @DisplayName("Khi truy cập endpoint bảo vệ mà KHÔNG có token -> Trả về 401 Unauthorized")
@@ -72,34 +76,63 @@ class SecurityIntegrationTest {
     @Test
     @DisplayName("Khi truy cập với Token HỢP LỆ -> Trả về 200 OK và thông tin user")
     void testAccessProtectedEndpoint_WithValidToken_ShouldReturnOk() throws Exception {
-        // Given
         String email = "test@example.com";
         String role = "ROLE_USER";
 
-        // 1. Giả lập hành vi của UserService (được gọi bởi JwtAuthenticationFilter)
-        // Spring Security UserDetails chuẩn
         UserDetails mockUserDetails = new User(email, "password", 
                 Collections.singletonList(new SimpleGrantedAuthority(role)));
         
         when(userService.loadUserByUsername(email)).thenReturn(mockUserDetails);
 
-        // 2. Giả lập hành vi của UserService (được gọi bởi UserController)
         UserResponse mockResponse = new UserResponse(
             1L, "Test User", email, role, null, null, null, true
         );
         when(userService.getCurrentUser()).thenReturn(mockResponse);
 
-        // 3. Tạo Token thật từ Provider (Integration Test điểm này là quan trọng nhất)
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 email, null, mockUserDetails.getAuthorities());
         String token = tokenProvider.generateToken(auth);
 
-        // When & Then
         mockMvc.perform(get("/api/users/me")
                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value(email))
                 .andExpect(jsonPath("$.role").value(role));
+    }
+
+    @Test
+    @DisplayName("RBAC: User thường truy cập API Admin -> Trả về 403 Forbidden")
+    void testAccessAdminEndpoint_AsUser_ShouldReturnForbidden() throws Exception {
+        String email = "user@example.com";
+        UserDetails mockUserDetails = new User(email, "password", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        
+        // Mock service trả về user có quyền USER
+        when(userService.loadUserByUsername(email)).thenReturn(mockUserDetails);
+        
+        // Tạo token tương ứng với user có quyền USER
+        String token = tokenProvider.generateToken(new UsernamePasswordAuthenticationToken(email, null, mockUserDetails.getAuthorities()));
+
+        mockMvc.perform(patch("/api/users/1/lock")
+                .param("locked", "true")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("RBAC: Admin truy cập API Admin -> Trả về 200 OK")
+    void testAccessAdminEndpoint_AsAdmin_ShouldReturnOk() throws Exception {
+        String email = "admin@example.com";
+        UserDetails mockUserDetails = new User(email, "password", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        
+        // Mock service trả về user có quyền ADMIN
+        when(userService.loadUserByUsername(email)).thenReturn(mockUserDetails);
+        
+        // Tạo token tương ứng với user có quyền ADMIN
+        String token = tokenProvider.generateToken(new UsernamePasswordAuthenticationToken(email, null, mockUserDetails.getAuthorities()));
+
+        mockMvc.perform(get("/api/users")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -115,13 +148,12 @@ class SecurityIntegrationTest {
     @Test
     @DisplayName("Khi truy cập với Header thiếu tiền tố 'Bearer ' -> Trả về 401 Unauthorized")
     void testAccessProtectedEndpoint_WithoutBearerPrefix_ShouldReturnUnauthorized() throws Exception {
-        // Tạo token hợp lệ nhưng gửi sai cách
         String email = "test@example.com";
         UserDetails mockUserDetails = new User(email, "password", List.of(new SimpleGrantedAuthority("ROLE_USER")));
         String token = tokenProvider.generateToken(new UsernamePasswordAuthenticationToken(email, null, mockUserDetails.getAuthorities()));
 
         mockMvc.perform(get("/api/users/me")
-                .header("Authorization", token)) // Thiếu "Bearer "
+                .header("Authorization", token))
                 .andExpect(status().isUnauthorized());
     }
 }
