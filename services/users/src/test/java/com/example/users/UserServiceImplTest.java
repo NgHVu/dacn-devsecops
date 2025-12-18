@@ -304,6 +304,7 @@ class UserServiceImplTest {
 
     private void mockGoogleFlow(String email, boolean emailVerified) {
         ClientRegistration registration = mock(ClientRegistration.class, RETURNS_DEEP_STUBS);
+        
         // FIX: Sử dụng lenient() để tránh lỗi UnnecessaryStubbing khi test case fail sớm
         lenient().when(clientRegistrationRepository.findByRegistrationId("google")).thenReturn(registration);
         
@@ -321,6 +322,7 @@ class UserServiceImplTest {
         lenient().when(requestBodySpec.bodyValue(any())).thenReturn(requestHeadersSpec);
         lenient().when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
         
+        // FIX: Mock đối tượng DTO thay vì khởi tạo bằng constructor để tránh lỗi biên dịch
         GoogleTokenResponse mockTokenResponse = mock(GoogleTokenResponse.class);
         lenient().when(mockTokenResponse.accessToken()).thenReturn("at");
         lenient().when(responseSpec.bodyToMono(GoogleTokenResponse.class)).thenReturn(Mono.just(mockTokenResponse));
@@ -331,6 +333,7 @@ class UserServiceImplTest {
         lenient().when(requestHeadersSpec.header(anyString(), anyString())).thenReturn(requestHeadersSpec);
         lenient().when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
         
+        // FIX: Mock đối tượng DTO thay vì khởi tạo bằng constructor
         GoogleUserInfo mockUserInfo = mock(GoogleUserInfo.class);
         lenient().when(mockUserInfo.email()).thenReturn(email);
         lenient().when(mockUserInfo.name()).thenReturn("Name");
