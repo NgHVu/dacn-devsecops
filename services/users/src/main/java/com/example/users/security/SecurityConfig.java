@@ -1,9 +1,10 @@
 package com.example.users.security;
 
 import com.example.users.service.UserService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy; 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
@@ -19,21 +20,17 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final UserService userService;
-    private final JwtTokenProvider jwtTokenProvider;
     private final JwtAuthenticationEntryPoint unauthorizedHandler;
-    private final JwtAuthenticationFilter jwtAuthenticationFilter; 
 
-    public SecurityConfig(@Lazy UserService userService, 
-                          JwtTokenProvider jwtTokenProvider, 
-                          JwtAuthenticationEntryPoint unauthorizedHandler,
-                          JwtAuthenticationFilter jwtAuthenticationFilter) { 
-        this.userService = userService;
-        this.jwtTokenProvider = jwtTokenProvider;
-        this.unauthorizedHandler = unauthorizedHandler;
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter; 
+    // 1. Tạo Bean cho Filter tại đây. 
+    // Dùng @Lazy UserService để phá vòng lặp dependency (UserService <-> PasswordEncoder)
+    @Bean
+    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtTokenProvider tokenProvider, 
+                                                           @Lazy UserService userService) {
+        return new JwtAuthenticationFilter(tokenProvider, userService);
     }
 
     @Bean
@@ -42,46 +39,38 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
-        return authenticationConfiguration.getAuthenticationManager();
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
+        return authConfig.getAuthenticationManager();
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, 
+                                                   JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable)
-                .cors(Customizer.withDefaults()) 
-                .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() 
-                        
-                        .requestMatchers("/error").permitAll()
-
-                        .requestMatchers("/uploads/**").permitAll()
-
-                        .requestMatchers(HttpMethod.POST, 
-                            "/api/auth/register",
-                            "/api/auth/login",
-                            "/api/auth/verify",
-                            "/api/auth/resend-otp",
-                            "/api/auth/oauth/google",
-                            "/api/auth/forgot-password",
-                            "/api/auth/reset-password"
-                        ).permitAll()
-                        
-                        .requestMatchers(HttpMethod.GET, 
-                            "/api/auth/validate-reset-token"
-                        ).permitAll()
-
-                        .requestMatchers("/api/internal/**").permitAll()
-
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
-                        
-                        .anyRequest().authenticated()
-                )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            .csrf(AbstractHttpConfigurer::disable)
+            .cors(Customizer.withDefaults())
+            .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedHandler))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(
+                    "/error", 
+                    "/uploads/**", 
+                    "/v3/api-docs/**", 
+                    "/swagger-ui/**", 
+                    "/actuator/**"
+                ).permitAll()
+                .requestMatchers(HttpMethod.POST,
+                    "/api/auth/**" // Gom nhóm các API auth
+                ).permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/auth/validate-reset-token").permitAll()
+                .requestMatchers("/api/internal/**").permitAll()
+                .anyRequest().authenticated()
+            )
+            
+            // Inject filter đã khai báo ở trên
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

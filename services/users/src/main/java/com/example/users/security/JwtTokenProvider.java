@@ -3,20 +3,20 @@ package com.example.users.security;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-import io.jsonwebtoken.security.SecurityException;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.Authentication; 
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.stereotype.Component;
+
+import javax.crypto.SecretKey;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.springframework.stereotype.Component;
-import javax.crypto.SecretKey;
-import java.util.Date;
 
 @Component
 public class JwtTokenProvider {
@@ -33,15 +33,17 @@ public class JwtTokenProvider {
 
     @PostConstruct
     public void init() {
-         try {
-             byte[] keyBytes = Decoders.BASE64.decode(this.jwtSecret);
-             this.key = Keys.hmacShaKeyFor(keyBytes);
-             logger.info("Khởi tạo JWT Secret Key thành công.");
-         } catch (IllegalArgumentException e) {
-             logger.error("Lỗi khi decode JWT Secret Key Base64: {}. Key có thể không hợp lệ hoặc quá ngắn.", e.getMessage());
-         }
-    }
+        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
 
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException(
+                "JWT secret key must be at least 256 bits (32 bytes) after Base64 decoding"
+            );
+        }
+
+        this.key = Keys.hmacShaKeyFor(keyBytes);
+        logger.info("JWT Secret Key initialized successfully");
+    }
 
     public String generateToken(Authentication authentication) {
         String username = authentication.getName();
@@ -58,13 +60,13 @@ public class JwtTokenProvider {
                 .claim("roles", roles)
                 .issuedAt(now)
                 .expiration(expiryDate)
-                .signWith(this.key)
+                .signWith(key)
                 .compact();
     }
 
     private Claims parseClaims(String token) {
         return Jwts.parser()
-                .verifyWith(this.key)
+                .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
@@ -78,11 +80,11 @@ public class JwtTokenProvider {
     public Collection<? extends GrantedAuthority> getAuthorities(String token) {
         Claims claims = parseClaims(token);
         List<String> roles = claims.get("roles", List.class);
-        
+
         if (roles == null) {
-            return List.of(); 
+            return List.of();
         }
-        
+
         return roles.stream()
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toList());
@@ -91,19 +93,13 @@ public class JwtTokenProvider {
     public boolean validateToken(String token) {
         try {
             Jwts.parser()
-                    .verifyWith(this.key)
+                    .verifyWith(key)
                     .build()
                     .parse(token);
             return true;
-        } catch (SecurityException | MalformedJwtException ex) {
-            logger.error("Token JWT không hợp lệ: {}", ex.getMessage());
-        } catch (ExpiredJwtException ex) {
-            logger.error("Token JWT đã hết hạn: {}", ex.getMessage());
-        } catch (UnsupportedJwtException ex) {
-            logger.error("Token JWT không được hỗ trợ: {}", ex.getMessage());
-        } catch (IllegalArgumentException ex) {
-            logger.error("Chuỗi JWT không hợp lệ hoặc rỗng: {}", ex.getMessage());
+        } catch (JwtException | IllegalArgumentException ex) {
+            logger.error("Invalid JWT token: {}", ex.getMessage());
+            return false;
         }
-        return false;
     }
 }
