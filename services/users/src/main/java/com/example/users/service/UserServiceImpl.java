@@ -1,18 +1,18 @@
 package com.example.users.service;
 
-import com.example.users.exception.ResourceNotFoundException;
 import com.example.users.dto.*;
-import com.example.users.entity.User;
 import com.example.users.entity.Role;
+import com.example.users.entity.User;
 import com.example.users.exception.EmailAlreadyExistsException;
+import com.example.users.exception.ResourceNotFoundException;
 import com.example.users.repository.UserRepository;
 import com.example.users.security.JwtTokenProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.data.domain.Page;         
-import org.springframework.data.domain.Pageable;     
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -30,15 +30,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.util.StringUtils;         
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.io.IOException;                      
-import java.nio.file.Files;                   
-import java.nio.file.Path;                            
-import java.nio.file.Paths;                           
-import java.nio.file.StandardCopyOption;             
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -63,6 +63,7 @@ public class UserServiceImpl implements UserService {
     private long otpExpirationMinutes;
     @Value("${app.oauth.google.redirect-uri}")
     private String googleRedirectUri;
+    
     private static final Random OTP_RANDOM = new SecureRandom();
     private static final String USER_NOT_FOUND_MSG_TPL = "Email '%s' chưa được đăng ký.";
     private static final long RESET_TOKEN_EXPIRATION_MINUTES = 15;
@@ -205,12 +206,24 @@ public class UserServiceImpl implements UserService {
         }
 
         GoogleTokenResponse tokenResponse = exchangeCodeForToken(authorizationCode, googleRegistration);
+        
+        // BUG 1 FIX: Kiểm tra tokenResponse có null không trước khi dùng
+        if (tokenResponse == null || tokenResponse.accessToken() == null) {
+            log.error("Không nhận được Access Token từ Google.");
+            throw new BadCredentialsException("Lỗi xác thực Google: Không nhận được Access Token.");
+        }
         log.debug("Đã nhận access_token từ Google.");
 
         GoogleUserInfo userInfo = getGoogleUserInfo(tokenResponse.accessToken(), googleRegistration);
+        
+        // BUG 2 FIX: Kiểm tra userInfo có null không trước khi dùng
+        if (userInfo == null) {
+            log.error("Không lấy được thông tin người dùng từ Google.");
+            throw new BadCredentialsException("Lỗi xác thực Google: Không lấy được thông tin người dùng.");
+        }
         log.debug("Đã lấy thông tin UserInfo từ Google, email user: {}", userInfo.email());
 
-        if (!userInfo.emailVerified()) {
+        if (!Boolean.TRUE.equals(userInfo.emailVerified())) {
             throw new BadCredentialsException("Email Google chưa được xác thực.");
         }
 
