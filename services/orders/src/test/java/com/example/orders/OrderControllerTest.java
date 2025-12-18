@@ -4,6 +4,7 @@ import com.example.orders.controller.OrderController;
 import com.example.orders.dto.*;
 import com.example.orders.exception.OrderNotFoundException;
 import com.example.orders.security.JwtAuthenticationEntryPoint;
+import com.example.orders.security.JwtAuthenticationFilter;
 import com.example.orders.security.JwtTokenProvider;
 import com.example.orders.service.OrderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +18,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,6 +28,7 @@ import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Collections;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -54,10 +59,22 @@ class OrderControllerTest {
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
     @MockBean
+    private JwtAuthenticationFilter jwtAuthenticationFilter; // [FIX] Bổ sung mock cho filter cần thiết bởi SecurityConfig
+
+    @MockBean
     private JpaMetamodelMappingContext jpaMetamodelMappingContext;
 
     private final String MOCK_EMAIL = "test.user@example.com";
     private final String MOCK_TOKEN = "Bearer dummy.token.123";
+
+    // Helper tạo Authentication giả để inject vào Controller method thông qua .principal()
+    private Authentication mockAuth(String username, String role) {
+        return new UsernamePasswordAuthenticationToken(
+                username,
+                null,
+                Collections.singletonList(new SimpleGrantedAuthority(role))
+        );
+    }
 
     private OrderResponse createMockOrderResponse(Long id) {
         OrderItemResponse itemResponse = new OrderItemResponse(
@@ -109,14 +126,15 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("GET /api/v1/orders/my: Thành công (200 OK)")
-    @WithMockUser(username = MOCK_EMAIL)
     void testGetMyOrders_Success() throws Exception {
         Page<OrderResponse> mockPage = new PageImpl<>(List.of(createMockOrderResponse(1L)));
 
         when(orderService.getOrders(eq(MOCK_EMAIL), eq(MOCK_TOKEN), any(Pageable.class)))
                 .thenReturn(mockPage);
 
+        // [FIX] Thêm .principal() để tránh NPE trong Controller khi gọi authentication.getName()
         mockMvc.perform(get("/api/v1/orders/my")
+                        .principal(mockAuth(MOCK_EMAIL, "ROLE_USER"))
                         .header("Authorization", MOCK_TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(1L));
@@ -124,12 +142,13 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("GET /api/v1/orders/{orderId}: Thành công (200 OK)")
-    @WithMockUser(username = MOCK_EMAIL)
     void testGetOrderById_Success() throws Exception {
         OrderResponse response = createMockOrderResponse(1L);
         when(orderService.getOrderById(1L, MOCK_EMAIL, MOCK_TOKEN)).thenReturn(response);
 
+        // [FIX] Thêm .principal()
         mockMvc.perform(get("/api/v1/orders/1")
+                        .principal(mockAuth(MOCK_EMAIL, "ROLE_USER"))
                         .header("Authorization", MOCK_TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1L));
@@ -137,12 +156,13 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("GET /api/v1/orders/{orderId}: Thất bại (404 Not Found)")
-    @WithMockUser(username = MOCK_EMAIL)
     void testGetOrderById_NotFound() throws Exception {
         when(orderService.getOrderById(99L, MOCK_EMAIL, MOCK_TOKEN))
                 .thenThrow(new OrderNotFoundException("Không tìm thấy đơn hàng"));
 
+        // [FIX] Thêm .principal()
         mockMvc.perform(get("/api/v1/orders/99")
+                        .principal(mockAuth(MOCK_EMAIL, "ROLE_USER"))
                         .header("Authorization", MOCK_TOKEN))
                 .andExpect(status().isNotFound());
     }
@@ -182,27 +202,17 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("GET /api/v1/orders/admin/dashboard: Lấy thống kê Dashboard thành công")
-    @WithMockUser(roles = "ADMIN")
     void testGetDashboardStats_Success() throws Exception {
-        // FIX: Chỉ mock các method mà chúng ta biết chắc chắn tồn tại (dựa trên việc log lỗi không báo về chúng)
         DashboardStats mockStats = mock(DashboardStats.class);
         
-        // Mock các phương thức accessors của Java Record (không có tiền tố get)
-        // Log lỗi trước đó không báo lỗi ở dòng này -> Có nghĩa là method này TỒN TẠI
         lenient().when(mockStats.totalRevenue()).thenReturn(new BigDecimal("5000000"));
-        
-        // Log lỗi trước đó không báo lỗi ở dòng này -> Method này TỒN TẠI
         lenient().when(mockStats.totalOrders()).thenReturn(100L);
-
-        // Đã xóa các lệnh mock cho 'recentOrders' và 'getRecentOrders' vì gây lỗi biên dịch.
-        // Jackson sẽ tự động serialize các field có trong Record.
 
         when(orderService.getDashboardStats()).thenReturn(mockStats);
 
         mockMvc.perform(get("/api/v1/orders/admin/dashboard")
                         .header("Authorization", MOCK_TOKEN))
                 .andExpect(status().isOk())
-                // Chỉ verify trường revenue vì chúng ta đã mock thành công
                 .andExpect(jsonPath("$.totalRevenue").value(5000000));
     }
 }

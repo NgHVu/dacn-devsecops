@@ -4,6 +4,7 @@ import com.example.orders.dto.*;
 import com.example.orders.entity.Order;
 import com.example.orders.entity.OrderItem;
 import com.example.orders.entity.OrderStatus;
+import com.example.orders.exception.OrderNotFoundException;
 import com.example.orders.repository.OrderRepository;
 import com.example.orders.service.ProductServiceClient;
 import com.example.orders.service.UserServiceClient;
@@ -67,7 +68,7 @@ class OrderServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        // FIX: Sửa constructor UserDto về 3 tham số (id, name, email) để khớp với định nghĩa DTO trong orders-service
+        // FIX: Sửa constructor UserDto về 3 tham số (id, name, email)
         mockUserDto = new UserDto(MOCK_USER_ID, "Test User", MOCK_EMAIL);
         
         mockProduct1 = new ProductDto(101L, "Sản phẩm 1", new BigDecimal("50.00"), "img1.jpg", 100);
@@ -124,7 +125,7 @@ class OrderServiceImplTest {
         assertThat(response).isNotNull();
         assertThat(response.userId()).isEqualTo(MOCK_USER_ID);
         assertThat(response.status()).isEqualTo(OrderStatus.PENDING.name());
-        assertThat(response.totalAmount()).isEqualByComparingTo(new BigDecimal("200.00")); // (50*2) + (100*1)
+        assertThat(response.totalAmount()).isEqualByComparingTo(new BigDecimal("200.00")); 
         
         verify(productServiceClient).reduceStock(anyList(), eq(MOCK_TOKEN));
         verify(userServiceClient).sendOrderNotification(any(SendOrderEmailRequest.class), eq(MOCK_TOKEN));
@@ -227,9 +228,7 @@ class OrderServiceImplTest {
         OrderResponse response = orderService.updateOrderStatus(orderId, update, MOCK_TOKEN);
 
         assertThat(response.status()).isEqualTo("CANCELLED");
-        // Verify hoàn kho được gọi
         verify(productServiceClient).restoreStock(anyList(), eq(MOCK_TOKEN));
-        // Verify gửi mail thông báo
         verify(userServiceClient).sendOrderNotification(any(), eq(MOCK_TOKEN));
     }
 
@@ -237,7 +236,7 @@ class OrderServiceImplTest {
     @DisplayName("updateOrderStatus: User cố cập nhật đơn của người khác -> 403 Forbidden")
     void testUpdateStatus_AccessDenied_OtherUser() {
         Long orderId = 1L;
-        Order mockOrder = Order.builder().id(orderId).userId(999L).build(); // Other user ID
+        Order mockOrder = Order.builder().id(orderId).userId(999L).build(); 
         OrderStatusUpdate update = new OrderStatusUpdate();
         update.setStatus("CANCELLED");
 
@@ -254,7 +253,7 @@ class OrderServiceImplTest {
         Long orderId = 1L;
         Order mockOrder = Order.builder().id(orderId).userId(MOCK_USER_ID).status(OrderStatus.PENDING).build();
         OrderStatusUpdate update = new OrderStatusUpdate();
-        update.setStatus("CONFIRMED"); // User cannot confirm orders
+        update.setStatus("CONFIRMED"); 
 
         when(userServiceClient.getCurrentUser(MOCK_TOKEN)).thenReturn(mockUserDto);
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(mockOrder));
@@ -266,7 +265,6 @@ class OrderServiceImplTest {
     @Test
     @DisplayName("updateOrderStatus: Admin cập nhật PENDING -> CONFIRMED -> Thành công")
     void testUpdateStatus_Admin_Success() {
-        // Setup Admin Context
         when(authentication.getAuthorities()).thenReturn((List) List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
         
         Long orderId = 1L;
@@ -286,12 +284,11 @@ class OrderServiceImplTest {
     @Test
     @DisplayName("updateOrderStatus: Lỗi chuyển đổi trạng thái không hợp lệ (Shipping -> Pending)")
     void testUpdateStatus_InvalidTransition() {
-        // Setup Admin
         when(authentication.getAuthorities()).thenReturn((List) List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
         
         Order mockOrder = Order.builder().id(1L).status(OrderStatus.SHIPPING).build();
         OrderStatusUpdate update = new OrderStatusUpdate();
-        update.setStatus("PENDING"); // Invalid transition
+        update.setStatus("PENDING"); 
 
         when(userServiceClient.getCurrentUser(MOCK_TOKEN)).thenReturn(mockUserDto);
         when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
@@ -310,7 +307,10 @@ class OrderServiceImplTest {
         when(orderRepository.count()).thenReturn(50L);
         when(orderRepository.countDistinctUsersInPeriod(any(), any())).thenReturn(10L);
         when(orderRepository.getMonthlyRevenue(any())).thenReturn(Collections.emptyList());
-        when(orderRepository.sumRevenueInPeriod(any(), any(), any())).thenReturn(new BigDecimal("500000")); // For growth calc
+        when(orderRepository.sumRevenueInPeriod(any(), any(), any())).thenReturn(new BigDecimal("500000")); 
+
+        // [FIX] Mock findAll(Pageable) để tránh NullPointerException khi lấy sales mới nhất
+        when(orderRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(Collections.emptyList()));
 
         // Mock product service call
         when(productServiceClient.countActiveProducts()).thenReturn(100L);
@@ -326,10 +326,13 @@ class OrderServiceImplTest {
     @DisplayName("getDashboardStats: Product Service lỗi -> vẫn trả về stats với activeProducts = 0")
     void testGetDashboardStats_ProductServiceFail() {
         when(orderRepository.sumTotalRevenue(any())).thenReturn(BigDecimal.ZERO);
+        // [FIX] Mock findAll(Pageable) cho case lỗi
+        when(orderRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(Collections.emptyList()));
+        
         when(productServiceClient.countActiveProducts()).thenThrow(new RuntimeException("Service down"));
 
         DashboardStats stats = orderService.getDashboardStats();
         
-        assertThat(stats.activeProducts()).isZero(); // Fallback value
+        assertThat(stats.activeProducts()).isZero(); 
     }
 }
