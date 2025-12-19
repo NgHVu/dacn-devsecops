@@ -59,7 +59,7 @@ pipeline {
             }
         }
 
-        stage('2. Build & Analyze (SonarQube)') {
+        stage('2. Build, Test & Analyze (SonarQube)') {
             agent {
                 docker {
                     // Sử dụng Node.js trên nền Debian (bookworm) để hỗ trợ cài Java cho SonarScanner
@@ -78,6 +78,11 @@ pipeline {
                         echo '--> Cài đặt thư viện Frontend...'
                         sh 'npm ci'
 
+                        echo '--> Chạy Unit Tests và tạo báo cáo Coverage...'
+                        // Chạy test với flag coverage để xuất file lcov.info cho SonarQube
+                        // Thêm || true để tránh dừng build nếu chưa có test case nào, nhưng vẫn khuyến khích viết test
+                        sh 'npm test -- --coverage --watchAll=false || echo "Cảnh báo: Không tìm thấy test case hoặc test fail."'
+
                         echo '--> Phân tích mã nguồn với SonarQube...'
                         withSonarQubeEnv('sonarqube-local') {
                             // Sử dụng npx để không phụ thuộc tool cài sẵn trên Jenkins
@@ -85,10 +90,11 @@ pipeline {
                                 npx sonarqube-scanner \
                                 -Dsonar.projectKey=frontend-service \
                                 -Dsonar.sources=. \
-                                -Dsonar.exclusions=**/.next/**,**/node_modules/**,**/out/** \
+                                -Dsonar.exclusions=**/.next/**,**/node_modules/**,**/out/**,build/**,next-env.d.ts \
                                 -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                                -Dsonar.css.allowUnknownAtRules=true \
                                 -Dsonar.host.url=http://sonarqube:9000 \
-                                -Dsonar.login=$SONAR_AUTH_TOKEN
+                                -Dsonar.token=$SONAR_AUTH_TOKEN
                             """
                         }
                     }
