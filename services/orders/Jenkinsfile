@@ -41,8 +41,8 @@ pipeline {
 
         stage('2. Parallel Analysis') {
             parallel {
-                
-                failFast true
+
+                //failFast true
 
                 stage('Code Quality (SonarQube)') {
                     agent {

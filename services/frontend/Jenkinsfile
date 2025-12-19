@@ -42,7 +42,7 @@ pipeline {
         stage('2. Parallel Analysis') {
             parallel {
                 // Nếu một trong hai nhánh fail, dừng toàn bộ stage Parallel ngay lập tức
-                failFast true
+                //failFast true
 
                 stage('Code Quality (SonarQube)') {
                     agent {
