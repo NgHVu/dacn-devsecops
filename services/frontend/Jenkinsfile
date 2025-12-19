@@ -7,7 +7,9 @@ pipeline {
         AWS_ACCOUNT_ID      = '257394468168'
         ECR_REGISTRY        = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_URI           = "${ECR_REGISTRY}/foodhub-${SERVICE_NAME}"
-        SCAN_CACHE_DIR      = "/var/jenkins_home/caches/trivy"
+        
+        // SỬA LỖI: Dùng đường dẫn cache tương đối trong Workspace để tránh lỗi Permission denied
+        SCAN_CACHE_DIR      = "${WORKSPACE}/.trivy-cache"
     }
 
     options {
@@ -21,9 +23,7 @@ pipeline {
         stage('1. Initialize') {
             steps {
                 script {
-                    // Lấy commit hash ngắn
                     env.COMMIT_HASH = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
-                    // Tạo Tag: Nếu là main thì dùng commit hash, nếu branch khác thì thêm tên branch
                     if (env.BRANCH_NAME == 'main') {
                         env.IMAGE_TAG = env.COMMIT_HASH
                     } else {
@@ -31,10 +31,10 @@ pipeline {
                     }
                     
                     sh 'chmod +x scripts/*.sh'
-                    echo "-->STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
+                    echo "--> 🚀 STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
                 }
                 
-                // Login ECR (Sử dụng IAM Role của EC2)
+                // Login ECR
                 sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
             }
         }
@@ -44,8 +44,9 @@ pipeline {
                 stage('Code Quality (SonarQube)') {
                     agent {
                         docker {
-                            image 'node:20-bookworm'
-                            args '-v $HOME/.m2:/root/.m2 -u 0:0'
+                            image 'mnode:20-bookworm'
+                            // Mount .m2 cache
+                            args '--network host -v $HOME/.m2:/root/.m2 -u 0:0'
                             reuseNode true
                         }
                     }
@@ -58,7 +59,9 @@ pipeline {
 
                 stage('Security Scan (Trivy)') {
                     steps {
-                        sh "./scripts/security-scan.sh services/${SERVICE_NAME} ${SCAN_CACHE_DIR} HIGH,CRITICAL"
+                        // Trivy sẽ chạy trực tiếp trên Host (nơi đã cài Trivy qua script setup)
+                        // Sử dụng cache dir mới đã sửa ở trên
+                        sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} HIGH,CRITICAL"
                     }
                 }
             }
@@ -73,7 +76,6 @@ pipeline {
         }
 
         stage('4. Build & Push Docker') {
-            // TIÊU CHUẨN PRO: Chỉ push lên ECR nếu là branch main
             when {
                 branch 'main'
             }
