@@ -11,7 +11,8 @@ pipeline {
 
     environment {
         APP_NAME        = 'frontend'
-        REGISTRY        = 'ghcr.io/NgHVu'
+        // [FIX] Docker/GHCR yêu cầu tên repository phải viết THƯỜNG hoàn toàn
+        REGISTRY        = 'ghcr.io/nghvu' 
         TRIVY_SEVERITY  = 'HIGH,CRITICAL'
         TRIVY_CACHE_DIR = "/var/jenkins_home/caches/trivy"
         NPM_CONFIG_CACHE = "/var/jenkins_home/caches/npm"
@@ -23,7 +24,6 @@ pipeline {
             steps {
                 script {
                     echo '--> 1. Khởi tạo và làm sạch Workspace...'
-                    // Xóa các file rác nhưng giữ lại cache thư mục nếu cần
                     sh 'git clean -fdx'
                     checkout scm
                     
@@ -40,7 +40,7 @@ pipeline {
                 stage('2.1. SonarQube Analysis') {
                     agent {
                         docker {
-                            image 'node:20-bookworm-slim' // Debian slim giúp chạy Sonar cực ổn định
+                            image 'node:20-bookworm-slim'
                             args "-v ${NPM_CONFIG_CACHE}:/root/.npm -u 0:0 --network dacn-ci_ci"
                         }
                     }
@@ -71,7 +71,6 @@ pipeline {
                     steps {
                         dir('services/frontend') {
                             echo '--> Đang quét lỗ hổng thư viện (SCA)...'
-                            // Chạy Trivy trực tiếp trên host hoặc container tùy ý, ưu tiên tốc độ
                             sh "trivy fs --cache-dir ${TRIVY_CACHE_DIR} --ignore-unfixed --severity ${TRIVY_SEVERITY} --exit-code 1 ."
                         }
                     }
@@ -94,21 +93,21 @@ pipeline {
             steps {
                 script {
                     echo '--> Đang đóng gói Docker Image...'
+                    // Đảm bảo sử dụng biến REGISTRY đã viết thường
                     withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_TOKEN')]) {
-                        sh 'echo $GITHUB_TOKEN | docker login ghcr.io -u NgHVu --password-stdin'
+                        sh "echo \$GITHUB_TOKEN | docker login ghcr.io -u NgHVu --password-stdin"
                     }
 
-                    // Sử dụng --pull để đảm bảo base image luôn mới nhất.
                     sh """
                         docker build --pull \
-                        -t ${REGISTRY}/${APP_NAME}:${env.IMAGE_TAG} \
-                        -t ${REGISTRY}/${APP_NAME}:latest \
+                        -t ${env.REGISTRY}/${env.APP_NAME}:${env.IMAGE_TAG} \
+                        -t ${env.REGISTRY}/${env.APP_NAME}:latest \
                         -f services/frontend/Dockerfile services/frontend
                     """
                     
                     echo '--> Đang đẩy Image lên GHCR...'
-                    sh "docker push ${REGISTRY}/${APP_NAME}:${env.IMAGE_TAG}"
-                    sh "docker push ${REGISTRY}/${APP_NAME}:latest"
+                    sh "docker push ${env.REGISTRY}/${env.APP_NAME}:${env.IMAGE_TAG}"
+                    sh "docker push ${env.REGISTRY}/${env.APP_NAME}:latest"
                 }
             }
         }
@@ -122,19 +121,26 @@ pipeline {
             }
             steps {
                 echo '--> Quét bảo mật Image cuối cùng trước khi hoàn tất...'
-                sh "trivy image --severity ${TRIVY_SEVERITY} --exit-code 1 ${REGISTRY}/${APP_NAME}:${env.IMAGE_TAG}"
+                sh "trivy image --severity ${TRIVY_SEVERITY} --exit-code 1 ${env.REGISTRY}/${env.APP_NAME}:${env.IMAGE_TAG}"
             }
         }
     }
 
     post {
         always {
-            script {
-                echo '--> Dọn dẹp hệ thống...'
-                // Xóa image local để tránh đầy ổ cứng server Jenkins
-                sh "docker rmi ${REGISTRY}/${APP_NAME}:${env.IMAGE_TAG} || true"
-                sh "docker image prune -f"
-                cleanWs()
+            // [FIX] Khối post trong pipeline "agent none" cần được bọc trong node {} 
+            // để có ngữ cảnh workspace (FilePath) cho các lệnh sh và cleanWs
+            node('any') {
+                script {
+                    echo '--> Dọn dẹp hệ thống...'
+                    try {
+                        sh "docker rmi ${env.REGISTRY}/${env.APP_NAME}:${env.IMAGE_TAG} || true"
+                        sh "docker image prune -f"
+                    } catch (Exception e) {
+                        echo "Lỗi khi dọn dẹp Docker: ${e.message}"
+                    }
+                    cleanWs()
+                }
             }
         }
         success {
