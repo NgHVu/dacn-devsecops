@@ -97,5 +97,5 @@ node_modules npm-debug.log
 Dockerfile
 .dockerignore
 Jenkinsfile
-tests
+__tests__
 coverage
