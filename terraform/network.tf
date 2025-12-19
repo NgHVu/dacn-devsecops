@@ -1,52 +1,57 @@
-# 1. Tạo VPC (Mạng riêng ảo)
-resource "aws_vpc" "foodhub_vpc" {
+# VPC
+resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = {
-    Name = "${var.project_name}-vpc"
-  }
+  tags = { Name = "${var.project_name}-vpc" }
 }
 
-# 2. Tạo Internet Gateway (Cổng ra Internet) - QUAN TRỌNG NHẤT
-resource "aws_internet_gateway" "foodhub_igw" {
-  vpc_id = aws_vpc.foodhub_vpc.id
-
-  tags = {
-    Name = "${var.project_name}-igw"
-  }
+# Internet Gateway
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
+  tags   = { Name = "${var.project_name}-igw" }
 }
 
-# 3. Tạo Public Subnet (Phân mạng công khai)
-resource "aws_subnet" "foodhub_public_subnet" {
-  vpc_id                  = aws_vpc.foodhub_vpc.id
+# Public Subnets (Dùng cho Jenkins & Load Balancer)
+resource "aws_subnet" "public_1" {
+  vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
-  map_public_ip_on_launch = true # Tự động cấp IP Public cho EC2
-  availability_zone       = "${var.aws_region}a" # Ví dụ: ap-southeast-1a
-
+  availability_zone       = "${var.aws_region}a"
+  map_public_ip_on_launch = true
   tags = {
-    Name = "${var.project_name}-public-subnet"
+    Name                     = "${var.project_name}-public-1"
+    "kubernetes.io/role/elb" = "1" # Tag cho EKS LB sau này
   }
 }
 
-# 4. Tạo Route Table (Bảng định tuyến)
-resource "aws_route_table" "foodhub_public_rt" {
-  vpc_id = aws_vpc.foodhub_vpc.id
+resource "aws_subnet" "public_2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.2.0/24"
+  availability_zone       = "${var.aws_region}b"
+  map_public_ip_on_launch = true
+  tags = {
+    Name                     = "${var.project_name}-public-2"
+    "kubernetes.io/role/elb" = "1"
+  }
+}
 
-  # Định tuyến tất cả traffic (0.0.0.0/0) đi qua Internet Gateway
+# Route Table cho Public Subnets
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.foodhub_igw.id
+    gateway_id = aws_internet_gateway.igw.id
   }
-
-  tags = {
-    Name = "${var.project_name}-public-rt"
-  }
+  tags = { Name = "${var.project_name}-public-rt" }
 }
 
-# 5. Gắn Subnet vào Route Table
-resource "aws_route_table_association" "foodhub_rta" {
-  subnet_id      = aws_subnet.foodhub_public_subnet.id
-  route_table_id = aws_route_table.foodhub_public_rt.id
+resource "aws_route_table_association" "pub_1" {
+  subnet_id      = aws_subnet.public_1.id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "pub_2" {
+  subnet_id      = aws_subnet.public_2.id
+  route_table_id = aws_route_table.public.id
 }

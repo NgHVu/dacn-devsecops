@@ -1,144 +1,96 @@
 pipeline {
-    agent any
+    agent any 
+    
+    environment {
+        SERVICE_NAME        = 'users' 
+        AWS_REGION          = 'ap-southeast-1'
+        AWS_ACCOUNT_ID      = '257394468168'
+        ECR_REGISTRY        = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        IMAGE_URI           = "${ECR_REGISTRY}/foodhub-${SERVICE_NAME}"
+        SCAN_CACHE_DIR      = "/var/jenkins_home/caches/trivy"
+    }
+
     options {
-        buildDiscarder(logRotator(numToKeepStr: '10'))
+        buildDiscarder(logRotator(numToKeepStr: '5'))
         disableConcurrentBuilds()
-        timeout(time: 30, unit: 'MINUTES')
         timestamps()
         ansiColor('xterm')
     }
 
-    environment {
-        IMAGE_NAME      = 'users'
-        TRIVY_EXIT_CODE = '1'
-        TRIVY_SEVERITY  = 'HIGH,CRITICAL'
-        DOCKER_BUILDKIT = '1'
-        TRIVY_CACHE_DIR = "/var/jenkins_home/caches/trivy"
-    }
-
     stages {
-        stage('1. Checkout SCM & Compute Tag') {
+        stage('1. Initialize') {
             steps {
-                echo '--> Lấy mã nguồn từ Git và tính toán Image Tag...'
-                sh 'git clean -fdx'
-                checkout scm
                 script {
-                    env.IMAGE_TAG = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
-                    if (!env.IMAGE_TAG) {
-                        env.IMAGE_TAG = "dev-${env.BUILD_NUMBER}"
+                    // Lấy commit hash ngắn
+                    env.COMMIT_HASH = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
+                    // Tạo Tag: Nếu là main thì dùng commit hash, nếu branch khác thì thêm tên branch
+                    if (env.BRANCH_NAME == 'main') {
+                        env.IMAGE_TAG = env.COMMIT_HASH
+                    } else {
+                        env.IMAGE_TAG = "${env.BRANCH_NAME}-${env.COMMIT_HASH}"
                     }
-                    echo "--> IMAGE_TAG = ${env.IMAGE_TAG}"
+                    
+                    sh 'chmod +x scripts/*.sh'
+                    echo "--> STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
                 }
-                // Đảm bảo thư mục cache tồn tại trước khi sử dụng
-                sh 'mkdir -p ${TRIVY_CACHE_DIR}'
-            }
-        }
-        
-        stage('1.5. Login to Registries') {
-            steps {
-                withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_TOKEN')]) {
-                    echo '--> Đăng nhập vào GitHub Container Registry...'
-
-                    sh '''
-                        echo $GITHUB_TOKEN | docker login ghcr.io -u NgHVu --password-stdin
-                    '''
-                }
+                
+                // Login ECR (Sử dụng IAM Role của EC2)
+                sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
             }
         }
 
-        stage('1.6. Warm-up Caches') {
-            agent {
-                docker {
-                    image 'ghcr.io/aquasecurity/trivy:0.49.1'
-                    // Ghi đè ENTRYPOINT để Jenkins có thể kiểm soát container
-                    args "--entrypoint='' -v ${TRIVY_CACHE_DIR}:/root/.cache/trivy -u 0:0 --network dacn-ci_ci"
-                    reuseNode true
+        stage('2. Parallel Analysis') {
+            parallel {
+                stage('Code Quality (SonarQube)') {
+                    agent {
+                        docker {
+                            image 'maven:3.9-eclipse-temurin-21'
+                            args '-v $HOME/.m2:/root/.m2 -u 0:0'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        withSonarQubeEnv('sonarqube-local') {
+                            sh "./scripts/analyze-backend.sh ${SERVICE_NAME}"
+                        }
+                    }
                 }
-            }
-            steps {
-                echo '--> Đang cập nhật cơ sở dữ liệu Trivy (lần đầu có thể chậm)...'
-                // Chạy trực tiếp, không cần script keep-alive phức tạp
-                sh "trivy image --download-db-only --cache-dir /root/.cache/trivy --timeout 30m"
-            }
-        }
 
-        stage('2. Test & Analyze') {
-            agent {
-                docker {
-                    image 'maven:3.9-eclipse-temurin-21'
-                    args '-v $HOME/.m2:/root/.m2 -u 0:0 --network dacn-ci_ci'
-                    reuseNode true
-                }
-            }
-            steps {
-                dir('services/users') {
-                    withSonarQubeEnv('sonarqube-local') {
-                        sh '''
-                           mvn clean verify sonar:sonar \
-                               -Dsonar.projectKey=users-service \
-                               -Dsonar.host.url=http://sonarqube:9000 \
-                               -Dsonar.login=$SONAR_AUTH_TOKEN
-                        '''
+                stage('Security Scan (Trivy)') {
+                    steps {
+                        sh "./scripts/security-scan.sh services/${SERVICE_NAME} ${SCAN_CACHE_DIR} HIGH,CRITICAL"
                     }
                 }
             }
         }
-        
+
         stage('3. Quality Gate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
+                timeout(time: 5, unit: 'MINUTES') { 
+                    waitForQualityGate abortPipeline: true 
                 }
             }
         }
 
-        stage('4. Trivy FS Scan (SCA)') {
-            steps {
-                dir('services/users') {
-                    echo '--> Quét thư viện với Trivy (Filesystem)...'
-                    sh "trivy fs --cache-dir ${TRIVY_CACHE_DIR} --timeout 30m --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ."
-                }
-            }
-        }
-
-        stage('5. Build Docker Image') {
-            steps {
-                dir('services/users') {
-                    echo '--> Building Docker image...'
-                    script {
-                        sh "docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} ."
-                    }
-                }
-            }
-        }
-
-        stage('6. Trivy Image Scan') {
-            agent {
-                docker {
-                    image 'ghcr.io/aquasecurity/trivy:0.49.1'
-                    // SỬA LỖI: Ghi đè ENTRYPOINT
-                    args "-v /var/run/docker.sock:/var/run/docker.sock -v ${TRIVY_CACHE_DIR}:/root/.cache/trivy -u 0:0 --network dacn-ci_ci --entrypoint=''"
-                    reuseNode true
-                }
+        stage('4. Build & Push Docker') {
+            // TIÊU CHUẨN PRO: Chỉ push lên ECR nếu là branch main
+            when {
+                branch 'main'
             }
             steps {
-                echo '--> Quét Docker image với Trivy...'
-                sh "trivy image --timeout 5m --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${IMAGE_URI} ${env.IMAGE_TAG}"
             }
         }
     }
 
     post {
         always {
-            echo '--> Dọn dẹp docker images...'
-            script {
-                if (env.IMAGE_TAG) {
-                    sh "docker rmi ${env.IMAGE_NAME}:${env.IMAGE_TAG} || true"
-                }
-                sh "docker image prune -f || true"
-            }
+            echo '--> 🧹 Cleaning up...'
+            sh "docker rmi ${IMAGE_URI}:${env.IMAGE_TAG} || true"
+            sh "docker rmi ${IMAGE_URI}:latest || true"
+        }
+        failure {
+            echo "Pipeline Failed on branch ${env.BRANCH_NAME}!"
         }
     }
 }
-
-

@@ -1,20 +1,11 @@
-# outputs.tf
-output "jenkins_url" {
-  description = "Đường dẫn truy cập Jenkins"
-  value       = "http://${aws_instance.jenkins_server.public_ip}:8080"
+output "jenkins_public_ip" {
+  value = "http://${aws_instance.jenkins.public_ip}:8080"
 }
 
-output "sonarqube_url" {
-  description = "Đường dẫn truy cập SonarQube"
-  value       = "http://${aws_instance.jenkins_server.public_ip}:9000"
+output "sonarqube_public_ip" {
+  value = "http://${aws_instance.jenkins.public_ip}:9000"
 }
 
-output "ecr_repository_urls" {
-  description = "URL của các ECR Repositories đã tạo"
-  value       = [for repo in aws_ecr_repository.foodhub_repos : repo.repository_url]
-}
-
-output "ssh_command" {
-  description = "Lệnh SSH vào server"
-  value       = "ssh -i ${var.key_name}.pem ubuntu@${aws_instance.jenkins_server.public_ip}"
+output "ecr_endpoints" {
+  value = { for k, v in aws_ecr_repository.repos : k => v.repository_url }
 }

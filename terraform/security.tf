@@ -1,33 +1,20 @@
 resource "aws_security_group" "jenkins_sg" {
   name        = "${var.project_name}-jenkins-sg"
-  description = "Allow ports for Jenkins, SonarQube and SSH"
-  vpc_id      = aws_vpc.foodhub_vpc.id  # <--- THÊM DÒNG NÀY
+  description = "Jenkins and SonarQube Security Group"
+  vpc_id      = aws_vpc.main.id
 
-  # SSH
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] 
+  # Inbound: SSH, Jenkins (8080), SonarQube (9000)
+  dynamic "ingress" {
+    for_each = [22, 8080, 9000]
+    content {
+      from_port   = ingress.value
+      to_port     = ingress.value
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"] # Trong thực tế nên giới hạn IP cá nhân
+    }
   }
 
-  # Jenkins UI
-  ingress {
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # SonarQube UI
-  ingress {
-    from_port   = 9000
-    to_port     = 9000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Outbound (Cho phép server tải package từ internet) - QUAN TRỌNG
+  # Outbound: Tất cả
   egress {
     from_port   = 0
     to_port     = 0
@@ -35,7 +22,5 @@ resource "aws_security_group" "jenkins_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = {
-    Name = "${var.project_name}-sg"
-  }
+  tags = { Name = "${var.project_name}-jenkins-sg" }
 }

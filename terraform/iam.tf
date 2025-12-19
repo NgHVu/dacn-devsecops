@@ -1,6 +1,5 @@
-# Role để EC2 có quyền thao tác với ECR
 resource "aws_iam_role" "jenkins_role" {
-  name = "${var.project_name}_jenkins_role"
+  name = "${var.project_name}-jenkins-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -12,14 +11,19 @@ resource "aws_iam_role" "jenkins_role" {
   })
 }
 
-# Gán quyền Full Access ECR
-resource "aws_iam_role_policy_attachment" "jenkins_ecr_policy" {
+# Quyền đẩy ảnh lên ECR
+resource "aws_iam_role_policy_attachment" "ecr_access" {
   role       = aws_iam_role.jenkins_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"
 }
 
-# Tạo Instance Profile để gắn vào EC2
+# Quyền quản lý EKS (Rất cần cho bước tiếp theo)
+resource "aws_iam_role_policy_attachment" "eks_access" {
+  role       = aws_iam_role.jenkins_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+}
+
 resource "aws_iam_instance_profile" "jenkins_profile" {
-  name = "${var.project_name}_jenkins_profile"
+  name = "${var.project_name}-jenkins-profile"
   role = aws_iam_role.jenkins_role.name
 }
