@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // [QUAN TRỌNG] Kích hoạt standalone mode để tối ưu Docker Image
+  output: 'standalone',
 
   images: {
     remotePatterns: [
@@ -17,7 +19,6 @@ const nextConfig: NextConfig = {
   },
 
   async rewrites() {
-    // URL của các service backend (ưu tiên lấy từ biến môi trường, fallback về localhost)
     const PRODUCTS_SERVICE_URL = process.env.PRODUCTS_SERVICE_URL || "http://localhost:8081";
     const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL || "http://localhost:8082";
     const ORDERS_SERVICE_URL = process.env.ORDERS_SERVICE_URL || "http://localhost:8083";
@@ -42,7 +43,6 @@ const nextConfig: NextConfig = {
         source: '/api/categories/:path*',
         destination: `${PRODUCTS_SERVICE_URL}/api/categories/:path*`,
       },
-      // [QUAN TRỌNG] Thêm đoạn này để map API Reviews sang Products Service
       {
         source: "/api/reviews/:path*",
         destination: `${PRODUCTS_SERVICE_URL}/api/reviews/:path*`,

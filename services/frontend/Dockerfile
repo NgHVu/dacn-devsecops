@@ -1,23 +1,52 @@
-# 1. Dùng Node.js nhẹ nhất
-FROM node:20-alpine
-
-# 2. Tạo thư mục làm việc
+# ================================================================= #
+# Giai đoạn 1: Cài đặt phụ thuộc (Dependencies)
+# ================================================================= #
+FROM node:20-alpine AS deps
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# 3. Copy file định nghĩa thư viện trước (để tận dụng cache)
 COPY package*.json ./
+RUN npm ci
 
-# 4. Cài đặt thư viện
-RUN npm install
-
-# 5. Copy toàn bộ code vào
+# ================================================================= #
+# Giai đoạn 2: Build ứng dụng
+# ================================================================= #
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# 6. Build dự án (Tạo ra thư mục .next) -> Đây là bước thay thế npm run dev
+# Vô hiệu hóa telemetry để tăng tốc build và bảo mật
+ENV NEXT_TELEMETRY_DISABLED=1
+
 RUN npm run build
 
-# 7. Mở port 3000
-EXPOSE 3000
+# ================================================================= #
+# Giai đoạn 3: Runner - Image cuối cùng siêu nhẹ
+# ================================================================= #
+FROM node:20-alpine AS runner
+WORKDIR /app
 
-# 8. Chạy ứng dụng ở chế độ Production
-CMD ["npm", "start"]
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# [SECURITY FIX] Cập nhật Alpine để vá lỗi Trivy (giống Backend)
+RUN apk update && apk upgrade --no-cache
+
+# Tạo user không có quyền root
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Chỉ copy những file cần thiết từ giai đoạn build
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Chạy bằng server.js được sinh ra từ mode standalone (không cần npm start)
+CMD ["node", "server.js"]

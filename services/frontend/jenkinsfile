@@ -1,0 +1,151 @@
+pipeline {
+    agent any
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        disableConcurrentBuilds()
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+        ansiColor('xterm')
+    }
+
+    environment {
+        IMAGE_NAME      = 'frontend'
+        TRIVY_EXIT_CODE = '1'
+        TRIVY_SEVERITY  = 'HIGH,CRITICAL'
+        DOCKER_BUILDKIT = '1'
+        TRIVY_CACHE_DIR = "/var/jenkins_home/caches/trivy"
+    }
+
+    stages {
+        stage('1. Checkout SCM & Compute Tag') {
+            steps {
+                echo '--> Lấy mã nguồn từ Git và tính toán Image Tag...'
+                sh 'git clean -fdx'
+                checkout scm
+                script {
+                    env.IMAGE_TAG = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
+                    if (!env.IMAGE_TAG) {
+                        env.IMAGE_TAG = "dev-${env.BUILD_NUMBER}"
+                    }
+                    echo "--> IMAGE_TAG = ${env.IMAGE_TAG}"
+                }
+                sh "mkdir -p ${TRIVY_CACHE_DIR}"
+            }
+        }
+
+        stage('1.5. Login to Registries') {
+            steps {
+                withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_TOKEN')]) {
+                    echo '--> Đăng nhập vào GitHub Container Registry...'
+                    // Sử dụng nháy đơn để bảo vệ biến môi trường shell $GITHUB_TOKEN
+                    sh 'echo $GITHUB_TOKEN | docker login ghcr.io -u NgHVu --password-stdin'
+                }
+            }
+        }
+
+        stage('1.6. Warm-up Caches') {
+            agent {
+                docker {
+                    image 'ghcr.io/aquasecurity/trivy:0.49.1'
+                    args "--entrypoint='' -v ${TRIVY_CACHE_DIR}:/root/.cache/trivy -u 0:0 --network dacn-ci_ci"
+                    reuseNode true
+                }
+            }
+            steps {
+                echo '--> Đang cập nhật cơ sở dữ liệu Trivy...'
+                sh "trivy image --download-db-only --cache-dir /root/.cache/trivy --timeout 30m"
+            }
+        }
+
+        stage('2. Build & Analyze (SonarQube)') {
+            agent {
+                docker {
+                    image 'node:20-alpine'
+                    args '-v $HOME/.npm:/root/.npm -u 0:0 --network dacn-ci_ci'
+                    reuseNode true
+                }
+            }
+            steps {
+                dir('services/frontend') {
+                    script {
+                        echo '--> Cài đặt môi trường Java cho Sonar Scanner...'
+                        // Sonar Scanner là công cụ viết bằng Java, bắt buộc phải có JRE
+                        sh 'apk add --no-cache openjdk17-jre'
+                        
+                        echo '--> Cài đặt thư viện Frontend (npm ci)...'
+                        sh 'npm ci'
+                        
+                        def scannerHome = tool 'sonar-scanner'
+                        withSonarQubeEnv('sonarqube-local') {
+                            sh """
+                                ${scannerHome}/bin/sonar-scanner \
+                                -Dsonar.projectKey=frontend-service \
+                                -Dsonar.sources=. \
+                                -Dsonar.exclusions=**/.next/**,**/node_modules/**,**/out/** \
+                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                                -Dsonar.host.url=http://sonarqube:9000
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('3. Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('4. Trivy FS Scan (SCA)') {
+            steps {
+                dir('services/frontend') {
+                    echo '--> Quét lỗ hổng trong mã nguồn và thư viện (SCA)...'
+                    sh "trivy fs --cache-dir ${TRIVY_CACHE_DIR} --timeout 30m --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ."
+                }
+            }
+        }
+
+        stage('5. Build Docker Image') {
+            steps {
+                echo '--> Building Frontend Docker image...'
+                // Context là root nhưng chỉ định Dockerfile và đường dẫn build cụ thể
+                sh "docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} -f services/frontend/Dockerfile services/frontend"
+            }
+        }
+
+        stage('6. Trivy Image Scan') {
+            agent {
+                docker {
+                    image 'ghcr.io/aquasecurity/trivy:0.49.1'
+                    args "-v /var/run/docker.sock:/var/run/docker.sock -v ${TRIVY_CACHE_DIR}:/root/.cache/trivy -u 0:0 --network dacn-ci_ci --entrypoint=''"
+                    reuseNode true
+                }
+            }
+            steps {
+                echo '--> Quét Docker image thành phẩm trước khi release...'
+                sh "trivy image --timeout 5m --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+            }
+        }
+    }
+
+    post {
+        always {
+            echo '--> Dọn dẹp tài nguyên sau khi pipeline kết thúc...'
+            script {
+                if (env.IMAGE_TAG) {
+                    sh "docker rmi ${env.IMAGE_NAME}:${env.IMAGE_TAG} || true"
+                }
+                sh "docker image prune -f || true"
+            }
+        }
+        success {
+            echo '--> Pipeline Frontend hoàn thành thành công!'
+        }
+        failure {
+            echo '--> Pipeline thất bại. Vui lòng kiểm tra log của stage lỗi.'
+        }
+    }
+}
