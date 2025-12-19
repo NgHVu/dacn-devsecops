@@ -8,7 +8,7 @@ pipeline {
         ECR_REGISTRY        = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_URI           = "${ECR_REGISTRY}/foodhub-${SERVICE_NAME}"
         
-        // SỬA LỖI: Dùng đường dẫn cache tương đối trong Workspace để tránh lỗi Permission denied
+        // Dùng đường dẫn cache trong Workspace để tránh lỗi Permission denied
         SCAN_CACHE_DIR      = "${WORKSPACE}/.trivy-cache"
     }
 
@@ -31,10 +31,10 @@ pipeline {
                     }
                     
                     sh 'chmod +x scripts/*.sh'
-                    echo "--> 🚀 STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
+                    echo "-->STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
                 }
                 
-                // Login ECR
+                // Login ECR (Sử dụng IAM Role của EC2)
                 sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
             }
         }
@@ -44,9 +44,11 @@ pipeline {
                 stage('Code Quality (SonarQube)') {
                     agent {
                         docker {
-                            image 'mnode:20-bookworm'
-                            // Mount .m2 cache
-                            args '--network host -v $HOME/.m2:/root/.m2 -u 0:0'
+                            // FIX: Đổi 'mnode' thành 'node'
+                            image 'node:20-bookworm'
+                            // FIX: Thêm --network host để kết nối localhost:9000 (SonarQube)
+                            // Mount .npm cache để tăng tốc độ cài đặt package
+                            args '--network host -v $HOME/.npm:/root/.npm -u 0:0'
                             reuseNode true
                         }
                     }
@@ -59,9 +61,8 @@ pipeline {
 
                 stage('Security Scan (Trivy)') {
                     steps {
-                        // Trivy sẽ chạy trực tiếp trên Host (nơi đã cài Trivy qua script setup)
-                        // Sử dụng cache dir mới đã sửa ở trên
-                        sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} HIGH,CRITICAL"
+                        // Quét filesystem bằng script dùng chung
+                        sh "./scripts/security-scan.sh services/${SERVICE_NAME} ${SCAN_CACHE_DIR} HIGH,CRITICAL"
                     }
                 }
             }
@@ -90,6 +91,8 @@ pipeline {
             echo '--> 🧹 Cleaning up...'
             sh "docker rmi ${IMAGE_URI}:${env.IMAGE_TAG} || true"
             sh "docker rmi ${IMAGE_URI}:latest || true"
+            // Xóa thư mục coverage do docker tạo ra để tránh lỗi quyền ghi lần sau
+            sh "rm -rf services/${SERVICE_NAME}/coverage || true"
         }
         failure {
             echo "Pipeline Failed on branch ${env.BRANCH_NAME}!"
