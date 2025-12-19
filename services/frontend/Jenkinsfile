@@ -24,6 +24,7 @@ pipeline {
             steps {
                 script {
                     echo '--> 1. Khởi tạo và làm sạch Workspace...'
+                    // Xóa các file rác để đảm bảo code checkout là mới nhất
                     sh 'git clean -fdx'
                     checkout scm
                     
@@ -40,7 +41,7 @@ pipeline {
                 stage('2.1. SonarQube Analysis') {
                     agent {
                         docker {
-                            image 'node:20-bookworm-slim'
+                            image 'node:20-bookworm-slim' // Debian slim giúp chạy Sonar cực ổn định
                             args "-v ${NPM_CONFIG_CACHE}:/root/.npm -u 0:0 --network dacn-ci_ci"
                         }
                     }
@@ -93,13 +94,13 @@ pipeline {
             steps {
                 script {
                     echo '--> Đang đóng gói Docker Image...'
-                    // Đảm bảo sử dụng biến REGISTRY đã viết thường và tên user viết thường
                     withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_TOKEN')]) {
                         sh "echo \$GITHUB_TOKEN | docker login ghcr.io -u nghvu --password-stdin"
                     }
 
+                    // [FIX] Thêm --no-cache để ép Docker build lại layer deps, nhận diện package-lock.json mới
                     sh """
-                        docker build --pull \
+                        docker build --no-cache --pull \
                         -t ${env.REGISTRY}/${env.APP_NAME}:${env.IMAGE_TAG} \
                         -t ${env.REGISTRY}/${env.APP_NAME}:latest \
                         -f services/frontend/Dockerfile services/frontend
@@ -120,16 +121,20 @@ pipeline {
                 }
             }
             steps {
-                echo '--> Quét bảo mật Image cuối cùng trước khi hoàn tất...'
-                sh "trivy image --severity ${TRIVY_SEVERITY} --exit-code 1 ${env.REGISTRY}/${env.APP_NAME}:${env.IMAGE_TAG}"
+                script {
+                    // [FIX] Xóa cache Trivy để đảm bảo kết quả quét là mới nhất, không dùng database cũ
+                    echo '--> Xóa cache Trivy cũ...'
+                    sh "trivy image --clear-cache"
+
+                    echo '--> Quét bảo mật Image cuối cùng trước khi hoàn tất...'
+                    sh "trivy image --severity ${TRIVY_SEVERITY} --exit-code 1 ${env.REGISTRY}/${env.APP_NAME}:${env.IMAGE_TAG}"
+                }
             }
         }
     }
 
     post {
         always {
-            // [FIX] Khối post trong pipeline "agent none" cần được bọc trong node {} 
-            // để có ngữ cảnh workspace (FilePath) cho các lệnh sh và cleanWs
             node('any') {
                 script {
                     echo '--> Dọn dẹp hệ thống...'
