@@ -23,9 +23,18 @@ pipeline {
             agent any
             steps {
                 script {
-                    echo '--> 1. Khởi tạo và làm sạch Workspace...'
-                    // Xóa các file rác để đảm bảo code checkout là mới nhất
-                    sh 'git clean -fdx'
+                    echo '--> 1. Khởi tạo và làm sạch Workspace triệt để...'
+                    
+                    // Lệnh xóa sạch dữ liệu cũ để build lại từ đầu
+                    sh """
+                        echo '--> Đang xóa cache hệ thống...'
+                        docker builder prune -a -f || true
+                        docker image prune -f || true
+                        rm -rf ${env.TRIVY_CACHE_DIR}/*
+                        rm -rf ${env.NPM_CONFIG_CACHE}/*
+                        git clean -fdx
+                    """
+                    
                     checkout scm
                     
                     env.IMAGE_TAG = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
@@ -50,7 +59,8 @@ pipeline {
                             script {
                                 echo '--> Đang phân tích mã nguồn với SonarQube...'
                                 sh 'apt-get update && apt-get install -y default-jre'
-                                sh 'npm ci --prefer-offline --no-audit'
+                                // Dùng --force để ép cài lại dù có cache
+                                sh 'npm ci --force --no-audit'
                                 
                                 withSonarQubeEnv('sonarqube-local') {
                                     sh """
@@ -98,7 +108,7 @@ pipeline {
                         sh "echo \$GITHUB_TOKEN | docker login ghcr.io -u nghvu --password-stdin"
                     }
 
-                    // [FIX] Thêm --no-cache để ép Docker build lại layer deps, nhận diện package-lock.json mới
+                    // [FIX] Sử dụng --no-cache mạnh mẽ để ép rebuild mọi layer
                     sh """
                         docker build --no-cache --pull \
                         -t ${env.REGISTRY}/${env.APP_NAME}:${env.IMAGE_TAG} \
@@ -140,7 +150,7 @@ pipeline {
                     echo '--> Dọn dẹp hệ thống...'
                     try {
                         sh "docker rmi ${env.REGISTRY}/${env.APP_NAME}:${env.IMAGE_TAG} || true"
-                        sh "docker image prune -f"
+                        sh "docker image prune -af" // Xóa cả image cũ không dùng
                     } catch (Exception e) {
                         echo "Lỗi khi dọn dẹp Docker: ${e.message}"
                     }
