@@ -37,7 +37,6 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_TOKEN')]) {
                     echo '--> Đăng nhập vào GitHub Container Registry...'
-                    // Sử dụng nháy đơn để bảo vệ biến môi trường shell $GITHUB_TOKEN
                     sh 'echo $GITHUB_TOKEN | docker login ghcr.io -u NgHVu --password-stdin'
                 }
             }
@@ -69,21 +68,23 @@ pipeline {
                 dir('services/frontend') {
                     script {
                         echo '--> Cài đặt môi trường Java cho Sonar Scanner...'
-                        // Sonar Scanner là công cụ viết bằng Java, bắt buộc phải có JRE
+                        // Sonar Scanner bắt buộc cần Java JRE để khởi chạy
                         sh 'apk add --no-cache openjdk17-jre'
                         
-                        echo '--> Cài đặt thư viện Frontend (npm ci)...'
+                        echo '--> Cài đặt thư viện Frontend...'
                         sh 'npm ci'
                         
-                        def scannerHome = tool 'sonar-scanner'
+                        // [FIX] Thay thế 'tool sonar-scanner' bằng npx để tự động tải trình quét
+                        // Việc này giúp pipeline tự chạy mà không cần cấu hình UI trong Jenkins
                         withSonarQubeEnv('sonarqube-local') {
                             sh """
-                                ${scannerHome}/bin/sonar-scanner \
+                                npx sonarqube-scanner \
                                 -Dsonar.projectKey=frontend-service \
                                 -Dsonar.sources=. \
                                 -Dsonar.exclusions=**/.next/**,**/node_modules/**,**/out/** \
                                 -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                                -Dsonar.host.url=http://sonarqube:9000
+                                -Dsonar.host.url=${SONAR_HOST_URL} \
+                                -Dsonar.login=${SONAR_AUTH_TOKEN}
                             """
                         }
                     }
@@ -111,7 +112,6 @@ pipeline {
         stage('5. Build Docker Image') {
             steps {
                 echo '--> Building Frontend Docker image...'
-                // Context là root nhưng chỉ định Dockerfile và đường dẫn build cụ thể
                 sh "docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} -f services/frontend/Dockerfile services/frontend"
             }
         }
