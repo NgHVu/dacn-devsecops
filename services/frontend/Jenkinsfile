@@ -60,7 +60,6 @@ pipeline {
             agent {
                 docker {
                     image 'node:20-alpine'
-                    // Ánh xạ cache npm để tăng tốc các lần build sau
                     args '-v $HOME/.npm:/root/.npm -u 0:0 --network dacn-ci_ci'
                     reuseNode true
                 }
@@ -69,15 +68,14 @@ pipeline {
                 dir('services/frontend') {
                     script {
                         echo '--> Cài đặt môi trường Java cho Sonar Scanner...'
-                        // Sonar Scanner là công cụ chạy trên Java, bắt buộc phải có JRE
                         sh 'apk add --no-cache openjdk17-jre'
                         
                         echo '--> Cài đặt thư viện Frontend...'
                         sh 'npm ci'
                         
-                        // [FIX TRIỆT ĐỂ] KHÔNG dùng lệnh 'tool'. 
-                        // Sử dụng 'npx sonarqube-scanner' để Jenkins tự tải trình quét về.
-                        // 'sonarqube-local' là tên Server bạn đã cấu hình trong Manage Jenkins -> System
+                        // [FIX ĐÃ LOẠI BỎ LỆNH TOOL]
+                        // Sử dụng hoàn toàn npx sonarqube-scanner. 
+                        // Plugin withSonarQubeEnv chỉ đóng vai trò truyền Token và URL server vào môi trường.
                         withSonarQubeEnv('sonarqube-local') {
                             sh """
                                 npx sonarqube-scanner \
@@ -96,7 +94,6 @@ pipeline {
 
         stage('3. Quality Gate') {
             steps {
-                // Đợi SonarQube phân tích xong và trả về kết quả (Pass/Fail)
                 timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
@@ -115,7 +112,6 @@ pipeline {
         stage('5. Build Docker Image') {
             steps {
                 echo '--> Building Frontend Docker image...'
-                // Context là root nhưng trỏ vào Dockerfile của frontend
                 sh "docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} -f services/frontend/Dockerfile services/frontend"
             }
         }
