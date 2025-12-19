@@ -8,27 +8,28 @@ export type Category = {
   productCount?: number; 
 };
 
+// [FIX] Cập nhật GetProductsParams để nhận trường 'name' thay vì hoặc cùng với 'search'
 export type GetProductsParams = {
   page?: number;
   size?: number;
   sort?: string; 
-  search?: string;
+  name?: string;     // Thêm trường name để khớp với SearchPage
+  search?: string;   // Giữ lại search nếu cần dùng cho các mục đích khác
   categoryId?: number | string;
   minPrice?: number;
   maxPrice?: number;
 };
 
-// [CẬP NHẬT] Thêm type cho Review
+// ... (Giữ nguyên các phần Review, Product, PageableResponse bên dưới)
 export type Review = {
   id: number;
   userId: string;
   userName: string;
-  orderId: number; // [NEW] Thêm dòng này
+  orderId: number;
   rating: number;
   comment: string;
   createdAt: string;
-  updatedAt?: string; // [NEW] Thêm dòng này (dấu ? vì có thể null hoặc undefined)
-  
+  updatedAt?: string;
 };
 
 export type Product = {
@@ -38,14 +39,10 @@ export type Product = {
   price: number;
   image: string;
   stockQuantity: number;
-  
   category?: Category; 
-
-  // [CẬP NHẬT] Thêm các trường thống kê mới
   averageRating?: number;
   reviewCount?: number;
   sold?: number;
-
   createdAt: string;
   updatedAt: string;
 };
@@ -87,7 +84,6 @@ export type CreateProductRequest = {
 
 export type UpdateProductRequest = Partial<CreateProductRequest>;
 
-// [CẬP NHẬT] Type cho request tạo review
 export type CreateReviewRequest = {
     productId: number;
     orderId: number;
