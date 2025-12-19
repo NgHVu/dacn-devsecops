@@ -6,7 +6,11 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+
+# [FIX] Thay vì 'npm ci' (chỉ tin tưởng package-lock.json cũ), 
+# ta dùng 'npm install' để nó đọc cả package.json và áp dụng overrides ngay lập tức.
+# Điều này đảm bảo cross-spawn 7.0.5 được cài đặt dù lockfile có thể chưa chuẩn.
+RUN npm install
 
 # ================================================================= #
 # Giai đoạn 2: Build ứng dụng
