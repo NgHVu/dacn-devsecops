@@ -41,12 +41,13 @@ pipeline {
 
         stage('2. Parallel Analysis') {
             parallel {
+                // Nếu một trong hai nhánh fail, dừng toàn bộ stage Parallel ngay lập tức
+                failFast true
+
                 stage('Code Quality (SonarQube)') {
                     agent {
                         docker {
-                            // FIX: Đổi 'mnode' thành 'node'
                             image 'node:20-bookworm'
-                            // FIX: Thêm --network host để kết nối localhost:9000 (SonarQube)
                             // Mount .npm cache để tăng tốc độ cài đặt package
                             args '--network host -v $HOME/.npm:/root/.npm -u 0:0'
                             reuseNode true
@@ -61,8 +62,8 @@ pipeline {
 
                 stage('Security Scan (Trivy)') {
                     steps {
-                        // Quét filesystem bằng script dùng chung
-                        sh "./scripts/security-scan.sh services/${SERVICE_NAME} ${SCAN_CACHE_DIR} HIGH,CRITICAL"
+                        // FIX: Chỉ truyền ${SERVICE_NAME} vì script đã tự động thêm prefix 'services/'
+                        sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} HIGH,CRITICAL"
                     }
                 }
             }
