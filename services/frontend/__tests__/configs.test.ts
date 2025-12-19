@@ -14,11 +14,12 @@ interface PostCSSConfig {
 interface ESLintConfigItem {
   ignores?: string[];
   rules?: Record<string, unknown>;
+  files?: string[];
 }
 
 /**
- * Khai báo các hàm toàn cục của Jest để TypeScript không báo lỗi "Cannot find name".
- * Chúng ta khai báo thủ công ở đây để tránh phụ thuộc vào module '@jest/globals' bị thiếu.
+ * Khai báo các hàm toàn cục của Jest. 
+ * Khi chạy local với npm test, Jest sẽ tự động cung cấp các hàm này.
  */
 declare const describe: (name: string, fn: () => void) => void;
 declare const test: (name: string, fn: () => void) => void;
@@ -27,20 +28,25 @@ declare const expect: (actual: unknown) => {
   toBe(value: unknown): void;
   toBeGreaterThan(value: number): void;
   toHaveProperty(path: string): void;
+  toContain(value: unknown): void;
+  toBeTruthy(): void;
 };
 
 describe('Kiểm tra cấu hình dự án (Coverage Fix)', () => {
   
-  test('PostCSS config nên chứa plugin Tailwind', () => {
+  test('PostCSS config nên chứa plugin Tailwind v4', () => {
     // Kiểm tra xem object config có tồn tại không
     expect(postcssConfig).toBeDefined();
     
-    // Ép kiểu về interface cụ thể để đảm bảo an toàn kiểu dữ liệu
+    // Ép kiểu để kiểm tra sâu vào thuộc tính, giúp tăng coverage cho object literal
     const config = postcssConfig as unknown as PostCSSConfig;
+    
+    // Kiểm tra sự tồn tại của plugin Tailwind PostCSS mới
     expect(config.plugins).toHaveProperty('@tailwindcss/postcss');
+    expect(config.plugins['@tailwindcss/postcss']).toBeDefined();
   });
 
-  test('ESLint config nên được định nghĩa dưới dạng mảng (Flat Config)', () => {
+  test('ESLint config nên được định nghĩa chuẩn (Flat Config)', () => {
     // ESLint 9+ dùng flat config là một mảng
     const isArray = Array.isArray(eslintConfig);
     expect(isArray).toBe(true);
@@ -50,10 +56,29 @@ describe('Kiểm tra cấu hình dự án (Coverage Fix)', () => {
     expect(configArray.length).toBeGreaterThan(0);
   });
 
-  test('ESLint config nên chứa các quy tắc cơ bản', () => {
+  test('ESLint config nên chứa đầy đủ các đường dẫn ignores', () => {
     const configArray = eslintConfig as unknown as ESLintConfigItem[];
-    // Duyệt qua các phần tử để tìm cấu hình ignores hoặc rules mà không dùng any
-    const hasIgnores = configArray.some((cfg) => cfg.ignores !== undefined);
-    expect(hasIgnores).toBe(true);
+    
+    // Tìm phần tử cấu hình ignores để kiểm tra chi tiết
+    const ignoreConfig = configArray.find((cfg) => cfg.ignores !== undefined);
+    expect(ignoreConfig).toBeDefined();
+    
+    if (ignoreConfig && ignoreConfig.ignores) {
+      // Kiểm tra từng đường dẫn để đảm bảo logic mapping trong eslint.config.mjs được thực thi
+      const pathsToVerify = ['.next/**', 'out/**', 'build/**', 'next-env.d.ts'];
+      pathsToVerify.forEach(path => {
+        expect(ignoreConfig.ignores).toContain(path);
+      });
+    }
+  });
+
+  test('ESLint config nên tích hợp cấu hình Next.js và TypeScript', () => {
+    const configArray = eslintConfig as unknown as ESLintConfigItem[];
+    // eslint-config-next thường tạo ra nhiều object trong mảng cấu hình
+    expect(configArray.length).toBeGreaterThan(2);
+    
+    // Đảm bảo có ít nhất một cấu hình có chứa rules hoặc định nghĩa files
+    const hasLogicConfig = configArray.some(cfg => cfg.rules !== undefined || cfg.files !== undefined);
+    expect(hasLogicConfig).toBeTruthy();
   });
 });
