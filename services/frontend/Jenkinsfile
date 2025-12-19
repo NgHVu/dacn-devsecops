@@ -1,5 +1,5 @@
 pipeline {
-    agent none // Không chiếm dụng agent ở mức global để tiết kiệm tài nguyên
+    agent none
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
@@ -10,11 +10,10 @@ pipeline {
     }
 
     environment {
-        APP_NAME        = 'frontend'
-        // [FIX] Docker/GHCR yêu cầu tên repository phải viết THƯỜNG hoàn toàn
-        REGISTRY        = 'ghcr.io/nghvu' 
-        TRIVY_SEVERITY  = 'HIGH,CRITICAL'
-        TRIVY_CACHE_DIR = "/var/jenkins_home/caches/trivy"
+        APP_NAME         = 'frontend'
+        REGISTRY         = 'ghcr.io/nghvu'
+        TRIVY_SEVERITY   = 'HIGH,CRITICAL'
+        TRIVY_CACHE_DIR  = "/var/jenkins_home/caches/trivy"
         NPM_CONFIG_CACHE = "/var/jenkins_home/caches/npm"
     }
 
@@ -23,23 +22,15 @@ pipeline {
             agent any
             steps {
                 script {
-                    echo '--> 1. Khởi tạo và làm sạch Workspace triệt để...'
-                    
-                    // Lệnh xóa sạch dữ liệu cũ để build lại từ đầu
-                    sh """
-                        echo '--> Đang xóa cache hệ thống...'
-                        docker builder prune -a -f || true
-                        docker image prune -f || true
-                        rm -rf ${env.TRIVY_CACHE_DIR}/*
-                        rm -rf ${env.NPM_CONFIG_CACHE}/*
-                        git clean -fdx
-                    """
-                    
+                    echo '--> 1. Khởi tạo Workspace...'
+                    // Xóa file không được track bởi git để đảm bảo môi trường sạch
+                    sh 'git clean -fdx' 
                     checkout scm
                     
                     env.IMAGE_TAG = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
                     echo "--> IMAGE_TAG: ${env.IMAGE_TAG}"
                     
+                    // Tạo thư mục cache nếu chưa có (để mount vào docker)
                     sh "mkdir -p ${TRIVY_CACHE_DIR} ${NPM_CONFIG_CACHE}"
                 }
             }
@@ -50,7 +41,7 @@ pipeline {
                 stage('2.1. SonarQube Analysis') {
                     agent {
                         docker {
-                            image 'node:20-bookworm-slim' // Debian slim giúp chạy Sonar cực ổn định
+                            image 'node:20-bookworm-slim'
                             args "-v ${NPM_CONFIG_CACHE}:/root/.npm -u 0:0 --network dacn-ci_ci"
                         }
                     }
@@ -59,8 +50,8 @@ pipeline {
                             script {
                                 echo '--> Đang phân tích mã nguồn với SonarQube...'
                                 sh 'apt-get update && apt-get install -y default-jre'
-                                // Dùng --force để ép cài lại dù có cache
-                                sh 'npm ci --force --no-audit'
+                                // Dùng --prefer-offline để tận dụng cache npm, tăng tốc độ
+                                sh 'npm ci --prefer-offline --no-audit'
                                 
                                 withSonarQubeEnv('sonarqube-local') {
                                     sh """
@@ -82,7 +73,8 @@ pipeline {
                     steps {
                         dir('services/frontend') {
                             echo '--> Đang quét lỗ hổng thư viện (SCA)...'
-                            sh "trivy fs --cache-dir ${TRIVY_CACHE_DIR} --ignore-unfixed --severity ${TRIVY_SEVERITY} --exit-code 1 ."
+                            // Thêm .trivyignore nếu bạn muốn bỏ qua các lỗi cụ thể
+                            sh "trivy fs --cache-dir ${TRIVY_CACHE_DIR} --ignore-unfixed --severity ${TRIVY_SEVERITY} --exit-code 1 --ignorefile .trivyignore ."
                         }
                     }
                 }
@@ -108,9 +100,10 @@ pipeline {
                         sh "echo \$GITHUB_TOKEN | docker login ghcr.io -u nghvu --password-stdin"
                     }
 
-                    // [FIX] Sử dụng --no-cache mạnh mẽ để ép rebuild mọi layer
+                    // Loại bỏ --no-cache để tận dụng Docker layer cache -> Build siêu nhanh
+                    // Thêm --pull để đảm bảo base image luôn mới nhất
                     sh """
-                        docker build --no-cache --pull \
+                        docker build --pull \
                         -t ${env.REGISTRY}/${env.APP_NAME}:${env.IMAGE_TAG} \
                         -t ${env.REGISTRY}/${env.APP_NAME}:latest \
                         -f services/frontend/Dockerfile services/frontend
@@ -132,12 +125,9 @@ pipeline {
             }
             steps {
                 script {
-                    // [FIX] Xóa cache Trivy để đảm bảo kết quả quét là mới nhất, không dùng database cũ
-                    echo '--> Xóa cache Trivy cũ...'
-                    sh "trivy image --clear-cache"
-
-                    echo '--> Quét bảo mật Image cuối cùng trước khi hoàn tất...'
-                    sh "trivy image --severity ${TRIVY_SEVERITY} --exit-code 1 ${env.REGISTRY}/${env.APP_NAME}:${env.IMAGE_TAG}"
+                    echo '--> Quét bảo mật Image cuối cùng...'
+                    // Không cần --clear-cache mỗi lần chạy để tiết kiệm thời gian tải DB
+                    sh "trivy image --severity ${TRIVY_SEVERITY} --exit-code 1 --ignorefile services/frontend/.trivyignore ${env.REGISTRY}/${env.APP_NAME}:${env.IMAGE_TAG}"
                 }
             }
         }
@@ -149,12 +139,14 @@ pipeline {
                 script {
                     echo '--> Dọn dẹp hệ thống...'
                     try {
+                        // Xóa image vừa build để giải phóng không gian đĩa
                         sh "docker rmi ${env.REGISTRY}/${env.APP_NAME}:${env.IMAGE_TAG} || true"
-                        sh "docker image prune -af" // Xóa cả image cũ không dùng
+                        // Dọn dẹp các dangling images (không tên) sinh ra trong quá trình build
+                        sh "docker image prune -f"
                     } catch (Exception e) {
                         echo "Lỗi khi dọn dẹp Docker: ${e.message}"
                     }
-                    cleanWs()
+                    cleanWs() // Xóa workspace
                 }
             }
         }
