@@ -1,5 +1,6 @@
 pipeline {
-    agent any
+    agent none // Không chiếm dụng agent ở mức global để tiết kiệm tài nguyên
+
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         disableConcurrentBuilds()
@@ -9,144 +10,138 @@ pipeline {
     }
 
     environment {
-        IMAGE_NAME      = 'frontend'
-        TRIVY_EXIT_CODE = '1'
+        APP_NAME        = 'frontend'
+        REGISTRY        = 'ghcr.io/NgHVu'
         TRIVY_SEVERITY  = 'HIGH,CRITICAL'
-        DOCKER_BUILDKIT = '1'
         TRIVY_CACHE_DIR = "/var/jenkins_home/caches/trivy"
+        NPM_CONFIG_CACHE = "/var/jenkins_home/caches/npm"
     }
 
     stages {
-        stage('1. Checkout SCM & Compute Tag') {
+        stage('1. Prepare') {
+            agent any
             steps {
-                echo '--> Lấy mã nguồn từ Git và tính toán Image Tag...'
-                sh 'git clean -fdx'
-                checkout scm
                 script {
+                    echo '--> 1. Khởi tạo và làm sạch Workspace...'
+                    // Xóa các file rác nhưng giữ lại cache thư mục nếu cần
+                    sh 'git clean -fdx'
+                    checkout scm
+                    
                     env.IMAGE_TAG = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
-                    if (!env.IMAGE_TAG) {
-                        env.IMAGE_TAG = "dev-${env.BUILD_NUMBER}"
+                    echo "--> IMAGE_TAG: ${env.IMAGE_TAG}"
+                    
+                    sh "mkdir -p ${TRIVY_CACHE_DIR} ${NPM_CONFIG_CACHE}"
+                }
+            }
+        }
+
+        stage('2. Quality & Security Gate (Parallel)') {
+            parallel {
+                stage('2.1. SonarQube Analysis') {
+                    agent {
+                        docker {
+                            image 'node:20-bookworm-slim' // Debian slim giúp chạy Sonar cực ổn định
+                            args "-v ${NPM_CONFIG_CACHE}:/root/.npm -u 0:0 --network dacn-ci_ci"
+                        }
                     }
-                    echo "--> IMAGE_TAG = ${env.IMAGE_TAG}"
+                    steps {
+                        dir('services/frontend') {
+                            script {
+                                echo '--> Đang phân tích mã nguồn với SonarQube...'
+                                sh 'apt-get update && apt-get install -y default-jre'
+                                sh 'npm ci --prefer-offline --no-audit'
+                                
+                                withSonarQubeEnv('sonarqube-local') {
+                                    sh """
+                                        npx sonarqube-scanner \
+                                        -Dsonar.projectKey=frontend-service \
+                                        -Dsonar.sources=. \
+                                        -Dsonar.exclusions=**/.next/**,**/node_modules/**,**/out/** \
+                                        -Dsonar.host.url=${SONAR_HOST_URL} \
+                                        -Dsonar.token=${SONAR_AUTH_TOKEN}
+                                    """
+                                }
+                            }
+                        }
+                    }
                 }
-                sh "mkdir -p ${TRIVY_CACHE_DIR}"
-            }
-        }
 
-        stage('1.5. Login to Registries') {
-            steps {
-                withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_TOKEN')]) {
-                    echo '--> Đăng nhập vào GitHub Container Registry...'
-                    sh 'echo $GITHUB_TOKEN | docker login ghcr.io -u NgHVu --password-stdin'
-                }
-            }
-        }
-
-        stage('1.6. Warm-up Caches') {
-            agent {
-                docker {
-                    image 'ghcr.io/aquasecurity/trivy:0.49.1'
-                    args "--entrypoint='' -v ${TRIVY_CACHE_DIR}:/root/.cache/trivy -u 0:0 --network dacn-ci_ci"
-                    reuseNode true
-                }
-            }
-            steps {
-                echo '--> Đang cập nhật cơ sở dữ liệu Trivy...'
-                sh "trivy image --download-db-only --cache-dir /root/.cache/trivy --timeout 30m"
-            }
-        }
-
-        stage('2. Build & Analyze (SonarQube)') {
-            agent {
-                docker {
-                    // [FIX] Sử dụng image Debian (bookworm) thay vì Alpine.
-                    // Debian hỗ trợ glibc mặc định, chạy mượt mà SonarScanner mà không cần patch.
-                    image 'node:20-bookworm'
-                    args '-v $HOME/.npm:/root/.npm -u 0:0 --network dacn-ci_ci'
-                    reuseNode true
-                }
-            }
-            steps {
-                dir('services/frontend') {
-                    script {
-                        echo '--> Cài đặt JRE (Java Runtime) trên Debian...'
-                        // Cài đặt Java bằng apt-get (chuẩn Debian/Ubuntu)
-                        sh 'apt-get update && apt-get install -y default-jre'
-                        
-                        echo '--> Cài đặt thư viện Frontend...'
-                        sh 'npm ci'
-                        
-                        echo '--> Chạy SonarQube Scanner...'
-                        withSonarQubeEnv('sonarqube-local') {
-                            sh """
-                                npx sonarqube-scanner \
-                                -Dsonar.projectKey=frontend-service \
-                                -Dsonar.sources=. \
-                                -Dsonar.exclusions=**/.next/**,**/node_modules/**,**/out/** \
-                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                                -Dsonar.host.url=${SONAR_HOST_URL} \
-                                -Dsonar.token=${SONAR_AUTH_TOKEN}
-                            """
+                stage('2.2. Trivy SCA Scan') {
+                    agent any
+                    steps {
+                        dir('services/frontend') {
+                            echo '--> Đang quét lỗ hổng thư viện (SCA)...'
+                            // Chạy Trivy trực tiếp trên host hoặc container tùy ý, ưu tiên tốc độ
+                            sh "trivy fs --cache-dir ${TRIVY_CACHE_DIR} --ignore-unfixed --severity ${TRIVY_SEVERITY} --exit-code 1 ."
                         }
                     }
                 }
             }
         }
 
-        stage('3. Quality Gate') {
+        stage('3. Quality Gate Result') {
+            agent any
             steps {
+                echo '--> Kiểm tra kết quả Quality Gate...'
                 timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
         }
 
-        stage('4. Trivy FS Scan (SCA)') {
+        stage('4. Build & Push Image') {
+            agent any
             steps {
-                dir('services/frontend') {
-                    echo '--> Quét lỗ hổng trong mã nguồn và thư viện (SCA)...'
-                    sh "trivy fs --cache-dir ${TRIVY_CACHE_DIR} --timeout 30m --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ."
+                script {
+                    echo '--> Đang đóng gói Docker Image...'
+                    withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_TOKEN')]) {
+                        sh 'echo $GITHUB_TOKEN | docker login ghcr.io -u NgHVu --password-stdin'
+                    }
+
+                    // Sử dụng --pull để đảm bảo base image luôn mới nhất.
+                    sh """
+                        docker build --pull \
+                        -t ${REGISTRY}/${APP_NAME}:${env.IMAGE_TAG} \
+                        -t ${REGISTRY}/${APP_NAME}:latest \
+                        -f services/frontend/Dockerfile services/frontend
+                    """
+                    
+                    echo '--> Đang đẩy Image lên GHCR...'
+                    sh "docker push ${REGISTRY}/${APP_NAME}:${env.IMAGE_TAG}"
+                    sh "docker push ${REGISTRY}/${APP_NAME}:latest"
                 }
             }
         }
 
-        stage('5. Build Docker Image') {
-            steps {
-                echo '--> Building Frontend Docker image...'
-                sh "docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} -f services/frontend/Dockerfile services/frontend"
-            }
-        }
-
-        stage('6. Trivy Image Scan') {
+        stage('5. Final Security Scan') {
             agent {
                 docker {
                     image 'ghcr.io/aquasecurity/trivy:0.49.1'
-                    args "-v /var/run/docker.sock:/var/run/docker.sock -v ${TRIVY_CACHE_DIR}:/root/.cache/trivy -u 0:0 --network dacn-ci_ci --entrypoint=''"
-                    reuseNode true
+                    args "-v /var/run/docker.sock:/var/run/docker.sock -v ${TRIVY_CACHE_DIR}:/root/.cache/trivy -u 0:0 --entrypoint=''"
                 }
             }
             steps {
-                echo '--> Quét Docker image thành phẩm trước khi release...'
-                sh "trivy image --timeout 5m --ignore-unfixed --no-progress --severity ${TRIVY_SEVERITY} --exit-code ${TRIVY_EXIT_CODE} ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                echo '--> Quét bảo mật Image cuối cùng trước khi hoàn tất...'
+                sh "trivy image --severity ${TRIVY_SEVERITY} --exit-code 1 ${REGISTRY}/${APP_NAME}:${env.IMAGE_TAG}"
             }
         }
     }
 
     post {
         always {
-            echo '--> Dọn dẹp tài nguyên sau khi pipeline kết thúc...'
             script {
-                if (env.IMAGE_TAG) {
-                    sh "docker rmi ${env.IMAGE_NAME}:${env.IMAGE_TAG} || true"
-                }
-                sh "docker image prune -f || true"
+                echo '--> Dọn dẹp hệ thống...'
+                // Xóa image local để tránh đầy ổ cứng server Jenkins
+                sh "docker rmi ${REGISTRY}/${APP_NAME}:${env.IMAGE_TAG} || true"
+                sh "docker image prune -f"
+                cleanWs()
             }
         }
         success {
-            echo '--> Pipeline Frontend hoàn thành thành công!'
+            echo '[SUCCESS] Pipeline hoàn thành xuất sắc!'
         }
         failure {
-            echo '--> Pipeline thất bại. Vui lòng kiểm tra log của stage lỗi.'
+            echo '[FAILURE] Pipeline thất bại. Kiểm tra log ngay!'
         }
     }
 }
