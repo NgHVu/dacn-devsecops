@@ -10,7 +10,6 @@ echo "--> [BACKEND] Bắt đầu Test & Phân tích cho: $SERVICE_NAME"
 cd "services/$SERVICE_NAME"
 
 # Chạy Maven Verify & SonarQube
-# Lưu ý: $SONAR_HOST_URL và $SONAR_AUTH_TOKEN sẽ được Jenkins tự bơm vào môi trường
 mvn clean verify sonar:sonar \
     -Dsonar.projectKey=$SONAR_PROJECT_KEY \
     -Dmaven.test.failure.ignore=false
