@@ -84,35 +84,38 @@ pipeline {
         }
 
         stage('5. Update GitOps (ArgoCD)') {
-            when { branch 'main' }
-            steps {
-                script {
-                    echo "--> 🔄 Updating dacn-config Manifest for Frontend with tag: ${env.IMAGE_TAG}"
-                    withCredentials([usernamePassword(credentialsId: "${GITOPS_CRED_ID}", passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
-                        sh """
-                            # Dọn dẹp folder tạm nếu có
-                            rm -rf tmp-gitops
-                            
-                            # Clone repo cấu hình
-                            git clone https://${GIT_USER}:${GIT_PASS}@${GITOPS_REPO_URL} tmp-gitops
-                            cd tmp-gitops/environments/dev/
-                            
-                            # Cập nhật tag image mới cho file frontend-values.yaml
-                            # Sử dụng SERVICE_NAME (frontend) để tìm đúng file
-                            sed -i 's/tag: .*/tag: ${env.IMAGE_TAG}/g' ${SERVICE_NAME}-values.yaml
-                            
-                            # Commit và đẩy thay đổi lên GitHub
-                            git config user.email "nhoangvu2306@gmail.com"
-                            git config user.name "NgHVu Jenkins Bot"
-                            git add ${SERVICE_NAME}-values.yaml
-                            git commit -m "Update ${SERVICE_NAME} image to ${env.IMAGE_TAG} [skip ci]"
-                            git push origin HEAD:main
-                        """
-                    }
-                }
+    when { branch 'main' }
+    steps {
+        script {
+            echo "--> 🔄 Updating dacn-config Manifest with new image tag: ${env.IMAGE_TAG}"
+            withCredentials([usernamePassword(credentialsId: "${GITOPS_CRED_ID}", passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
+                sh """
+                    # 1. Xóa sạch và clone lại
+                    rm -rf tmp-gitops
+                    git clone https://${GIT_USER}:${GIT_PASS}@${GITOPS_REPO_URL} tmp-gitops
+                    
+                    # 2. Kiểm tra cấu trúc thư mục thực tế (Log ra để debug)
+                    echo "--- THƯ MỤC TRONG REPO ---"
+                    ls -R tmp-gitops
+                    
+                    # 3. Di chuyển vào thư mục chứa file values
+                    # LƯU Ý: Nếu repo của bạn không có folder environments/dev, hãy sửa đường dẫn này
+                    cd tmp-gitops/environments/dev/ || cd tmp-gitops/
+                    
+                    # 4. Cập nhật tag image
+                    sed -i 's/tag: .*/tag: ${env.IMAGE_TAG}/g' ${SERVICE_NAME}-values.yaml
+                    
+                    # 5. Commit và Push
+                    git config user.email "nhoangvu2306@gmail.com"
+                    git config user.name "NgHVu Jenkins Bot"
+                    git add ${SERVICE_NAME}-values.yaml
+                    git commit -m "Update ${SERVICE_NAME} image tag to ${env.IMAGE_TAG} [skip ci]"
+                    git push origin HEAD:main
+                """
             }
         }
     }
+}
 
     post {
         always {
