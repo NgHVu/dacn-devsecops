@@ -2,13 +2,18 @@ pipeline {
     agent any 
     
     environment {
+        // --- THÔNG TIN DỰ ÁN ---
         SERVICE_NAME        = 'users' 
         AWS_REGION          = 'ap-southeast-1'
         AWS_ACCOUNT_ID      = '257394468168'
         ECR_REGISTRY        = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_URI           = "${ECR_REGISTRY}/foodhub-${SERVICE_NAME}"
         
-        // SỬA LỖI: Dùng đường dẫn cache tương đối trong Workspace để tránh lỗi Permission denied
+        // --- THÔNG TIN GITOPS (Đã khớp với Repo NgHVu/dacn-config và Credential github-pat) ---
+        GITOPS_REPO_URL     = "github.com/NgHVu/dacn-config.git"
+        GITOPS_CRED_ID      = "github-pat" 
+        
+        // Đường dẫn cache cho quét bảo mật
         SCAN_CACHE_DIR      = "${WORKSPACE}/.trivy-cache"
     }
 
@@ -23,6 +28,7 @@ pipeline {
         stage('1. Initialize') {
             steps {
                 script {
+                    // Lấy mã hash rút gọn của git commit làm tag
                     env.COMMIT_HASH = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
                     if (env.BRANCH_NAME == 'main') {
                         env.IMAGE_TAG = env.COMMIT_HASH
@@ -31,24 +37,20 @@ pipeline {
                     }
                     
                     sh 'chmod +x scripts/*.sh'
-                    echo "-->STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
+                    echo "--> 🚀 STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
                 }
                 
-                // Login ECR
+                // Đăng nhập vào AWS ECR
                 sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
             }
         }
 
         stage('2. Parallel Analysis') {
             parallel {
-
-                //failFast true
-
                 stage('Code Quality (SonarQube)') {
                     agent {
                         docker {
                             image 'maven:3.9-eclipse-temurin-21'
-                            // Mount .m2 cache
                             args '--network host -v $HOME/.m2:/root/.m2 -u 0:0'
                             reuseNode true
                         }
@@ -62,8 +64,7 @@ pipeline {
 
                 stage('Security Scan (Trivy)') {
                     steps {
-                        // Trivy sẽ chạy trực tiếp trên Host (nơi đã cài Trivy qua script setup)
-                        // Sử dụng cache dir mới đã sửa ở trên
+                        // Quét lỗ hổng bảo mật mức HIGH và CRITICAL
                         sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} HIGH,CRITICAL"
                     }
                 }
@@ -72,6 +73,7 @@ pipeline {
 
         stage('3. Quality Gate') {
             steps {
+                // Kiểm tra ngưỡng chất lượng từ SonarQube
                 timeout(time: 5, unit: 'MINUTES') { 
                     waitForQualityGate abortPipeline: true 
                 }
@@ -79,23 +81,57 @@ pipeline {
         }
 
         stage('4. Build & Push Docker') {
-            when {
-                branch 'main'
-            }
+            when { branch 'main' }
             steps {
+                // Build và đẩy Docker Image lên ECR
                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${IMAGE_URI} ${env.IMAGE_TAG}"
+            }
+        }
+
+        stage('5. Update GitOps (ArgoCD)') {
+            when { branch 'main' }
+            steps {
+                script {
+                    echo "--> 🔄 Updating dacn-config Manifest with new image tag: ${env.IMAGE_TAG}"
+                    // Sử dụng Personal Access Token từ Jenkins Credentials
+                    withCredentials([usernamePassword(credentialsId: "${GITOPS_CRED_ID}", passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
+                        sh """
+                            rm -rf tmp-gitops
+                            
+                            # Clone repo dacn-config của bạn
+                            git clone https://${GIT_USER}:${GIT_PASS}@${GITOPS_REPO_URL} tmp-gitops
+                            cd tmp-gitops/environments/dev/
+                            
+                            # Cập nhật tag image mới cho file users-values.yaml bằng lệnh sed
+                            sed -i 's/tag: .*/tag: ${env.IMAGE_TAG}/g' ${SERVICE_NAME}-values.yaml
+                            
+                            # Cấu hình danh tính để commit
+                            git config user.email "nhoangvu2306@gmail.com"
+                            git config user.name "NgHVu Jenkins Bot"
+                            
+                            # Commit và đẩy thay đổi lên GitHub
+                            git add ${SERVICE_NAME}-values.yaml
+                            git commit -m "Update ${SERVICE_NAME} image tag to ${env.IMAGE_TAG} [skip ci]"
+                            git push origin HEAD:main
+                        """
+                    }
+                }
             }
         }
     }
 
     post {
         always {
-            echo '--> 🧹 Cleaning up...'
+            echo '--> 🧹 Cleaning up temporary docker images and files...'
             sh "docker rmi ${IMAGE_URI}:${env.IMAGE_TAG} || true"
             sh "docker rmi ${IMAGE_URI}:latest || true"
+            sh "rm -rf tmp-gitops"
         }
         failure {
             echo "Pipeline Failed on branch ${env.BRANCH_NAME}!"
+        }
+        success {
+            echo "Pipeline Success! ArgoCD will now detect the changes and update the cluster."
         }
     }
 }

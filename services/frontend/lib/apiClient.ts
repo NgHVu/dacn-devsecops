@@ -6,7 +6,7 @@ const getBaseUrl = () => {
     return "/";
   }
   
-  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return process.env.NEXT_PUBLIC_APP_URL || "http://frontend:80";
 };
 
 const apiClient = axios.create({

@@ -2,13 +2,17 @@ pipeline {
     agent any 
     
     environment {
+        // --- THÔNG TIN DỰ ÁN ---
         SERVICE_NAME        = 'frontend' 
         AWS_REGION          = 'ap-southeast-1'
         AWS_ACCOUNT_ID      = '257394468168'
         ECR_REGISTRY        = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_URI           = "${ECR_REGISTRY}/foodhub-${SERVICE_NAME}"
         
-        // Dùng đường dẫn cache trong Workspace để tránh lỗi Permission denied
+        // --- THÔNG TIN GITOPS (Khớp với github-pat và repo dacn-config) ---
+        GITOPS_REPO_URL     = "github.com/NgHVu/dacn-config.git"
+        GITOPS_CRED_ID      = "github-pat" 
+        
         SCAN_CACHE_DIR      = "${WORKSPACE}/.trivy-cache"
     }
 
@@ -34,21 +38,17 @@ pipeline {
                     echo "-->STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
                 }
                 
-                // Login ECR (Sử dụng IAM Role của EC2)
+                // Login ECR
                 sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
             }
         }
 
         stage('2. Parallel Analysis') {
             parallel {
-                // Nếu một trong hai nhánh fail, dừng toàn bộ stage Parallel ngay lập tức
-                //failFast true
-
                 stage('Code Quality (SonarQube)') {
                     agent {
                         docker {
                             image 'node:20-bookworm'
-                            // Mount .npm cache để tăng tốc độ cài đặt package
                             args '--network host -v $HOME/.npm:/root/.npm -u 0:0'
                             reuseNode true
                         }
@@ -62,7 +62,6 @@ pipeline {
 
                 stage('Security Scan (Trivy)') {
                     steps {
-                        // FIX: Chỉ truyền ${SERVICE_NAME} vì script đã tự động thêm prefix 'services/'
                         sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} HIGH,CRITICAL"
                     }
                 }
@@ -78,11 +77,39 @@ pipeline {
         }
 
         stage('4. Build & Push Docker') {
-            when {
-                branch 'main'
-            }
+            when { branch 'main' }
             steps {
                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${IMAGE_URI} ${env.IMAGE_TAG}"
+            }
+        }
+
+        stage('5. Update GitOps (ArgoCD)') {
+            when { branch 'main' }
+            steps {
+                script {
+                    echo "--> 🔄 Updating dacn-config Manifest for Frontend with tag: ${env.IMAGE_TAG}"
+                    withCredentials([usernamePassword(credentialsId: "${GITOPS_CRED_ID}", passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
+                        sh """
+                            # Dọn dẹp folder tạm nếu có
+                            rm -rf tmp-gitops
+                            
+                            # Clone repo cấu hình
+                            git clone https://${GIT_USER}:${GIT_PASS}@${GITOPS_REPO_URL} tmp-gitops
+                            cd tmp-gitops/environments/dev/
+                            
+                            # Cập nhật tag image mới cho file frontend-values.yaml
+                            # Sử dụng SERVICE_NAME (frontend) để tìm đúng file
+                            sed -i 's/tag: .*/tag: ${env.IMAGE_TAG}/g' ${SERVICE_NAME}-values.yaml
+                            
+                            # Commit và đẩy thay đổi lên GitHub
+                            git config user.email "nhoangvu2306@gmail.com"
+                            git config user.name "NgHVu Jenkins Bot"
+                            git add ${SERVICE_NAME}-values.yaml
+                            git commit -m "Update ${SERVICE_NAME} image to ${env.IMAGE_TAG} [skip ci]"
+                            git push origin HEAD:main
+                        """
+                    }
+                }
             }
         }
     }
@@ -92,11 +119,14 @@ pipeline {
             echo '--> 🧹 Cleaning up...'
             sh "docker rmi ${IMAGE_URI}:${env.IMAGE_TAG} || true"
             sh "docker rmi ${IMAGE_URI}:latest || true"
-            // Xóa thư mục coverage do docker tạo ra để tránh lỗi quyền ghi lần sau
             sh "rm -rf services/${SERVICE_NAME}/coverage || true"
+            sh "rm -rf tmp-gitops"
         }
         failure {
             echo "Pipeline Failed on branch ${env.BRANCH_NAME}!"
+        }
+        success {
+            echo "Pipeline Success! ArgoCD will deploy the new Frontend version shortly."
         }
     }
 }
