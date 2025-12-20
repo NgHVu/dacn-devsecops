@@ -87,15 +87,15 @@ pipeline {
                             rm -rf tmp-gitops
                             git clone https://${GIT_USER}:${GIT_PASS}@${GITOPS_REPO_URL} tmp-gitops
                             
-                            # 2. Kiểm tra cấu trúc thư mục thực tế
-                            echo "--- THƯ MỤC TRONG REPO ---"
-                            ls -R tmp-gitops
+                            # 2. Di chuyển vào thư mục (Đã sửa thành enviroments theo thực tế của bạn)
+                            cd tmp-gitops/enviroments/dev/
                             
-                            # 3. Di chuyển vào thư mục chứa file values
-                            cd tmp-gitops/environments/dev/ || cd tmp-gitops/
-                            
-                            # 4. Cập nhật tag image
+                            # 3. Cập nhật tag image cho đúng file values của service
+                            # Dùng nháy kép cho sed để nội suy biến môi trường Jenkins
                             sed -i "s/tag: .*/tag: ${IMAGE_TAG}/g" ${SERVICE_NAME}-values.yaml
+                            
+                            # 4. Kiểm tra xem file đã được sửa chưa (để chắc chắn)
+                            grep "tag:" ${SERVICE_NAME}-values.yaml
                             
                             # 5. Commit và Push
                             git config user.email "nhoangvu2306@gmail.com"
