@@ -25,7 +25,7 @@ pipeline {
         
         // --- SONARQUBE GLOBAL ---
         // Inject Token để script shell dùng được
-        SONAR_AUTH_TOKEN = credentials('jenkin-token')
+        SONAR_AUTH_TOKEN = credentials('sonar-token')
         
         // Dùng localhost vì Agent chạy với '--network host', nó sẽ nhìn thấy SonarQube ngay trên máy Local
         // Không dùng IP Public để tránh lỗi khi IP thay đổi
