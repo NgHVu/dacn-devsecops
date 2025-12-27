@@ -41,7 +41,7 @@ public class DataSeeder implements CommandLineRunner {
         log.info("DataSeeder: Bắt đầu khởi tạo dữ liệu mẫu...");
 
         // 1. Seed Categories
-        Category catMonHot = seedCategory("Món Hot", "Các món 'Best Seller' được yêu thích nhất", "Flame");
+        Category catMonHot = seedCategory("Món Hot", "Các món 'Best Seller' được yêu thích nhất test", "Flame");
         Category catComTam = seedCategory("Cơm Tấm", "Cơm tấm Sài Gòn hạt vỡ chính hiệu", "Utensils");
         Category catBunPho = seedCategory("Bún Phở", "Hương vị truyền thống Việt Nam đậm đà", "Soup");
         Category catDoUong = seedCategory("Đồ Uống", "Trà sữa, Cà phê & Nước ép tươi", "Coffee");
