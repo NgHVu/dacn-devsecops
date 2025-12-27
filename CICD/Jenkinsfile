@@ -28,10 +28,10 @@ pipeline {
         stage('1. Initialize') {
             steps {
                 script {
-                    // Cấp quyền thực thi cho toàn bộ script
+                    // Cấp quyền thực thi cho script
                     sh 'chmod +x scripts/*.sh'
                     
-                    // Tính toán Tag cho Image (Commit Hash ngắn)
+                    // Tính toán Tag
                     env.COMMIT_HASH = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
                     if (env.BRANCH_NAME == 'main') {
                         env.IMAGE_TAG = env.COMMIT_HASH
@@ -41,7 +41,7 @@ pipeline {
                     
                     echo "--> 🚀 STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
                 }
-                // Đăng nhập ECR một lần dùng chung cho tất cả
+                // Đăng nhập ECR
                 sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
             }
         }
@@ -49,10 +49,16 @@ pipeline {
         stage('2. Build & Deploy Microservices') {
             parallel {
                 // ==========================================
-                // SERVICE: USERS (Backend)
+                // 1. USERS SERVICE
                 // ==========================================
                 stage('Users Service') {
-                    when { changeset "services/users/**" }
+                    when {
+                        anyOf {
+                            triggeredBy 'UserIdCause'       // 1. Bấm nút Build tay -> Chạy luôn
+                            triggeredBy 'BranchIndexingCause' // 2. Lần đầu quét branch -> Chạy luôn
+                            changeset "services/users/**"   // 3. Có code thay đổi -> Chạy
+                        }
+                    }
                     environment { SERVICE_NAME = 'users' }
                     stages {
                         stage('Users: Code Analysis') {
@@ -71,10 +77,7 @@ pipeline {
                         }
                         stage('Users: Security & Build') {
                             steps {
-                                // Quét bảo mật (Trivy FS)
                                 sh "./scripts/security-scan.sh services/${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
-                                
-                                // Build & Push Docker (Gọi script chung)
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
                         }
@@ -88,10 +91,16 @@ pipeline {
                 }
 
                 // ==========================================
-                // SERVICE: PRODUCTS (Backend)
+                // 2. PRODUCTS SERVICE
                 // ==========================================
                 stage('Products Service') {
-                    when { changeset "services/products/**" }
+                    when {
+                        anyOf {
+                            triggeredBy 'UserIdCause'
+                            triggeredBy 'BranchIndexingCause'
+                            changeset "services/products/**"
+                        }
+                    }
                     environment { SERVICE_NAME = 'products' }
                     stages {
                         stage('Products: Code Analysis') {
@@ -124,10 +133,16 @@ pipeline {
                 }
 
                 // ==========================================
-                // SERVICE: ORDERS (Backend)
+                // 3. ORDERS SERVICE
                 // ==========================================
                 stage('Orders Service') {
-                    when { changeset "services/orders/**" }
+                    when {
+                        anyOf {
+                            triggeredBy 'UserIdCause'
+                            triggeredBy 'BranchIndexingCause'
+                            changeset "services/orders/**"
+                        }
+                    }
                     environment { SERVICE_NAME = 'orders' }
                     stages {
                         stage('Orders: Code Analysis') {
@@ -160,10 +175,16 @@ pipeline {
                 }
 
                 // ==========================================
-                // SERVICE: FRONTEND
+                // 4. FRONTEND SERVICE
                 // ==========================================
                 stage('Frontend Service') {
-                    when { changeset "services/frontend/**" }
+                    when {
+                        anyOf {
+                            triggeredBy 'UserIdCause'
+                            triggeredBy 'BranchIndexingCause'
+                            changeset "services/frontend/**"
+                        }
+                    }
                     environment { SERVICE_NAME = 'frontend' }
                     stages {
                         stage('Frontend: Code Analysis') {
@@ -201,7 +222,6 @@ pipeline {
     post {
         always {
             echo '--> 🧹 Cleaning up temporary docker images...'
-            // Dọn dẹp images sau khi build để tránh đầy ổ cứng
             sh "docker image prune -f || true"
         }
         success {
@@ -214,12 +234,11 @@ pipeline {
 }
 
 // =========================================================
-// HÀM HELPER: Cập nhật GitOps Repo (Dùng chung cho các service)
+// HÀM HELPER: Cập nhật GitOps Repo
 // =========================================================
 def updateGitOps(serviceName, imageTag) {
     script {
         echo "--> 🔄 [GitOps] Updating ${serviceName} to tag: ${imageTag}"
-        // Tạo tên thư mục tạm duy nhất để tránh xung đột khi chạy song song
         def tmpDir = "tmp-gitops-${serviceName}"
         
         withCredentials([usernamePassword(credentialsId: "${GITOPS_CRED_ID}", passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
@@ -241,7 +260,7 @@ def updateGitOps(serviceName, imageTag) {
                     git add ${serviceName}-values.yaml
                     git commit -m "Update ${serviceName} image tag to ${imageTag} [skip ci]"
                     
-                    # 4. Push (Retry để tránh race condition khi chạy song song)
+                    # 4. Push with Retry
                     count=0
                     until git push origin HEAD:main; do
                         echo "Push failed, retrying pull --rebase..."
