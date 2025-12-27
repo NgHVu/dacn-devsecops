@@ -259,7 +259,7 @@ pipeline {
 
 // =========================================================
 // HÀM HELPER: Cập nhật GitOps Repo
-// Sửa lỗi: Dùng git-credential-store để tránh lỗi 'Too many arguments'
+// Cập nhật: Cô lập môi trường HOME để tránh Race Condition khi chạy song song
 // =========================================================
 def updateGitOps(serviceName, imageTag) {
     script {
@@ -268,14 +268,18 @@ def updateGitOps(serviceName, imageTag) {
         
         withCredentials([usernamePassword(credentialsId: "${GITOPS_CRED_ID}", passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
             sh """
+                # TẠO MÔI TRƯỜNG CÔ LẬP (Isolation)
+                # Mỗi service sẽ có một thư mục HOME riêng để chứa file .git-credentials
+                mkdir -p ${tmpDir}_home
+                export HOME=\$(pwd)/${tmpDir}_home
+                
                 rm -rf ${tmpDir}
                 
-                # CẤU HÌNH CREDENTIAL STORE (Sửa lỗi Git Clone)
-                # Lưu user/pass vào file tạm để Git tự đọc, thay vì dán trực tiếp vào URL (gây lỗi ký tự đặc biệt)
+                # Cấu hình Credential cho HOME riêng biệt này
                 git config --global credential.helper store
                 echo "https://\$GIT_USER:\$GIT_PASS@github.com" > ~/.git-credentials
                 
-                # Clone repo (Git sẽ tự lấy pass từ file store)
+                # Clone
                 git clone https://${GITOPS_REPO_URL} ${tmpDir}
                 
                 cd ${tmpDir}/enviroments/dev/
@@ -291,21 +295,21 @@ def updateGitOps(serviceName, imageTag) {
                     git add ${serviceName}-values.yaml
                     git commit -m "Update ${serviceName} image tag to ${imageTag} [skip ci]"
                     
-                    # Retry Push
+                    # Retry Push (Sửa cú pháp count++)
                     count=0
                     until git push origin HEAD:main; do
                         echo "Push failed, retrying pull --rebase..."
                         git pull --rebase origin main
-                        ((count++))
+                        count=\$((count+1))  # Sửa cú pháp tại đây
                         if [ \$count -ge 5 ]; then echo "Git push failed after 5 retries"; exit 1; fi
                         sleep 2
                     done
                 fi
                 
-                # QUAN TRỌNG: Xóa file credential ngay sau khi dùng xong
-                rm -f ~/.git-credentials
+                # Dọn dẹp thư mục tạm
+                cd ../../../
+                rm -rf ${tmpDir} ${tmpDir}_home
             """
         }
-        sh "rm -rf ${tmpDir}"
     }
 }
