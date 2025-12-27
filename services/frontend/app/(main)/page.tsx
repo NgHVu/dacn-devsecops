@@ -136,7 +136,7 @@ async function ProductListSection({ searchParams }: { searchParams: Promise<{ [k
                     <>
                         <Sparkles className="h-7 w-7 text-yellow-500 fill-yellow-500 animate-pulse" />
                         <span className="bg-clip-text text-transparent bg-gradient-to-r from-orange-600 to-red-600">
-                            Món Ngon Hôm Nay 
+                            Món Ngon Hôm Nay test 
                         </span>
                     </>
                 )}
