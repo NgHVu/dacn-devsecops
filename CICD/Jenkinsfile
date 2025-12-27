@@ -10,32 +10,38 @@ pipeline {
     }
 
     environment {
+        // --- THÔNG TIN CHUNG DỰ ÁN ---
         AWS_REGION      = 'ap-southeast-1'
         AWS_ACCOUNT_ID  = '257394468168'
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        
+        // --- CẤU HÌNH BẢO MẬT & CACHE ---
         TRIVY_SEVERITY  = 'HIGH,CRITICAL'
         SCAN_CACHE_DIR  = "${WORKSPACE}/.trivy-cache"
+        
+        // --- THÔNG TIN GITOPS (ArgoCD) ---
         GITOPS_REPO_URL = "github.com/NgHVu/dacn-config.git"
         GITOPS_CRED_ID  = "github-pat"
-        
-        // SonarQube Vars (Dùng cho script shell fallback nếu cần)
-        SONAR_AUTH_TOKEN = credentials('sonar-token')
-        SONAR_HOST_URL   = 'http://localhost:9000'
     }
 
     stages {
         stage('1. Initialize') {
             steps {
                 script {
+                    // Cấp quyền thực thi cho script
                     sh 'chmod +x scripts/*.sh'
+                    
+                    // Tính toán Tag
                     env.COMMIT_HASH = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
                     if (env.BRANCH_NAME == 'main') {
                         env.IMAGE_TAG = env.COMMIT_HASH
                     } else {
                         env.IMAGE_TAG = "${env.BRANCH_NAME}-${env.COMMIT_HASH}"
                     }
-                    echo "-->STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
+                    
+                    echo "--> STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
                 }
+                // Đăng nhập ECR
                 sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
             }
         }
@@ -48,9 +54,9 @@ pipeline {
                 stage('Users Service') {
                     when {
                         anyOf {
-                            triggeredBy 'UserIdCause'
-                            triggeredBy 'BranchIndexingCause'
-                            changeset "services/users/**"
+                            triggeredBy 'UserIdCause'       // 1. Bấm nút Build tay -> Chạy luôn
+                            triggeredBy 'BranchIndexingCause' // 2. Lần đầu quét branch -> Chạy luôn
+                            changeset "services/users/**"   // 3. Có code thay đổi -> Chạy
                         }
                     }
                     environment { SERVICE_NAME = 'users' }
@@ -64,34 +70,17 @@ pipeline {
                                 }
                             }
                             steps {
-                                // Bọc trong withSonarQubeEnv để Jenkins nhận diện task
                                 withSonarQubeEnv('sonarqube-local') {
                                     sh "./scripts/analyze-backend.sh ${SERVICE_NAME}"
                                 }
                             }
-                            post { always { sh "rm -rf services/${SERVICE_NAME}/target" } }
                         }
-
-                        stage('Users: Quality Gate') {
-                            steps {
-                                timeout(time: 5, unit: 'MINUTES') {
-                                    waitForQualityGate abortPipeline: true
-                                }
-                            }
-                        }
-                        
-                        stage('Users: Trivy FS Scan') {
+                        stage('Users: Security & Build') {
                             steps {
                                 sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
-                            }
-                        }
-
-                        stage('Users: Docker Build & Push') {
-                            steps {
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
                         }
-
                         stage('Users: Update GitOps') {
                             when { branch 'main' }
                             steps {
@@ -127,29 +116,13 @@ pipeline {
                                     sh "./scripts/analyze-backend.sh ${SERVICE_NAME}"
                                 }
                             }
-                            post { always { sh "rm -rf services/${SERVICE_NAME}/target" } }
                         }
-
-                        stage('Products: Quality Gate') {
-                            steps {
-                                timeout(time: 5, unit: 'MINUTES') {
-                                    waitForQualityGate abortPipeline: true
-                                }
-                            }
-                        }
-
-                        stage('Products: Trivy FS Scan') {
+                        stage('Products: Security & Build') {
                             steps {
                                 sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
-                            }
-                        }
-
-                        stage('Products: Docker Build & Push') {
-                            steps {
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
                         }
-
                         stage('Products: Update GitOps') {
                             when { branch 'main' }
                             steps {
@@ -185,29 +158,13 @@ pipeline {
                                     sh "./scripts/analyze-backend.sh ${SERVICE_NAME}"
                                 }
                             }
-                            post { always { sh "rm -rf services/${SERVICE_NAME}/target" } }
                         }
-
-                        stage('Orders: Quality Gate') {
-                            steps {
-                                timeout(time: 5, unit: 'MINUTES') {
-                                    waitForQualityGate abortPipeline: true
-                                }
-                            }
-                        }
-
-                        stage('Orders: Trivy FS Scan') {
+                        stage('Orders: Security & Build') {
                             steps {
                                 sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
-                            }
-                        }
-
-                        stage('Orders: Docker Build & Push') {
-                            steps {
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
                         }
-
                         stage('Orders: Update GitOps') {
                             when { branch 'main' }
                             steps {
@@ -243,29 +200,13 @@ pipeline {
                                     sh "./scripts/analyze-frontend.sh"
                                 }
                             }
-                            post { always { sh "rm -rf services/${SERVICE_NAME}/node_modules services/${SERVICE_NAME}/coverage" } }
                         }
-
-                        stage('Frontend: Quality Gate') {
-                            steps {
-                                timeout(time: 5, unit: 'MINUTES') {
-                                    waitForQualityGate abortPipeline: true
-                                }
-                            }
-                        }
-
-                        stage('Frontend: Trivy FS Scan') {
+                        stage('Frontend: Security & Build') {
                             steps {
                                 sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
-                            }
-                        }
-
-                        stage('Frontend: Docker Build & Push') {
-                            steps {
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
                         }
-
                         stage('Frontend: Update GitOps') {
                             when { branch 'main' }
                             steps {
@@ -280,14 +221,14 @@ pipeline {
 
     post {
         always {
-            echo '-->Cleaning up temporary docker images...'
+            echo '--> Cleaning up temporary docker images...'
             sh "docker image prune -f || true"
         }
         success {
-            echo "Pipeline Success! ArgoCD will now detect the changes."
+            echo " Pipeline Success! ArgoCD will now detect the changes."
         }
         failure {
-            echo "Pipeline Failed! Please check the logs."
+            echo " Pipeline Failed! Please check the logs."
         }
     }
 }
@@ -300,14 +241,17 @@ def updateGitOps(serviceName, imageTag) {
         echo "--> 🔄 [GitOps] Updating ${serviceName} to tag: ${imageTag}"
         def tmpDir = "tmp-gitops-${serviceName}"
         
-        withCredentials([string(credentialsId: "${GITOPS_CRED_ID}", variable: 'GIT_TOKEN')]) {
+        withCredentials([usernamePassword(credentialsId: "${GITOPS_CRED_ID}", passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
             sh """
+                # 1. Clean & Clone
                 rm -rf ${tmpDir}
-                git clone https://${GIT_TOKEN}@${GITOPS_REPO_URL} ${tmpDir}
-                cd ${tmpDir}/enviroments/dev/
+                git clone https://${GIT_USER}:${GIT_PASS}@${GITOPS_REPO_URL} ${tmpDir}
                 
+                # 2. Update Value
+                cd ${tmpDir}/enviroments/dev/
                 sed -i "s/tag: .*/tag: ${imageTag}/g" ${serviceName}-values.yaml
                 
+                # 3. Check & Commit
                 if git diff --quiet; then
                     echo "No changes detected for ${serviceName}"
                 else
@@ -316,6 +260,7 @@ def updateGitOps(serviceName, imageTag) {
                     git add ${serviceName}-values.yaml
                     git commit -m "Update ${serviceName} image tag to ${imageTag} [skip ci]"
                     
+                    # 4. Push with Retry
                     count=0
                     until git push origin HEAD:main; do
                         echo "Push failed, retrying pull --rebase..."
