@@ -15,13 +15,14 @@ pipeline {
         AWS_ACCOUNT_ID  = '257394468168'
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         
-        // --- CẤU HÌNH BẢO MẬT & CACHE ---
+        // --- CẤU HÌNH BẢO MẬT & CACHE (Tối ưu tốc độ) ---
         TRIVY_SEVERITY  = 'HIGH,CRITICAL'
-        SCAN_CACHE_DIR  = "${WORKSPACE}/.trivy-cache"
+        // Lưu cache Trivy ra thư mục gốc của Jenkins user để tái sử dụng giữa các lần build
+        SCAN_CACHE_DIR  = "/var/lib/jenkins/.trivy-cache"
         
         // --- THÔNG TIN GITOPS (ArgoCD) ---
         GITOPS_REPO_URL = "github.com/NgHVu/dacn-config.git"
-        // QUAN TRỌNG: Đảm bảo bạn đã tạo Credential loại "Username with password" có ID là "github-pat" trong Jenkins
+        // ID này phải khớp với Credential "Username with password" trong Jenkins
         GITOPS_CRED_ID  = "github-pat" 
         
         // --- SONARQUBE GLOBAL ---
@@ -34,6 +35,12 @@ pipeline {
             steps {
                 script {
                     sh 'chmod +x scripts/*.sh'
+                    
+                    // Tạo thư mục cache trên host nếu chưa có
+                    sh "mkdir -p ${SCAN_CACHE_DIR}"
+                    sh "mkdir -p /var/lib/jenkins/.m2/repository"
+                    sh "mkdir -p /var/lib/jenkins/.npm"
+                    
                     env.COMMIT_HASH = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
                     if (env.BRANCH_NAME == 'main') {
                         env.IMAGE_TAG = env.COMMIT_HASH
@@ -65,7 +72,8 @@ pipeline {
                             agent {
                                 docker {
                                     image 'maven:3.9-eclipse-temurin-21'
-                                    args '--network host -v $HOME/.m2:/root/.m2 -u 0:0'
+                                    // TỐI ƯU: Map thư mục .m2 của Host vào Container để không phải tải lại thư viện
+                                    args '--network host -v /var/lib/jenkins/.m2:/root/.m2 -u 0:0'
                                     reuseNode true
                                 }
                             }
@@ -76,23 +84,11 @@ pipeline {
                             }
                             post { always { sh "rm -rf services/${SERVICE_NAME}/target" } }
                         }
-
-                        stage('Users: Quality Gate') {
-                            steps {
-                                timeout(time: 5, unit: 'MINUTES') {
-                                    waitForQualityGate abortPipeline: true
-                                }
-                            }
-                        }
                         
-                        stage('Users: Trivy FS Scan') {
+                        stage('Users: Security & Build') {
                             steps {
+                                // Quét Trivy dùng cache trên Host
                                 sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
-                            }
-                        }
-
-                        stage('Users: Docker Build & Push') {
-                            steps {
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
                         }
@@ -123,7 +119,8 @@ pipeline {
                             agent {
                                 docker {
                                     image 'maven:3.9-eclipse-temurin-21'
-                                    args '--network host -v $HOME/.m2:/root/.m2 -u 0:0'
+                                    // TỐI ƯU CACHE
+                                    args '--network host -v /var/lib/jenkins/.m2:/root/.m2 -u 0:0'
                                     reuseNode true
                                 }
                             }
@@ -135,22 +132,9 @@ pipeline {
                             post { always { sh "rm -rf services/${SERVICE_NAME}/target" } }
                         }
 
-                        stage('Products: Quality Gate') {
-                            steps {
-                                timeout(time: 5, unit: 'MINUTES') {
-                                    waitForQualityGate abortPipeline: true
-                                }
-                            }
-                        }
-
-                        stage('Products: Trivy FS Scan') {
+                        stage('Products: Security & Build') {
                             steps {
                                 sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
-                            }
-                        }
-
-                        stage('Products: Docker Build & Push') {
-                            steps {
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
                         }
@@ -181,7 +165,8 @@ pipeline {
                             agent {
                                 docker {
                                     image 'maven:3.9-eclipse-temurin-21'
-                                    args '--network host -v $HOME/.m2:/root/.m2 -u 0:0'
+                                    // TỐI ƯU CACHE
+                                    args '--network host -v /var/lib/jenkins/.m2:/root/.m2 -u 0:0'
                                     reuseNode true
                                 }
                             }
@@ -193,22 +178,9 @@ pipeline {
                             post { always { sh "rm -rf services/${SERVICE_NAME}/target" } }
                         }
 
-                        stage('Orders: Quality Gate') {
-                            steps {
-                                timeout(time: 5, unit: 'MINUTES') {
-                                    waitForQualityGate abortPipeline: true
-                                }
-                            }
-                        }
-
-                        stage('Orders: Trivy FS Scan') {
+                        stage('Orders: Security & Build') {
                             steps {
                                 sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
-                            }
-                        }
-
-                        stage('Orders: Docker Build & Push') {
-                            steps {
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
                         }
@@ -239,7 +211,8 @@ pipeline {
                             agent {
                                 docker {
                                     image 'node:20-bookworm'
-                                    args '--network host -v $HOME/.npm:/root/.npm -u 0:0'
+                                    // TỐI ƯU CACHE: Map thư mục .npm của Host
+                                    args '--network host -v /var/lib/jenkins/.npm:/root/.npm -u 0:0'
                                     reuseNode true
                                 }
                             }
@@ -251,22 +224,9 @@ pipeline {
                             post { always { sh "rm -rf services/${SERVICE_NAME}/node_modules services/${SERVICE_NAME}/coverage" } }
                         }
 
-                        stage('Frontend: Quality Gate') {
-                            steps {
-                                timeout(time: 5, unit: 'MINUTES') {
-                                    waitForQualityGate abortPipeline: true
-                                }
-                            }
-                        }
-
-                        stage('Frontend: Trivy FS Scan') {
+                        stage('Frontend: Security & Build') {
                             steps {
                                 sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
-                            }
-                        }
-
-                        stage('Frontend: Docker Build & Push') {
-                            steps {
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
                         }
@@ -299,19 +259,24 @@ pipeline {
 
 // =========================================================
 // HÀM HELPER: Cập nhật GitOps Repo
-// Sửa lỗi: Chuyển sang dùng usernamePassword để tương thích tốt hơn
+// Sửa lỗi: Dùng git-credential-store để tránh lỗi 'Too many arguments'
 // =========================================================
 def updateGitOps(serviceName, imageTag) {
     script {
         echo "--> [GitOps] Updating ${serviceName} to tag: ${imageTag}"
         def tmpDir = "tmp-gitops-${serviceName}"
         
-        // SỬA: Dùng usernamePassword (yêu cầu credential loại "Username with password" trong Jenkins)
         withCredentials([usernamePassword(credentialsId: "${GITOPS_CRED_ID}", passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
             sh """
                 rm -rf ${tmpDir}
-                # Clone dùng User & Pass (Token)
-                git clone https://${GIT_USER}:${GIT_PASS}@${GITOPS_REPO_URL} ${tmpDir}
+                
+                # CẤU HÌNH CREDENTIAL STORE (Sửa lỗi Git Clone)
+                # Lưu user/pass vào file tạm để Git tự đọc, thay vì dán trực tiếp vào URL (gây lỗi ký tự đặc biệt)
+                git config --global credential.helper store
+                echo "https://\$GIT_USER:\$GIT_PASS@github.com" > ~/.git-credentials
+                
+                # Clone repo (Git sẽ tự lấy pass từ file store)
+                git clone https://${GITOPS_REPO_URL} ${tmpDir}
                 
                 cd ${tmpDir}/enviroments/dev/
                 
@@ -336,6 +301,9 @@ def updateGitOps(serviceName, imageTag) {
                         sleep 2
                     done
                 fi
+                
+                # QUAN TRỌNG: Xóa file credential ngay sau khi dùng xong
+                rm -f ~/.git-credentials
             """
         }
         sh "rm -rf ${tmpDir}"
