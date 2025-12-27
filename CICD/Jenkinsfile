@@ -10,25 +10,16 @@ pipeline {
     }
 
     environment {
-        // --- THÔNG TIN CHUNG DỰ ÁN ---
         AWS_REGION      = 'ap-southeast-1'
         AWS_ACCOUNT_ID  = '257394468168'
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-        
-        // --- CẤU HÌNH BẢO MẬT & CACHE ---
         TRIVY_SEVERITY  = 'HIGH,CRITICAL'
         SCAN_CACHE_DIR  = "${WORKSPACE}/.trivy-cache"
-        
-        // --- THÔNG TIN GITOPS (ArgoCD) ---
         GITOPS_REPO_URL = "github.com/NgHVu/dacn-config.git"
-        GITOPS_CRED_ID  = "github-pat" // Credential loại Secret Text chứa Github Token
+        GITOPS_CRED_ID  = "github-pat"
         
-        // --- SONARQUBE GLOBAL ---
-        // Inject Token để script shell dùng được
+        // SonarQube Vars (Dùng cho script shell fallback nếu cần)
         SONAR_AUTH_TOKEN = credentials('sonar-token')
-        
-        // Dùng localhost vì Agent chạy với '--network host', nó sẽ nhìn thấy SonarQube ngay trên máy Local
-        // Không dùng IP Public để tránh lỗi khi IP thay đổi
         SONAR_HOST_URL   = 'http://localhost:9000'
     }
 
@@ -37,18 +28,14 @@ pipeline {
             steps {
                 script {
                     sh 'chmod +x scripts/*.sh'
-                    
-                    // Tính toán Tag
                     env.COMMIT_HASH = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
                     if (env.BRANCH_NAME == 'main') {
                         env.IMAGE_TAG = env.COMMIT_HASH
                     } else {
                         env.IMAGE_TAG = "${env.BRANCH_NAME}-${env.COMMIT_HASH}"
                     }
-                    
-                    echo "--> 🚀 STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
+                    echo "-->STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
                 }
-                // Đăng nhập ECR
                 sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
             }
         }
@@ -72,21 +59,39 @@ pipeline {
                             agent {
                                 docker {
                                     image 'maven:3.9-eclipse-temurin-21'
-                                    // Quan trọng: --network host giúp container gọi được localhost:9000
                                     args '--network host -v $HOME/.m2:/root/.m2 -u 0:0'
                                     reuseNode true
                                 }
                             }
                             steps {
-                                sh "./scripts/analyze-backend.sh ${SERVICE_NAME}"
+                                // Bọc trong withSonarQubeEnv để Jenkins nhận diện task
+                                withSonarQubeEnv('sonarqube-local') {
+                                    sh "./scripts/analyze-backend.sh ${SERVICE_NAME}"
+                                }
+                            }
+                            post { always { sh "rm -rf services/${SERVICE_NAME}/target" } }
+                        }
+
+                        stage('Users: Quality Gate') {
+                            steps {
+                                timeout(time: 5, unit: 'MINUTES') {
+                                    waitForQualityGate abortPipeline: true
+                                }
                             }
                         }
-                        stage('Users: Security & Build') {
+                        
+                        stage('Users: Trivy FS Scan') {
                             steps {
-                                sh "./scripts/security-scan.sh services/${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
+                                sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
+                            }
+                        }
+
+                        stage('Users: Docker Build & Push') {
+                            steps {
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
                         }
+
                         stage('Users: Update GitOps') {
                             when { branch 'main' }
                             steps {
@@ -118,15 +123,33 @@ pipeline {
                                 }
                             }
                             steps {
-                                sh "./scripts/analyze-backend.sh ${SERVICE_NAME}"
+                                withSonarQubeEnv('sonarqube-local') {
+                                    sh "./scripts/analyze-backend.sh ${SERVICE_NAME}"
+                                }
+                            }
+                            post { always { sh "rm -rf services/${SERVICE_NAME}/target" } }
+                        }
+
+                        stage('Products: Quality Gate') {
+                            steps {
+                                timeout(time: 5, unit: 'MINUTES') {
+                                    waitForQualityGate abortPipeline: true
+                                }
                             }
                         }
-                        stage('Products: Security & Build') {
+
+                        stage('Products: Trivy FS Scan') {
                             steps {
-                                sh "./scripts/security-scan.sh services/${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
+                                sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
+                            }
+                        }
+
+                        stage('Products: Docker Build & Push') {
+                            steps {
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
                         }
+
                         stage('Products: Update GitOps') {
                             when { branch 'main' }
                             steps {
@@ -158,15 +181,33 @@ pipeline {
                                 }
                             }
                             steps {
-                                sh "./scripts/analyze-backend.sh ${SERVICE_NAME}"
+                                withSonarQubeEnv('sonarqube-local') {
+                                    sh "./scripts/analyze-backend.sh ${SERVICE_NAME}"
+                                }
+                            }
+                            post { always { sh "rm -rf services/${SERVICE_NAME}/target" } }
+                        }
+
+                        stage('Orders: Quality Gate') {
+                            steps {
+                                timeout(time: 5, unit: 'MINUTES') {
+                                    waitForQualityGate abortPipeline: true
+                                }
                             }
                         }
-                        stage('Orders: Security & Build') {
+
+                        stage('Orders: Trivy FS Scan') {
                             steps {
-                                sh "./scripts/security-scan.sh services/${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
+                                sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
+                            }
+                        }
+
+                        stage('Orders: Docker Build & Push') {
+                            steps {
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
                         }
+
                         stage('Orders: Update GitOps') {
                             when { branch 'main' }
                             steps {
@@ -198,15 +239,33 @@ pipeline {
                                 }
                             }
                             steps {
-                                sh "./scripts/analyze-frontend.sh"
+                                withSonarQubeEnv('sonarqube-local') {
+                                    sh "./scripts/analyze-frontend.sh"
+                                }
+                            }
+                            post { always { sh "rm -rf services/${SERVICE_NAME}/node_modules services/${SERVICE_NAME}/coverage" } }
+                        }
+
+                        stage('Frontend: Quality Gate') {
+                            steps {
+                                timeout(time: 5, unit: 'MINUTES') {
+                                    waitForQualityGate abortPipeline: true
+                                }
                             }
                         }
-                        stage('Frontend: Security & Build') {
+
+                        stage('Frontend: Trivy FS Scan') {
                             steps {
-                                sh "./scripts/security-scan.sh services/${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
+                                sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
+                            }
+                        }
+
+                        stage('Frontend: Docker Build & Push') {
+                            steps {
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
                         }
+
                         stage('Frontend: Update GitOps') {
                             when { branch 'main' }
                             steps {
@@ -221,14 +280,14 @@ pipeline {
 
     post {
         always {
-            echo '--> 🧹 Cleaning up temporary docker images...'
+            echo '-->Cleaning up temporary docker images...'
             sh "docker image prune -f || true"
         }
         success {
-            echo "✅ Pipeline Success! ArgoCD will now detect the changes."
+            echo "Pipeline Success! ArgoCD will now detect the changes."
         }
         failure {
-            echo "❌ Pipeline Failed! Please check the logs."
+            echo "Pipeline Failed! Please check the logs."
         }
     }
 }
@@ -241,16 +300,12 @@ def updateGitOps(serviceName, imageTag) {
         echo "--> 🔄 [GitOps] Updating ${serviceName} to tag: ${imageTag}"
         def tmpDir = "tmp-gitops-${serviceName}"
         
-        // Sửa: Dùng string credential cho Secret Text
         withCredentials([string(credentialsId: "${GITOPS_CRED_ID}", variable: 'GIT_TOKEN')]) {
             sh """
                 rm -rf ${tmpDir}
-                # Authenticate bằng Token
                 git clone https://${GIT_TOKEN}@${GITOPS_REPO_URL} ${tmpDir}
-                
                 cd ${tmpDir}/enviroments/dev/
                 
-                # Cập nhật Tag
                 sed -i "s/tag: .*/tag: ${imageTag}/g" ${serviceName}-values.yaml
                 
                 if git diff --quiet; then
@@ -261,7 +316,6 @@ def updateGitOps(serviceName, imageTag) {
                     git add ${serviceName}-values.yaml
                     git commit -m "Update ${serviceName} image tag to ${imageTag} [skip ci]"
                     
-                    # Retry Push
                     count=0
                     until git push origin HEAD:main; do
                         echo "Push failed, retrying pull --rebase..."
