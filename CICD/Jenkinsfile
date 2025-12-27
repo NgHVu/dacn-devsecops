@@ -15,14 +15,12 @@ pipeline {
         AWS_ACCOUNT_ID  = '257394468168'
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         
-        // --- CẤU HÌNH BẢO MẬT & CACHE (Tối ưu tốc độ) ---
+        // --- CẤU HÌNH BẢO MẬT & CACHE ---
         TRIVY_SEVERITY  = 'HIGH,CRITICAL'
-        // Lưu cache Trivy ra thư mục gốc của Jenkins user để tái sử dụng giữa các lần build
         SCAN_CACHE_DIR  = "/var/lib/jenkins/.trivy-cache"
         
         // --- THÔNG TIN GITOPS (ArgoCD) ---
         GITOPS_REPO_URL = "github.com/NgHVu/dacn-config.git"
-        // ID này phải khớp với Credential "Username with password" trong Jenkins
         GITOPS_CRED_ID  = "github-pat" 
         
         // --- SONARQUBE GLOBAL ---
@@ -36,7 +34,7 @@ pipeline {
                 script {
                     sh 'chmod +x scripts/*.sh'
                     
-                    // Tạo thư mục cache trên host nếu chưa có
+                    // Tạo thư mục cache
                     sh "mkdir -p ${SCAN_CACHE_DIR}"
                     sh "mkdir -p /var/lib/jenkins/.m2/repository"
                     sh "mkdir -p /var/lib/jenkins/.npm"
@@ -61,9 +59,9 @@ pipeline {
                 stage('Users Service') {
                     when {
                         anyOf {
-                            triggeredBy 'UserIdCause'
-                            triggeredBy 'BranchIndexingCause'
-                            changeset "services/users/**"
+                            triggeredBy 'UserIdCause' // Chạy khi bấm nút Build (thủ công)
+                            expression { return currentBuild.previousBuild == null } // Chạy nếu là lần build đầu tiên của branch
+                            changeset "services/users/**" // Chạy nếu code thư mục này thay đổi
                         }
                     }
                     environment { SERVICE_NAME = 'users' }
@@ -72,7 +70,6 @@ pipeline {
                             agent {
                                 docker {
                                     image 'maven:3.9-eclipse-temurin-21'
-                                    // TỐI ƯU: Map thư mục .m2 của Host vào Container để không phải tải lại thư viện
                                     args '--network host -v /var/lib/jenkins/.m2:/root/.m2 -u 0:0'
                                     reuseNode true
                                 }
@@ -87,7 +84,6 @@ pipeline {
                         
                         stage('Users: Security & Build') {
                             steps {
-                                // Quét Trivy dùng cache trên Host
                                 sh "./scripts/security-scan.sh ${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
                                 sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
                             }
@@ -109,7 +105,7 @@ pipeline {
                     when {
                         anyOf {
                             triggeredBy 'UserIdCause'
-                            triggeredBy 'BranchIndexingCause'
+                            expression { return currentBuild.previousBuild == null }
                             changeset "services/products/**"
                         }
                     }
@@ -119,7 +115,6 @@ pipeline {
                             agent {
                                 docker {
                                     image 'maven:3.9-eclipse-temurin-21'
-                                    // TỐI ƯU CACHE
                                     args '--network host -v /var/lib/jenkins/.m2:/root/.m2 -u 0:0'
                                     reuseNode true
                                 }
@@ -155,7 +150,7 @@ pipeline {
                     when {
                         anyOf {
                             triggeredBy 'UserIdCause'
-                            triggeredBy 'BranchIndexingCause'
+                            expression { return currentBuild.previousBuild == null }
                             changeset "services/orders/**"
                         }
                     }
@@ -165,7 +160,6 @@ pipeline {
                             agent {
                                 docker {
                                     image 'maven:3.9-eclipse-temurin-21'
-                                    // TỐI ƯU CACHE
                                     args '--network host -v /var/lib/jenkins/.m2:/root/.m2 -u 0:0'
                                     reuseNode true
                                 }
@@ -201,7 +195,7 @@ pipeline {
                     when {
                         anyOf {
                             triggeredBy 'UserIdCause'
-                            triggeredBy 'BranchIndexingCause'
+                            expression { return currentBuild.previousBuild == null }
                             changeset "services/frontend/**"
                         }
                     }
@@ -211,7 +205,6 @@ pipeline {
                             agent {
                                 docker {
                                     image 'node:20-bookworm'
-                                    // TỐI ƯU CACHE: Map thư mục .npm của Host
                                     args '--network host -v /var/lib/jenkins/.npm:/root/.npm -u 0:0'
                                     reuseNode true
                                 }
@@ -249,17 +242,16 @@ pipeline {
             sh "docker image prune -f || true"
         }
         success {
-            echo "Pipeline Success! ArgoCD will now detect the changes."
+            echo " Pipeline Success! ArgoCD will now detect the changes."
         }
         failure {
-            echo "Pipeline Failed! Please check the logs."
+            echo " Pipeline Failed! Please check the logs."
         }
     }
 }
 
 // =========================================================
 // HÀM HELPER: Cập nhật GitOps Repo
-// Cập nhật: Cô lập môi trường HOME để tránh Race Condition khi chạy song song
 // =========================================================
 def updateGitOps(serviceName, imageTag) {
     script {
@@ -268,23 +260,19 @@ def updateGitOps(serviceName, imageTag) {
         
         withCredentials([usernamePassword(credentialsId: "${GITOPS_CRED_ID}", passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
             sh """
-                # TẠO MÔI TRƯỜNG CÔ LẬP (Isolation)
-                # Mỗi service sẽ có một thư mục HOME riêng để chứa file .git-credentials
+                # MÔI TRƯỜNG CÔ LẬP
                 mkdir -p ${tmpDir}_home
                 export HOME=\$(pwd)/${tmpDir}_home
                 
                 rm -rf ${tmpDir}
                 
-                # Cấu hình Credential cho HOME riêng biệt này
                 git config --global credential.helper store
                 echo "https://\$GIT_USER:\$GIT_PASS@github.com" > ~/.git-credentials
                 
-                # Clone
                 git clone https://${GITOPS_REPO_URL} ${tmpDir}
                 
                 cd ${tmpDir}/enviroments/dev/
                 
-                # Cập nhật Tag
                 sed -i "s/tag: .*/tag: ${imageTag}/g" ${serviceName}-values.yaml
                 
                 if git diff --quiet; then
@@ -295,18 +283,16 @@ def updateGitOps(serviceName, imageTag) {
                     git add ${serviceName}-values.yaml
                     git commit -m "Update ${serviceName} image tag to ${imageTag} [skip ci]"
                     
-                    # Retry Push (Sửa cú pháp count++)
                     count=0
                     until git push origin HEAD:main; do
                         echo "Push failed, retrying pull --rebase..."
                         git pull --rebase origin main
-                        count=\$((count+1))  # Sửa cú pháp tại đây
+                        count=\$((count+1))
                         if [ \$count -ge 5 ]; then echo "Git push failed after 5 retries"; exit 1; fi
                         sleep 2
                     done
                 fi
                 
-                # Dọn dẹp thư mục tạm
                 cd ../../../
                 rm -rf ${tmpDir} ${tmpDir}_home
             """
