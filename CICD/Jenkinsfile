@@ -1,0 +1,258 @@
+pipeline {
+    agent any
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        disableConcurrentBuilds()
+        timeout(time: 60, unit: 'MINUTES')
+        timestamps()
+        ansiColor('xterm')
+    }
+
+    environment {
+        // --- THÔNG TIN CHUNG DỰ ÁN ---
+        AWS_REGION      = 'ap-southeast-1'
+        AWS_ACCOUNT_ID  = '257394468168'
+        ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        
+        // --- CẤU HÌNH BẢO MẬT & CACHE ---
+        TRIVY_SEVERITY  = 'HIGH,CRITICAL'
+        SCAN_CACHE_DIR  = "${WORKSPACE}/.trivy-cache"
+        
+        // --- THÔNG TIN GITOPS (ArgoCD) ---
+        GITOPS_REPO_URL = "github.com/NgHVu/dacn-config.git"
+        GITOPS_CRED_ID  = "github-pat"
+    }
+
+    stages {
+        stage('1. Initialize') {
+            steps {
+                script {
+                    // Cấp quyền thực thi cho toàn bộ script
+                    sh 'chmod +x scripts/*.sh'
+                    
+                    // Tính toán Tag cho Image (Commit Hash ngắn)
+                    env.COMMIT_HASH = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
+                    if (env.BRANCH_NAME == 'main') {
+                        env.IMAGE_TAG = env.COMMIT_HASH
+                    } else {
+                        env.IMAGE_TAG = "${env.BRANCH_NAME}-${env.COMMIT_HASH}"
+                    }
+                    
+                    echo "--> 🚀 STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
+                }
+                // Đăng nhập ECR một lần dùng chung cho tất cả
+                sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
+            }
+        }
+
+        stage('2. Build & Deploy Microservices') {
+            parallel {
+                // ==========================================
+                // SERVICE: USERS (Backend)
+                // ==========================================
+                stage('Users Service') {
+                    when { changeset "services/users/**" }
+                    environment { SERVICE_NAME = 'users' }
+                    stages {
+                        stage('Users: Code Analysis') {
+                            agent {
+                                docker {
+                                    image 'maven:3.9-eclipse-temurin-21'
+                                    args '--network host -v $HOME/.m2:/root/.m2 -u 0:0'
+                                    reuseNode true
+                                }
+                            }
+                            steps {
+                                withSonarQubeEnv('sonarqube-local') {
+                                    sh "./scripts/analyze-backend.sh ${SERVICE_NAME}"
+                                }
+                            }
+                        }
+                        stage('Users: Security & Build') {
+                            steps {
+                                // Quét bảo mật (Trivy FS)
+                                sh "./scripts/security-scan.sh services/${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
+                                
+                                // Build & Push Docker (Gọi script chung)
+                                sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
+                            }
+                        }
+                        stage('Users: Update GitOps') {
+                            when { branch 'main' }
+                            steps {
+                                updateGitOps("${SERVICE_NAME}", "${env.IMAGE_TAG}")
+                            }
+                        }
+                    }
+                }
+
+                // ==========================================
+                // SERVICE: PRODUCTS (Backend)
+                // ==========================================
+                stage('Products Service') {
+                    when { changeset "services/products/**" }
+                    environment { SERVICE_NAME = 'products' }
+                    stages {
+                        stage('Products: Code Analysis') {
+                            agent {
+                                docker {
+                                    image 'maven:3.9-eclipse-temurin-21'
+                                    args '--network host -v $HOME/.m2:/root/.m2 -u 0:0'
+                                    reuseNode true
+                                }
+                            }
+                            steps {
+                                withSonarQubeEnv('sonarqube-local') {
+                                    sh "./scripts/analyze-backend.sh ${SERVICE_NAME}"
+                                }
+                            }
+                        }
+                        stage('Products: Security & Build') {
+                            steps {
+                                sh "./scripts/security-scan.sh services/${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
+                                sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
+                            }
+                        }
+                        stage('Products: Update GitOps') {
+                            when { branch 'main' }
+                            steps {
+                                updateGitOps("${SERVICE_NAME}", "${env.IMAGE_TAG}")
+                            }
+                        }
+                    }
+                }
+
+                // ==========================================
+                // SERVICE: ORDERS (Backend)
+                // ==========================================
+                stage('Orders Service') {
+                    when { changeset "services/orders/**" }
+                    environment { SERVICE_NAME = 'orders' }
+                    stages {
+                        stage('Orders: Code Analysis') {
+                            agent {
+                                docker {
+                                    image 'maven:3.9-eclipse-temurin-21'
+                                    args '--network host -v $HOME/.m2:/root/.m2 -u 0:0'
+                                    reuseNode true
+                                }
+                            }
+                            steps {
+                                withSonarQubeEnv('sonarqube-local') {
+                                    sh "./scripts/analyze-backend.sh ${SERVICE_NAME}"
+                                }
+                            }
+                        }
+                        stage('Orders: Security & Build') {
+                            steps {
+                                sh "./scripts/security-scan.sh services/${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
+                                sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
+                            }
+                        }
+                        stage('Orders: Update GitOps') {
+                            when { branch 'main' }
+                            steps {
+                                updateGitOps("${SERVICE_NAME}", "${env.IMAGE_TAG}")
+                            }
+                        }
+                    }
+                }
+
+                // ==========================================
+                // SERVICE: FRONTEND
+                // ==========================================
+                stage('Frontend Service') {
+                    when { changeset "services/frontend/**" }
+                    environment { SERVICE_NAME = 'frontend' }
+                    stages {
+                        stage('Frontend: Code Analysis') {
+                            agent {
+                                docker {
+                                    image 'node:20-bookworm'
+                                    args '--network host -v $HOME/.npm:/root/.npm -u 0:0'
+                                    reuseNode true
+                                }
+                            }
+                            steps {
+                                withSonarQubeEnv('sonarqube-local') {
+                                    sh "./scripts/analyze-frontend.sh"
+                                }
+                            }
+                        }
+                        stage('Frontend: Security & Build') {
+                            steps {
+                                sh "./scripts/security-scan.sh services/${SERVICE_NAME} ${SCAN_CACHE_DIR} ${TRIVY_SEVERITY}"
+                                sh "./scripts/docker-build-push.sh ${SERVICE_NAME} ${ECR_REGISTRY}/foodhub-${SERVICE_NAME} ${env.IMAGE_TAG}"
+                            }
+                        }
+                        stage('Frontend: Update GitOps') {
+                            when { branch 'main' }
+                            steps {
+                                updateGitOps("${SERVICE_NAME}", "${env.IMAGE_TAG}")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo '--> 🧹 Cleaning up temporary docker images...'
+            // Dọn dẹp images sau khi build để tránh đầy ổ cứng
+            sh "docker image prune -f || true"
+        }
+        success {
+            echo "✅ Pipeline Success! ArgoCD will now detect the changes."
+        }
+        failure {
+            echo "❌ Pipeline Failed! Please check the logs."
+        }
+    }
+}
+
+// =========================================================
+// HÀM HELPER: Cập nhật GitOps Repo (Dùng chung cho các service)
+// =========================================================
+def updateGitOps(serviceName, imageTag) {
+    script {
+        echo "--> 🔄 [GitOps] Updating ${serviceName} to tag: ${imageTag}"
+        // Tạo tên thư mục tạm duy nhất để tránh xung đột khi chạy song song
+        def tmpDir = "tmp-gitops-${serviceName}"
+        
+        withCredentials([usernamePassword(credentialsId: "${GITOPS_CRED_ID}", passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
+            sh """
+                # 1. Clean & Clone
+                rm -rf ${tmpDir}
+                git clone https://${GIT_USER}:${GIT_PASS}@${GITOPS_REPO_URL} ${tmpDir}
+                
+                # 2. Update Value
+                cd ${tmpDir}/enviroments/dev/
+                sed -i "s/tag: .*/tag: ${imageTag}/g" ${serviceName}-values.yaml
+                
+                # 3. Check & Commit
+                if git diff --quiet; then
+                    echo "No changes detected for ${serviceName}"
+                else
+                    git config user.email "jenkins-bot@foodhub.com"
+                    git config user.name "FoodHub Jenkins Bot"
+                    git add ${serviceName}-values.yaml
+                    git commit -m "Update ${serviceName} image tag to ${imageTag} [skip ci]"
+                    
+                    # 4. Push (Retry để tránh race condition khi chạy song song)
+                    count=0
+                    until git push origin HEAD:main; do
+                        echo "Push failed, retrying pull --rebase..."
+                        git pull --rebase origin main
+                        ((count++))
+                        if [ \$count -ge 5 ]; then echo "Git push failed after 5 retries"; exit 1; fi
+                        sleep 2
+                    done
+                fi
+            """
+        }
+        sh "rm -rf ${tmpDir}"
+    }
+}

@@ -90,8 +90,8 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    const redirectUri = process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI;
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
 
     if (!clientId || !redirectUri) {
       console.error("Thiếu cấu hình Google Client ID hoặc Redirect URI");
