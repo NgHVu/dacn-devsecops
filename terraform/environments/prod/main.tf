@@ -122,3 +122,10 @@ resource "kubernetes_namespace" "foodhub_app" {
   }
   depends_on = [module.eks]
 }
+
+module "remote_backend" {
+  source = "../../modules/remote-backend"
+
+  project_name = var.project_name
+  environment  = local.environment
+}
