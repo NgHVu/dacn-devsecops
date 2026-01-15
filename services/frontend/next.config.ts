@@ -17,13 +17,20 @@ const nextConfig: NextConfig = {
   },
 
   async rewrites() {
-    // [FIX] Sử dụng tên Service nội bộ K8s làm giá trị mặc định (Fallback)
-    // Next.js Server Actions/SSR sẽ sử dụng các URL này để proxy request.
+    // [FIX QUAN TRỌNG] Cập nhật tên Service cho đúng với tên trong K8s (foodhub-dev-...)
     
-    // Nếu biến môi trường K8s được inject (Khuyến khích dùng trong Production)
-    const PRODUCTS_SERVICE_URL = process.env.PRODUCTS_SERVICE_URL || "http://products-service:8081";
-    const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL || "http://users-service:8082";
-    const ORDERS_SERVICE_URL = process.env.ORDERS_SERVICE_URL || "http://orders-service:8083";
+    // 1. Products Service (Port 8081)
+    const PRODUCTS_SERVICE_URL = process.env.PRODUCTS_SERVICE_URL || "http://foodhub-dev-products:8081";
+    
+    // 2. Users Service (Port 8082)
+    const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL || "http://foodhub-dev-users:8082";
+    
+    // 3. Orders Service (Port 8083)
+    const ORDERS_SERVICE_URL = process.env.ORDERS_SERVICE_URL || "http://foodhub-dev-orders:8083";
+
+    console.log("--> REWRITE RULES LOADED:");
+    console.log(`Products URL: ${PRODUCTS_SERVICE_URL}`);
+    console.log(`Users URL: ${USERS_SERVICE_URL}`);
 
     return [
       // --- USERS SERVICE ---
@@ -45,7 +52,6 @@ const nextConfig: NextConfig = {
         source: '/api/categories/:path*',
         destination: `${PRODUCTS_SERVICE_URL}/api/categories/:path*`,
       },
-      // [QUAN TRỌNG] Thêm đoạn này để map API Reviews sang Products Service
       {
         source: "/api/reviews/:path*",
         destination: `${PRODUCTS_SERVICE_URL}/api/reviews/:path*`,
