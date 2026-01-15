@@ -10,7 +10,7 @@ variable "project_name" {
 
 variable "environment" {
   type        = string
-  default     = "staging" 
+  default     = "staging"
   description = "Môi trường triển khai: dev, staging, prod"
 }
 
@@ -31,7 +31,7 @@ variable "db_password" {
 }
 
 variable "slack_webhook_url" {
-  type        = string
-  sensitive   = true
-  default     = "" 
+  type      = string
+  sensitive = true
+  default   = ""
 }

@@ -29,7 +29,7 @@ pipeline {
     }
 
     stages {
-        stage('1. Initialize') {
+        stage('1. Initialize & Detect Env') {
             steps {
                 script {
                     sh 'chmod +x scripts/*.sh'
@@ -39,14 +39,36 @@ pipeline {
                     sh "mkdir -p /var/lib/jenkins/.m2/repository"
                     sh "mkdir -p /var/lib/jenkins/.npm"
                     
+                    // --- [LOGIC MỚI] XÁC ĐỊNH MÔI TRƯỜNG DỰA TRÊN NHÁNH ---
+                    if (env.BRANCH_NAME == 'develop') {
+                        env.DEPLOY_ENV = 'dev'
+                        echo "--> Detected Environment: DEV"
+                    } 
+                    else if (env.BRANCH_NAME == 'staging') {
+                        env.DEPLOY_ENV = 'staging'
+                        echo "--> Detected Environment: STAGING"
+                    } 
+                    else if (env.BRANCH_NAME == 'main') {
+                        env.DEPLOY_ENV = 'prod'
+                        echo "--> Detected Environment: PRODUCTION"
+                    } 
+                    else {
+                        error "--> Branch ${env.BRANCH_NAME} is not configured for deployment. Skipping."
+                    }
+
+                    // Tạo Tag cho Docker Image
                     env.COMMIT_HASH = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
+                    
+                    // Prod dùng tag gọn, Dev/Staging dùng tag có tên nhánh để dễ debug
                     if (env.BRANCH_NAME == 'main') {
                         env.IMAGE_TAG = env.COMMIT_HASH
                     } else {
                         env.IMAGE_TAG = "${env.BRANCH_NAME}-${env.COMMIT_HASH}"
                     }
-                    echo "--> STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TAG: ${env.IMAGE_TAG}"
+                    
+                    echo "--> STARTING CI FOR BRANCH: ${env.BRANCH_NAME} | TARGET ENV: ${env.DEPLOY_ENV} | TAG: ${env.IMAGE_TAG}"
                 }
+                // Login ECR 1 lần dùng chung
                 sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
             }
         }
@@ -59,9 +81,9 @@ pipeline {
                 stage('Users Service') {
                     when {
                         anyOf {
-                            triggeredBy 'UserIdCause' // Chạy khi bấm nút Build (thủ công)
-                            expression { return currentBuild.previousBuild == null } // Chạy nếu là lần build đầu tiên của branch
-                            changeset "services/users/**" // Chạy nếu code thư mục này thay đổi
+                            triggeredBy 'UserIdCause'
+                            expression { return currentBuild.previousBuild == null }
+                            changeset "services/users/**"
                         }
                     }
                     environment { SERVICE_NAME = 'users' }
@@ -90,7 +112,8 @@ pipeline {
                         }
 
                         stage('Users: Update GitOps') {
-                            when { branch 'main' }
+                            // Chạy trên cả 3 nhánh deploy
+                            when { anyOf { branch 'main'; branch 'staging'; branch 'develop' } }
                             steps {
                                 updateGitOps("${SERVICE_NAME}", "${env.IMAGE_TAG}")
                             }
@@ -135,7 +158,7 @@ pipeline {
                         }
 
                         stage('Products: Update GitOps') {
-                            when { branch 'main' }
+                            when { anyOf { branch 'main'; branch 'staging'; branch 'develop' } }
                             steps {
                                 updateGitOps("${SERVICE_NAME}", "${env.IMAGE_TAG}")
                             }
@@ -180,7 +203,7 @@ pipeline {
                         }
 
                         stage('Orders: Update GitOps') {
-                            when { branch 'main' }
+                            when { anyOf { branch 'main'; branch 'staging'; branch 'develop' } }
                             steps {
                                 updateGitOps("${SERVICE_NAME}", "${env.IMAGE_TAG}")
                             }
@@ -225,7 +248,7 @@ pipeline {
                         }
 
                         stage('Frontend: Update GitOps') {
-                            when { branch 'main' }
+                            when { anyOf { branch 'main'; branch 'staging'; branch 'develop' } }
                             steps {
                                 updateGitOps("${SERVICE_NAME}", "${env.IMAGE_TAG}")
                             }
@@ -242,21 +265,21 @@ pipeline {
             sh "docker image prune -f || true"
         }
         success {
-            echo " Pipeline Success! ArgoCD will now detect the changes."
+            echo "Pipeline Success! Updated environment: ${env.DEPLOY_ENV}"
         }
         failure {
-            echo " Pipeline Failed! Please check the logs."
+            echo "Pipeline Failed! Please check the logs."
         }
     }
 }
 
 // =========================================================
-// HÀM HELPER: Cập nhật GitOps Repo
+// HÀM HELPER: Cập nhật GitOps Repo ĐA MÔI TRƯỜNG
 // =========================================================
 def updateGitOps(serviceName, imageTag) {
     script {
-        echo "--> [GitOps] Updating ${serviceName} to tag: ${imageTag}"
-        def tmpDir = "tmp-gitops-${serviceName}"
+        echo "--> [GitOps] Updating ${serviceName} in [${env.DEPLOY_ENV}] to tag: ${imageTag}"
+        def tmpDir = "tmp-gitops-${serviceName}-${env.DEPLOY_ENV}"
         
         withCredentials([usernamePassword(credentialsId: "${GITOPS_CRED_ID}", passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
             sh """
@@ -271,17 +294,25 @@ def updateGitOps(serviceName, imageTag) {
                 
                 git clone https://${GITOPS_REPO_URL} ${tmpDir}
                 
-                cd ${tmpDir}/environments/dev/
+                # CHUYỂN VÀO THƯ MỤC MÔI TRƯỜNG TƯƠNG ỨNG 
+                # Biến ${env.DEPLOY_ENV} sẽ là 'dev', 'staging', hoặc 'prod'
+                cd ${tmpDir}/environments/${env.DEPLOY_ENV}/
                 
+                # Kiểm tra xem file có tồn tại không để tránh lỗi
+                if [ ! -f ${serviceName}-values.yaml ]; then
+                    echo "ERROR: File ${serviceName}-values.yaml does not exist in environments/${env.DEPLOY_ENV}/"
+                    exit 1
+                fi
+
                 sed -i "s/tag: .*/tag: ${imageTag}/g" ${serviceName}-values.yaml
                 
                 if git diff --quiet; then
-                    echo "No changes detected for ${serviceName}"
+                    echo "No changes detected for ${serviceName} in ${env.DEPLOY_ENV}"
                 else
                     git config user.email "jenkins-bot@foodhub.com"
                     git config user.name "FoodHub Jenkins Bot"
                     git add ${serviceName}-values.yaml
-                    git commit -m "Update ${serviceName} image tag to ${imageTag} [skip ci]"
+                    git commit -m "Update ${serviceName} image tag to ${imageTag} in ${env.DEPLOY_ENV} [skip ci]"
                     
                     count=0
                     until git push origin HEAD:main; do

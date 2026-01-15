@@ -1,7 +1,7 @@
 terraform {
   required_providers {
-    aws = { source = "hashicorp/aws", version = "~> 5.0" }
-    helm = { source = "hashicorp/helm", version = "~> 2.12" }
+    aws        = { source = "hashicorp/aws", version = "~> 5.0" }
+    helm       = { source = "hashicorp/helm", version = "~> 2.12" }
     kubernetes = { source = "hashicorp/kubernetes", version = "~> 2.24" }
     # Tạm thời comment PostgreSQL provider để tránh lỗi kết nối từ local (giống Dev)
     # postgresql = { source = "cyrilgdn/postgresql", version = "1.22.0" }
@@ -19,12 +19,12 @@ locals {
 # --- 1. NETWORK (VPC Prod riêng biệt) ---
 module "network" {
   source = "../../modules/network"
-  
-  project_name         = var.project_name
-  environment          = local.environment
-  
+
+  project_name = var.project_name
+  environment  = local.environment
+
   # VPC CIDR khác Dev để tránh xung đột nếu sau này Peering
-  vpc_cidr             = "192.168.0.0/16" 
+  vpc_cidr             = "192.168.0.0/16"
   public_subnets_cidr  = ["192.168.1.0/24", "192.168.2.0/24"]
   private_subnets_cidr = ["192.168.3.0/24", "192.168.4.0/24"]
   availability_zones   = ["${var.aws_region}a", "${var.aws_region}b"]
@@ -47,16 +47,16 @@ module "database" {
   environment        = local.environment
   private_subnet_ids = module.network.private_subnet_ids
   rds_sg_id          = module.security.rds_sg_id
-  db_password        = var.db_password 
+  db_password        = var.db_password
 }
 
 # --- 4. EKS CLUSTER (Prod Cluster) ---
 module "eks" {
   source = "../../modules/eks"
 
-  project_name       = var.project_name
-  environment        = local.environment
-  
+  project_name = var.project_name
+  environment  = local.environment
+
   # Prod dùng NAT Gateway nên Node nằm ở Private Subnet là chuẩn bài
   public_subnet_ids  = module.network.public_subnet_ids
   private_subnet_ids = module.network.private_subnet_ids
@@ -110,9 +110,9 @@ module "rancher" {
 
   project_name = var.project_name
   environment  = local.environment
-  hostname     = "rancher-prod.localhost" 
-  
-  depends_on   = [module.eks]
+  hostname     = "rancher-prod.localhost"
+
+  depends_on = [module.eks]
 }
 
 # --- 8. APP NAMESPACES ---
