@@ -271,7 +271,7 @@ def updateGitOps(serviceName, imageTag) {
                 
                 git clone https://${GITOPS_REPO_URL} ${tmpDir}
                 
-                cd ${tmpDir}/enviroments/dev/
+                cd ${tmpDir}/environments/dev/
                 
                 sed -i "s/tag: .*/tag: ${imageTag}/g" ${serviceName}-values.yaml
                 

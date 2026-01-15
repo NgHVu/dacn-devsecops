@@ -8,9 +8,15 @@ variable "project_name" {
   default = "foodhub"
 }
 
+variable "environment" {
+  type        = string
+  default     = "dev"
+  description = "Môi trường triển khai: dev, staging, prod"
+}
+
 variable "instance_type" {
   type    = string
-  default = "t3.medium" # Jenkins + SonarQube cần tối thiểu 4GB RAM
+  default = "t3.medium"
 }
 
 variable "key_name" {
@@ -20,10 +26,22 @@ variable "key_name" {
 
 variable "ami_id" {
   type    = string
-  default = "ami-0672fd5b9210aa093" # Ubuntu 22.04 LTS ap-southeast-1
+  default = "ami-0672fd5b9210aa093"
 }
 
 variable "ecr_repos" {
   type    = set(string)
   default = ["foodhub-users", "foodhub-products", "foodhub-orders", "foodhub-frontend"]
+}
+
+variable "db_password" {
+  type        = string
+  sensitive   = true
+  description = "Mật khẩu cho RDS Database admin"
+}
+
+variable "slack_webhook_url" {
+  type      = string
+  sensitive = true
+  default   = "" # Sẽ nhập trong terraform.tfvars
 }
