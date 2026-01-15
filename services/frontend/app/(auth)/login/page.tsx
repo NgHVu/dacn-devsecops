@@ -90,8 +90,8 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+    const clientId = process.env.GOOGLE_CLIENT_ID || "210099132466-tld27udkcs4krtmuthp78281g0ibjfja.apps.googleusercontent.com";
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://a0a045358fd094087831676cf2c907ee-702165636.ap-southeast-1.elb.amazonaws.com/callback";
 
     if (!clientId || !redirectUri) {
       console.error("Thiếu cấu hình Google Client ID hoặc Redirect URI");
