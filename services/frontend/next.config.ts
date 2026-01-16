@@ -20,13 +20,13 @@ const nextConfig: NextConfig = {
     // [FIX QUAN TRỌNG] Cập nhật tên Service cho đúng với tên trong K8s (foodhub-dev-...)
     
     // 1. Products Service (Port 8081)
-    const PRODUCTS_SERVICE_URL = process.env.PRODUCTS_SERVICE_URL || "http://foodhub-dev-products:8081";
+    const PRODUCTS_SERVICE_URL = process.env.PRODUCTS_SERVICE_URL || "http://foodhub-prod-products:8081";
     
     // 2. Users Service (Port 8082)
-    const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL || "http://foodhub-dev-users:8082";
+    const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL || "http://foodhub-prod-users:8082";
     
     // 3. Orders Service (Port 8083)
-    const ORDERS_SERVICE_URL = process.env.ORDERS_SERVICE_URL || "http://foodhub-dev-orders:8083";
+    const ORDERS_SERVICE_URL = process.env.ORDERS_SERVICE_URL || "http://foodhub-prod-orders:8083";
 
     console.log("--> REWRITE RULES LOADED:");
     console.log(`Products URL: ${PRODUCTS_SERVICE_URL}`);
