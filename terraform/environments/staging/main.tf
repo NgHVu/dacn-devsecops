@@ -1,10 +1,8 @@
 terraform {
   required_providers {
-    aws = { source = "hashicorp/aws", version = "~> 5.0" }
-    helm = { source = "hashicorp/helm", version = "~> 2.12" }
+    aws        = { source = "hashicorp/aws", version = "~> 5.0" }
+    helm       = { source = "hashicorp/helm", version = "~> 2.12" }
     kubernetes = { source = "hashicorp/kubernetes", version = "~> 2.24" }
-    # Tạm thời comment PostgreSQL để tránh lỗi kết nối từ local
-    # postgresql = { source = "cyrilgdn/postgresql", version = "1.22.0" }
   }
 }
 
@@ -16,14 +14,14 @@ locals {
   environment = var.environment
 }
 
-# --- 1. NETWORK (VPC Staging riêng biệt) ---
+# --- 1. NETWORK (VPC Staging: 172.16.x.x) ---
 module "network" {
   source = "../../modules/network"
   
   project_name         = var.project_name
   environment          = local.environment
   
-  # Dùng dải IP khác Dev và Prod để dễ quản lý
+  # Dùng dải IP riêng biệt
   vpc_cidr             = "172.16.0.0/16" 
   public_subnets_cidr  = ["172.16.1.0/24", "172.16.2.0/24"]
   private_subnets_cidr = ["172.16.3.0/24", "172.16.4.0/24"]
@@ -37,6 +35,7 @@ module "security" {
   project_name = var.project_name
   environment  = local.environment
   vpc_id       = module.network.vpc_id
+  vpc_cidr     = "172.16.0.0/16" # QUAN TRỌNG: Để mở port 5432 nội bộ Staging
 }
 
 # --- 3. DATABASE (RDS Staging) ---
@@ -50,19 +49,65 @@ module "database" {
   db_password        = var.db_password 
 }
 
-# --- 4. EKS CLUSTER (Staging Cluster) ---
+# --- 4. BASTION HOST (Staging) ---
+# Nên có Bastion ở Staging để test quy trình kết nối DB giống hệt Prod
+
+# 4.1. Security Group Bastion
+resource "aws_security_group" "bastion_sg" {
+  name        = "${var.project_name}-${var.environment}-bastion-sg"
+  description = "Allow SSH to Bastion Staging"
+  vpc_id      = module.network.vpc_id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] 
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  tags = { Name = "${var.project_name}-${var.environment}-bastion-sg" }
+}
+
+# 4.2. Instance Bastion
+resource "aws_instance" "bastion" {
+  ami                         = "ami-047126e50991d067b" # Ubuntu 22.04 LTS
+  instance_type               = "t3.micro"
+  subnet_id                   = module.network.public_subnet_ids[0]
+  vpc_security_group_ids      = [aws_security_group.bastion_sg.id]
+  key_name                    = var.key_name
+  associate_public_ip_address = true
+
+  tags = { Name = "${var.project_name}-${var.environment}-bastion" }
+}
+
+# 4.3. Rule: Bastion -> RDS
+resource "aws_security_group_rule" "allow_bastion_to_rds" {
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = module.security.rds_sg_id
+  source_security_group_id = aws_security_group.bastion_sg.id
+}
+
+# --- 5. EKS CLUSTER (Staging Cluster) ---
 module "eks" {
   source = "../../modules/eks"
 
   project_name       = var.project_name
   environment        = local.environment
-  
-  # Node nằm Private Subnet (Vì đã có NAT Gateway trong module network)
   public_subnet_ids  = module.network.public_subnet_ids
   private_subnet_ids = module.network.private_subnet_ids
 }
 
-# --- CONFIG PROVIDER K8S & HELM ---
+# --- CONFIG PROVIDER ---
 provider "kubernetes" {
   host                   = module.eks.cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
@@ -85,7 +130,7 @@ provider "helm" {
   }
 }
 
-# --- 5. MONITORING (Prometheus/Grafana riêng cho Staging) ---
+# --- 6. MONITORING ---
 module "monitoring" {
   source = "../../modules/monitoring"
 
@@ -95,7 +140,7 @@ module "monitoring" {
   slack_webhook_url = var.slack_webhook_url
 }
 
-# --- 6. ARGOCD & ARGO ROLLOUTS ---
+# --- 7. ARGOCD ---
 module "argocd" {
   source = "../../modules/argocd"
 
@@ -104,21 +149,26 @@ module "argocd" {
   depends_on   = [module.eks]
 }
 
-# --- 7. RANCHER ---
+# --- 8. RANCHER ---
 module "rancher" {
   source = "../../modules/rancher"
 
   project_name = var.project_name
   environment  = local.environment
-  hostname     = "rancher-staging.localhost" 
-  
+  hostname     = "rancher-staging.localhost"
   depends_on   = [module.eks]
 }
 
-# --- 8. APP NAMESPACES ---
+# --- 9. APP NAMESPACES ---
 resource "kubernetes_namespace" "foodhub_app" {
   metadata {
-    name = "${var.project_name}-${var.environment}" # foodhub-staging
+    name = "${var.project_name}-${var.environment}" 
   }
   depends_on = [module.eks]
+}
+
+module "remote_backend" {
+  source = "../../modules/remote-backend"
+  project_name = var.project_name
+  environment  = local.environment
 }
