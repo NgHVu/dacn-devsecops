@@ -1,13 +1,25 @@
 output "rds_endpoint" {
-  value = module.database.db_endpoint
+  description = "Endpoint RDS Staging"
+  value       = module.database.db_endpoint
 }
 
 output "eks_cluster_name" {
-  value = module.eks.cluster_name
+  description = "Tên Cluster Staging"
+  value       = module.eks.cluster_name
+}
+
+output "bastion_public_ip" {
+  description = "IP Bastion Staging"
+  value       = aws_instance.bastion.public_ip
+}
+
+output "cmd_ssh_bastion" {
+  description = "Lệnh SSH vào Bastion Staging"
+  value       = "ssh -i ${var.key_name}.pem ubuntu@${aws_instance.bastion.public_ip}"
 }
 
 output "cmd_update_kubeconfig" {
-  description = "Chạy lệnh này để kết nối kubectl vào cluster Staging"
+  description = "Lệnh kết nối kubectl vào cluster Staging"
   value       = "aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_name}"
 }
 

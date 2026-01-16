@@ -21,6 +21,7 @@ variable "instance_type" {
 
 variable "key_name" {
   type        = string
+  default     = "foodhub-key"
   description = "Tên Key Pair đã có trên AWS"
 }
 
@@ -31,7 +32,7 @@ variable "db_password" {
 }
 
 variable "slack_webhook_url" {
-  type        = string
-  sensitive   = true
-  default     = "" 
+  type      = string
+  sensitive = true
+  default   = "" 
 }

@@ -10,17 +10,18 @@ variable "project_name" {
 
 variable "environment" {
   type        = string
-  default     = "staging"
+  default     = "prod" # Đã sửa thành Prod
   description = "Môi trường triển khai: dev, staging, prod"
 }
 
 variable "instance_type" {
   type    = string
-  default = "t3.medium"
+  default = "t3.medium" # Instance cho EKS Node
 }
 
 variable "key_name" {
   type        = string
+  default     = "foodhub-key" # Đặt mặc định luôn cho tiện
   description = "Tên Key Pair đã có trên AWS"
 }
 

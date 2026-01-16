@@ -1,4 +1,6 @@
-# --- SG cho Jenkins (Nếu bạn host Jenkins trên EC2) ---
+# modules/security/main.tf
+
+# --- SG cho Jenkins ---
 resource "aws_security_group" "jenkins_sg" {
   name        = "${var.project_name}-${var.environment}-jenkins-sg"
   description = "Security Group for Jenkins"
@@ -9,7 +11,7 @@ resource "aws_security_group" "jenkins_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Nên thay bằng IP Public của bạn để bảo mật
+    cidr_blocks = ["0.0.0.0/0"] 
   }
 
   ingress {
@@ -38,21 +40,19 @@ resource "aws_security_group" "jenkins_sg" {
   tags = { Name = "${var.project_name}-${var.environment}-jenkins-sg" }
 }
 
-# --- SG cho RDS (Database) ---
-# Đây là cái quan trọng giúp Backend kết nối được DB
+# --- SG cho RDS ---
 resource "aws_security_group" "rds_sg" {
   name        = "${var.project_name}-${var.environment}-rds-sg"
   description = "Security Group for RDS"
   vpc_id      = var.vpc_id
 
-  # Cho phép EKS Node hoặc Jenkins truy cập vào Database (MySQL/Postgres)
-  # Tạm thời allow all trong VPC, sau này sẽ thắt chặt chỉ allow từ EKS SG
+  # Rule cơ bản: Cho phép truy cập từ nội bộ VPC (Dev/Prod tự động nhận theo var.vpc_cidr)
   ingress {
     description = "Database Access from VPC"
-    from_port   = 5432 # Hoặc 5432 nếu dùng Postgres
+    from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"] # CIDR của VPC
+    cidr_blocks = [var.vpc_cidr] 
   }
 
   tags = { Name = "${var.project_name}-${var.environment}-rds-sg" }
